@@ -1,0 +1,69 @@
+{
+  "name": "@antelopejs/api",
+  "version": "0.0.1",
+  "description": "A flexible API module that implements the API interfaces of antelopejs with HTTP and WebSocket support",
+  "keywords": [
+    "antelopejs",
+    "api",
+    "http",
+    "websocket",
+    "server"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AntelopeJS/api.git"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.6.5",
+  "scripts": {
+    "dev": "ajs project run -w -p playground",
+    "build": "tsc",
+    "prepack": "pnpm run build",
+    "release": "pnpm run lint && pnpm run test && pnpm run prepack && release-it",
+    "format": "prettier --write .",
+    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "test": "ajs module test ."
+  },
+  "antelopeJs": {
+    "exportsPath": "dist/interfaces",
+    "imports": [
+      "core@beta"
+    ],
+    "importsOptional": [],
+    "test": {
+      "project": "testproject.json",
+      "folder": "dist/test"
+    }
+  },
+  "dependencies": {
+    "reflect-metadata": "^0.2.2",
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "@types/chai": "^5.2.2",
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.25.0",
+    "@release-it/conventional-changelog": "^10.0.1",
+    "@types/express": "^5.0.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.14.1",
+    "@types/sinon": "^17.0.4",
+    "@types/ws": "^8.18.1",
+    "eslint": "^9.25.0",
+    "eslint-config-prettier": "^10.1.2",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-prettier": "^5.2.6",
+    "globals": "^16.0.0",
+    "prettier": "^3.5.3",
+    "release-it": "^19.0.2",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.30.1",
+    "chai": "^5.2.0",
+    "sinon": "^20.0.0"
+  }
+}
