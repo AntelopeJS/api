@@ -8,13 +8,19 @@
 
 A lightweight, flexible HTTP/WebSocket API module that implements the interface API of antelopejs.
 
-For detailed documentation on the API interface, please refer to the [docs](https://github.com/AntelopeJS/interface-api).
-
 ## Installation
 
 ```bash
 ajs project modules add @antelopejs/api
 ```
+
+## Interfaces
+
+This module implements the API interfaces who provide a HTTP framework with decorator controllers and middleware support. The interfaces are installed separately to maintain modularity and minimize dependencies.
+
+| Name          | Install command                         |                                                              |
+| ------------- | --------------------------------------- | ------------------------------------------------------------ |
+| API           | `ajs module imports add api`            | [Documentation](https://github.com/AntelopeJS/interface-api) |
 
 ## Overview
 
