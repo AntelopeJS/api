@@ -6,6 +6,7 @@ import stream from 'stream';
 import { ImplementInterface } from '@ajs/core/beta';
 import { requestListener, upgradeListener } from './server';
 import './middlewares/cors';
+import { Logging } from '@ajs/logging/beta';
 
 interface HTTPConfig extends http.ServerOptions {
   protocol: 'http';
@@ -74,7 +75,9 @@ export function start(): void {
         );
         break;
     }
-    return server.listen(config.port, config.host);
+    const server_listener = server.listen(config.port, config.host);
+    Logging.Info(`Server started, listening on ${config.protocol}://${config.host || 'localhost'}:${config.port}`);
+    return server_listener;
   });
 }
 

@@ -7,6 +7,7 @@ import {
 } from '@ajs/core/beta/decorators';
 import { IncomingMessage, ServerResponse } from 'http';
 import { PassThrough } from 'stream';
+import Logging from '@ajs/logging/beta';
 
 /**
  * @internal
@@ -513,8 +514,8 @@ let nextId = 0;
  */
 export function RegisterRoute(handler: RouteHandler) {
   const id = nextId++;
-  console.log(
-    `[Route Registered] ${handler.method.toUpperCase()} ${handler.location} (${handler.callback.name || 'anonymous'})`,
+  Logging.Debug(
+    `Registered ${handler.method.toUpperCase()} ${handler.location} (${handler.callback.name || 'anonymous'})`,
   );
   routesProxy.register(id.toString(), handler);
   routesList.push({ ...handler, id });
@@ -534,7 +535,6 @@ export function getRegisteredRoutes(): Array<{
   properties: Record<string, ComputedParameter>;
   priority?: HandlerPriority;
 }> {
-  console.log(routesList);
   return routesList.map((handler) => ({
     id: handler.id.toString(),
     location: handler.location,
