@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete } from '@ajs/api/beta';
+import { Controller, Get, Post, Put, Delete, JSONBody, Parameter, assert } from '@ajs/api/beta';
 
 export class PlaygroundController extends Controller('/playground') {
   @Get('/hello')
@@ -13,7 +13,7 @@ export class PlaygroundController extends Controller('/playground') {
   }
 
   @Put('/update')
-  async update(body: any) {
+  async update(@JSONBody() body: unknown) {
     console.log('update', body);
     return { updated: body };
   }
@@ -22,6 +22,13 @@ export class PlaygroundController extends Controller('/playground') {
   async remove() {
     console.log('remove');
     return { message: 'Deleted' };
+  }
+
+  @Get('/ping')
+  async ping(@Parameter('pong', 'query') pong: string) {
+    assert(pong === 'pong', 400, 'Pong must be pong');
+
+    return { message: 'Pong', pong };
   }
 }
 
