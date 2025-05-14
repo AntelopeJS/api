@@ -526,7 +526,7 @@ export declare const WebsocketHandler: (location?: string | undefined) => import
  * @param context Request context
  * @returns Body buffer
  */
-export declare function ReadBody(context: RequestContext): unknown;
+export declare function ReadBody(context: RequestContext): Promise<Buffer>;
 /**
  * Set the ParameterProvider on a Handler or Property.
  *
@@ -589,6 +589,24 @@ export declare function AddParameterModifier(target: any, key: PropertyKey, inde
  * ```
  */
 export declare const RawBody: () => import("@ajs/core/beta/decorators").PropertyDecorator & import("@ajs/core/beta/decorators").ParameterDecorator;
+/**
+ * Parameter Provider: JSON Request Body.
+ *
+ * Parses the HTTP request body as JSON and provides the resulting object.
+ * This is useful for handling JSON payloads in POST, PUT, and other methods
+ * that accept request bodies.
+ *
+ * Example:
+ * ```ts
+ * @Post()
+ * async createUser(@JSONBody body: { name: string; email: string }) {
+ *   // body is already parsed as a JavaScript object
+ *   const user = await saveUser(body);
+ *   return new HTTPResult(201, user);
+ * }
+ * ```
+ */
+export declare const JSONBody: () => import("@ajs/core/beta/decorators").PropertyDecorator & import("@ajs/core/beta/decorators").ParameterDecorator;
 /**
  * Parameter Provider: Request Parameter.
  *
@@ -756,3 +774,26 @@ export declare const Connection: () => import("@ajs/core/beta/decorators").Prope
  * ```
  */
 export declare const MultiParameter: (name: string, source?: "query" | "header" | undefined) => import("@ajs/core/beta/decorators").PropertyDecorator & import("@ajs/core/beta/decorators").ParameterDecorator;
+/**
+ * Assert a condition is truthy, throwing an HTTPResult error if false.
+ *
+ * This utility function can be used in API handlers to validate conditions
+ * and return appropriate HTTP error responses when validations fail.
+ *
+ * @param condition The condition to assert (truthy values pass, falsy values throw)
+ * @param code HTTP status code to use for the error response (e.g., 400, 404, 500)
+ * @param message Error message to include in the response body
+ * @throws {HTTPResult} Throws an HTTPResult with the specified code and message if condition is falsy
+ *
+ * Example:
+ * ```ts
+ * @Get('users/:id')
+ * async getUser(@Parameter('id') id: string) {
+ *   const user = await findUser(id);
+ *   assert(user, 404, "User not found");
+ *
+ *   return new HTTPResult(200, user);
+ * }
+ * ```
+ */
+export declare function assert<T>(condition: T, code: number, message: string): asserts condition;
