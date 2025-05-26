@@ -20,7 +20,7 @@
     "baseUrl": "src",
     "paths": {
       "@ajs.local/*": ["interfaces/*"],
-      "@ajs/api/*": ["../../.antelope/output/api/*"],
+      "@ajs/api/*": ["../../output/api/*"],
       "@ajs/core/*": ["../../.antelope/interfaces.d/core/*"],
       "@ajs/*": ["../.antelope/interfaces.d/*"]
     }
