@@ -43,7 +43,7 @@
     ],
     "importsOptional": [],
     "test": {
-      "project": "testproject.json",
+      "project": "src/test/antelope.test.json",
       "folder": "dist/test"
     }
   },
