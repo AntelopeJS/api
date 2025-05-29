@@ -42,6 +42,17 @@
       "logging@beta"
     ],
     "importsOptional": [],
+    "defaultConfig": {
+      "config": {
+        "servers": [
+          {
+            "protocol": "http",
+            "host": "localhost",
+            "port": 8080
+          }
+        ]
+      }
+    },
     "test": {
       "project": "src/test/antelope.test.json",
       "folder": "dist/test"
