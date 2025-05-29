@@ -36,9 +36,20 @@
     "exportsPath": "dist/interfaces",
     "imports": [
       "core@beta",
-	  "logging@beta"
+      "logging@beta"
     ],
     "importsOptional": [],
+    "defaultConfig": {
+      "config": {
+        "servers": [
+          {
+            "protocol": "http",
+            "host": "localhost",
+            "port": 8080
+          }
+        ]
+      }
+    },
     "test": {
       "project": "testproject.json",
       "folder": "dist/test"
