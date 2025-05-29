@@ -1,0 +1,30 @@
+{
+  "name": "playground",
+  "version": "1.0.0",
+  "description": "",
+  "author": "",
+  "modules": {
+    "playground": {
+      "source": {
+        "type": "local",
+        "path": ".",
+        "installCommand": "npx tsc"
+      }
+    },
+    "api": {
+      "source": {
+        "type": "local",
+        "path": "..",
+        "installCommand": ["npx tsc"]
+      },
+      "config": {
+        "servers": [
+          {
+            "protocol": "http",
+            "port": "5010"
+          }
+        ]
+      }
+    }
+  }
+}

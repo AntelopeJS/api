@@ -12,14 +12,21 @@
   },
   "antelopeJs": {
     "imports": [
-      "core@beta",
-      "api@beta"
+      {
+        "name": "core@beta",
+        "skipInstall": true
+      },
+      {
+        "name": "api@beta",
+        "skipInstall": true
+      }
     ],
     "baseUrl": "dist",
     "paths": {
       "@/*": [
         "*"
       ]
-    }
+    },
+    "importsOptional": []
   }
 }
