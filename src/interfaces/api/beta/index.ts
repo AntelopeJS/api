@@ -1125,31 +1125,3 @@ export const MultiParameter = MakeParameterAndPropertyDecorator(
     });
   },
 );
-
-/**
- * Assert a condition is truthy, throwing an HTTPResult error if false.
- *
- * This utility function can be used in API handlers to validate conditions
- * and return appropriate HTTP error responses when validations fail.
- *
- * @param condition The condition to assert (truthy values pass, falsy values throw)
- * @param code HTTP status code to use for the error response (e.g., 400, 404, 500)
- * @param message Error message to include in the response body
- * @throws {HTTPResult} Throws an HTTPResult with the specified code and message if condition is falsy
- *
- * Example:
- * ```ts
- * @Get('users/:id')
- * async getUser(@Parameter('id') id: string) {
- *   const user = await findUser(id);
- *   assert(user, 404, "User not found");
- *
- *   return new HTTPResult(200, user);
- * }
- * ```
- */
-export function assert<T>(condition: T, code: number, message: string): asserts condition {
-  if (!condition) {
-    throw new HTTPResult(code, message);
-  }
-}
