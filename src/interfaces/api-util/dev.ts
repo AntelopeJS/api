@@ -31,11 +31,11 @@ export function assert<T>(condition: T, code: number, message: string): asserts 
 /**
  * Executes the given validator function on a body, throwing an HTTPResult error if it fails.
  * The validator should return a validated object on success and throw on failure.
- * 
+ *
  * The error thrown by the validator may be altered by passing an error handler.
  * The result of this error handler will be passed directly as the body of the HTTPResult.
  * If no error handler is given, assertValidation will resort to calling the error's toString() method if possible.
- * 
+ *
  * @param body Input to validate
  * @param validator Validator function
  * @param errorFunc Error handler
@@ -43,7 +43,7 @@ export function assert<T>(condition: T, code: number, message: string): asserts 
  * @returns Validated body
  * @throws {HTTPResult} Throws an HTTPResult with the specified code and message on failure
  */
-function assertValidation<T>(
+export function assertValidation<T>(
   body: unknown,
   validator: (body: unknown) => T,
   errorFunc?: (err: any) => unknown,
