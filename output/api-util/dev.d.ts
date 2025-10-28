@@ -35,5 +35,14 @@ export declare function assert<T>(condition: T, code: number, message: string): 
  * @param code Error code on failure
  * @returns Validated body
  * @throws {HTTPResult} Throws an HTTPResult with the specified code and message on failure
+ *
+ * Example:
+ * ```ts
+ * import * as z from 'zod';
+ *
+ * const schema = z.object({ name: z.string() })
+ *
+ * const { name } = assertValidation(requestBody, schema.parse);
+ * ```
  */
 export declare function assertValidation<T>(body: unknown, validator: (body: unknown) => T, errorFunc?: (err: any) => unknown, code?: number): T;
