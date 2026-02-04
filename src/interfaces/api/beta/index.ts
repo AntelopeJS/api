@@ -904,6 +904,9 @@ export const RawBody = MakeParameterAndPropertyDecorator((target, key, param) =>
 export const JSONBody = MakeParameterAndPropertyDecorator((target, key, index) => {
   SetParameterProvider(target, key, index, (ctx: RequestContext) =>
     ReadBody(ctx).then((body: unknown) => {
+      if (!body || (body instanceof Buffer && body.length === 0)) {
+        return undefined;
+      }
       if (typeof body === 'string' || body instanceof Buffer) {
         return JSON.parse(body.toString());
       }
