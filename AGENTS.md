@@ -1,4 +1,4 @@
-# @antelopejs/redis
+# @antelopejs/api
 
 ## Code Conventions
 
