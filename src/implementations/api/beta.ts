@@ -2,33 +2,60 @@ import { computeParameter, RouteHandler, ControllerMeta } from '@ajs.local/api/b
 import { registerHandler, RequestContext, unregisterHandler } from '../../server';
 import { GetMetadata } from '@ajs/core/beta';
 
+type UnknownRecord = Record<string, unknown>;
+
+type ControllerConstructor = new () => UnknownRecord;
+
+interface ControllerMetadata {
+  computed_props: Record<string, unknown>;
+}
+
 const classCacheSymbol = Symbol();
 const registeredRoutes = new Map<string, RouteHandler>();
 
 interface RequestContextDev extends RequestContext {
-  [classCacheSymbol]?: Map<any, any>;
+  [classCacheSymbol]?: Map<object, UnknownRecord>;
 }
 
-export async function GetControllerInstance(cl: any, context: RequestContextDev) {
-  if (!(classCacheSymbol in context)) {
-    context[classCacheSymbol] = new Map();
-  }
-  if (context[classCacheSymbol]!.has(cl.prototype)) {
-    return context[classCacheSymbol]!.get(cl.prototype)!;
+function getControllerCache(context: RequestContextDev): Map<object, UnknownRecord> {
+  if (!context[classCacheSymbol]) {
+    context[classCacheSymbol] = new Map<object, UnknownRecord>();
   }
 
-  const obj = new cl();
-  const meta = GetMetadata(cl, ControllerMeta);
+  return context[classCacheSymbol];
+}
 
+async function applyComputedProperties(
+  controllerInstance: UnknownRecord,
+  controllerMetadata: ControllerMetadata,
+  context: RequestContextDev,
+): Promise<void> {
   await Promise.all(
-    Object.entries(meta.computed_props).map(async ([key, param]) => {
-      const val = await computeParameter(context, param, obj);
-      obj[key] = val;
+    Object.entries(controllerMetadata.computed_props).map(async ([propertyKey, parameter]) => {
+      const computedValue = await computeParameter(context, parameter, controllerInstance);
+      controllerInstance[propertyKey] = computedValue;
     }),
   );
+}
 
-  context[classCacheSymbol]!.set(cl.prototype, obj);
-  return obj;
+export async function GetControllerInstance(
+  controllerClass: ControllerConstructor,
+  context: RequestContextDev,
+): Promise<UnknownRecord> {
+  const controllerCache = getControllerCache(context);
+  const cachedController = controllerCache.get(controllerClass.prototype);
+
+  if (cachedController) {
+    return cachedController;
+  }
+
+  const controllerInstance = new controllerClass();
+  const controllerMetadata = GetMetadata(controllerClass, ControllerMeta) as ControllerMetadata;
+
+  await applyComputedProperties(controllerInstance, controllerMetadata, context);
+
+  controllerCache.set(controllerClass.prototype, controllerInstance);
+  return controllerInstance;
 }
 
 interface RouteInfo {
@@ -40,23 +67,28 @@ interface RouteInfo {
   callbackName: string;
 }
 
+async function invokeHandler(handler: RouteHandler, context: RequestContextDev): Promise<unknown> {
+  const controllerClass = handler.proto.constructor as ControllerConstructor;
+  const controllerInstance = await GetControllerInstance(controllerClass, context);
+  const resolvedParameters = await Promise.all(
+    handler.parameters.map((parameter) => computeParameter(context, parameter, controllerInstance)),
+  );
+  return handler.callback.apply(controllerInstance, resolvedParameters);
+}
+
 export const routesProxy = {
-  register: (id: string, handler: RouteHandler) => {
+  register: (id: string, handler: RouteHandler): void => {
     registeredRoutes.set(id, handler);
     registerHandler(
       'dev/' + id,
       handler.mode,
       handler.method,
       handler.location,
-      async (context: RequestContextDev) => {
-        const thisObj = await GetControllerInstance(handler.proto.constructor, context);
-        const params = await Promise.all(handler.parameters.map((param) => computeParameter(context, param, thisObj)));
-        return handler.callback.apply(thisObj, params);
-      },
+      async (context: RequestContextDev) => invokeHandler(handler, context),
       handler.priority,
     );
   },
-  unregister: (id: string) => {
+  unregister: (id: string): void => {
     registeredRoutes.delete(id);
     unregisterHandler('dev/' + id);
   },

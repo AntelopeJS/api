@@ -3,7 +3,7 @@ import { IncomingMessage, ServerResponse } from 'http';
 import stream from 'stream';
 import { WebSocket, WebSocketServer } from 'ws';
 
-export type RouteCallback = (context: RequestContext) => any;
+export type RouteCallback = (context: RequestContext) => unknown | Promise<unknown>;
 export interface IdentifiableRouteCallback {
   id: string;
   callback: RouteCallback;
@@ -16,13 +16,19 @@ export interface RequestContext {
   url: URL;
   routeParameters: Record<string, string>;
   response: HTTPResult;
-  connection?: unknown /* WebsocketConnection */;
+  connection?: unknown;
+}
+
+interface DynamicRoute {
+  match: RegExp;
+  sub: RouteLevel;
+  mapping: string[];
 }
 
 class RouteLevel {
   handlers: IdentifiableRouteCallback[] = [];
   staticRoutes: Record<string, RouteLevel> = {};
-  dynamicRoutes: Record<string, { match: RegExp; sub: RouteLevel; mapping: string[] }> = {};
+  dynamicRoutes: Record<string, DynamicRoute> = {};
 }
 
 const roots: Record<string, Record<string, RouteLevel>> = {
@@ -32,7 +38,14 @@ const roots: Record<string, Record<string, RouteLevel>> = {
   websocket: {},
 };
 
-type HandlerResult = { handler: RouteCallback; parameters: Record<string, string>; priority: HandlerPriority };
+interface HandlerResult {
+  handler: RouteCallback;
+  parameters: Record<string, string>;
+  priority: HandlerPriority;
+}
+
+type HandlerLookupResult = HandlerResult | HandlerResult[] | undefined;
+
 function findHandlers(
   path: string[],
   depth: number,
@@ -64,7 +77,11 @@ function findHandlers(
     if (res) {
       const newParameters = { ...parameters };
       for (let i = 0; i < mapping.length; ++i) {
-        newParameters[mapping[i]] = res[i + 1];
+        const parameterName = mapping[i];
+        const parameterValue = res[i + 1];
+        if (parameterName !== undefined && parameterValue !== undefined) {
+          newParameters[parameterName] = parameterValue;
+        }
       }
       findHandlers(path, depth + 1, sub, result, newParameters, multi);
       if (result.length > 0 && !multi) {
@@ -74,16 +91,14 @@ function findHandlers(
   }
 }
 
-function getHandler(method: string, path: string[], source: Record<string, RouteLevel>, multi = false) {
+function getHandler(method: string, path: string[], source: Record<string, RouteLevel>, multi = false): HandlerLookupResult {
   const result: Array<HandlerResult> = [];
-  // check source[method]
   if (method in source) {
     findHandlers(path, 0, source[method], result, {}, multi);
     if (result.length > 0 && !multi) {
       return result[0];
     }
   }
-  // if multi or not found: check source['any']
   if ('any' in source) {
     findHandlers(path, 0, source.any, result, {}, multi);
     if (result.length > 0 && !multi) {
@@ -218,6 +233,14 @@ function handleResult(isHeadRequest: boolean, response: HTTPResult, res: ServerR
   }
 }
 
+function resolveErrorBody(error: unknown): unknown {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return error;
+}
+
 export async function requestListener(req: IncomingMessage, res: ServerResponse, protocol: 'http' | 'https') {
   const url = new URL(req.url || '', `${protocol}://${req.headers.host || 'localhost'}`);
   const requestContext: RequestContext = {
@@ -286,10 +309,10 @@ export async function requestListener(req: IncomingMessage, res: ServerResponse,
     }
 
     handleResult(isHeadRequest, requestContext.response, res);
-  } catch (err: any) {
+  } catch (err: unknown) {
     handleResult(
       isHeadRequest,
-      HTTPResult.withHeaders(err.message || err, requestContext.response.getHeaders(), 500),
+      HTTPResult.withHeaders(resolveErrorBody(err), requestContext.response.getHeaders(), 500),
       res,
     );
   }
@@ -348,12 +371,7 @@ export async function upgradeListener(
       socket.destroy();
     }
   } catch (err: unknown) {
-    handleResult(false, HTTPResult.withHeaders(err, requestContext.response.getHeaders(), 500), res);
+    handleResult(false, HTTPResult.withHeaders(resolveErrorBody(err), requestContext.response.getHeaders(), 500), res);
     socket.destroy();
   }
 }
-
-// Websocket: mode 'websocket', set context.connection to ws connection
-//  https://www.npmjs.com/package/ws -> Multiple servers sharing a single HTTP/S server
-
-// SSE: https://github.com/andywer/http-event-stream/blob/HEAD/dist/index.d.ts
