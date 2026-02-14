@@ -3,7 +3,7 @@ import { IncomingMessage, ServerResponse } from 'http';
 import stream from 'stream';
 import { WebSocket, WebSocketServer } from 'ws';
 
-export type RouteCallback = (context: RequestContext) => unknown | Promise<unknown>;
+export type RouteCallback = (context: RequestContext) => unknown;
 export interface IdentifiableRouteCallback {
   id: string;
   callback: RouteCallback;
@@ -91,7 +91,12 @@ function findHandlers(
   }
 }
 
-function getHandler(method: string, path: string[], source: Record<string, RouteLevel>, multi = false): HandlerLookupResult {
+function getHandler(
+  method: string,
+  path: string[],
+  source: Record<string, RouteLevel>,
+  multi = false,
+): HandlerLookupResult {
   const result: Array<HandlerResult> = [];
   if (method in source) {
     findHandlers(path, 0, source[method], result, {}, multi);

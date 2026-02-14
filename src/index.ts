@@ -68,11 +68,14 @@ function createHTTPSServer(config: HTTPSConfig): net.Server {
 }
 
 function attachServerListeners(server: net.Server, protocol: ServerProtocol, socketProtocol: SocketProtocol): void {
-  server.on('request', (req: http.IncomingMessage, res: http.ServerResponse) =>
-    void requestListener(req, res, protocol),
+  server.on(
+    'request',
+    (req: http.IncomingMessage, res: http.ServerResponse) => void requestListener(req, res, protocol),
   );
-  server.on('upgrade', (req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) =>
-    void upgradeListener(req, socket, head, socketProtocol),
+  server.on(
+    'upgrade',
+    (req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) =>
+      void upgradeListener(req, socket, head, socketProtocol),
   );
 }
 

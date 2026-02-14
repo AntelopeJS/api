@@ -1,25 +1,28 @@
-import { computeParameter, RouteHandler, ControllerMeta } from '@ajs.local/api/beta';
+import { computeParameter, RouteHandler, ControllerMeta, ComputedParameter } from '@ajs.local/api/beta';
 import { registerHandler, RequestContext, unregisterHandler } from '../../server';
 import { GetMetadata } from '@ajs/core/beta';
+import { Class } from '@ajs/core/beta/decorators';
 
-type UnknownRecord = Record<string, unknown>;
+type UnknownRecord = Record<PropertyKey, unknown>;
 
-type ControllerConstructor = new () => UnknownRecord;
+type ControllerClass = Class<unknown> & {
+  location: string;
+};
 
 interface ControllerMetadata {
-  computed_props: Record<string, unknown>;
+  computed_props: Record<PropertyKey, ComputedParameter>;
 }
 
 const classCacheSymbol = Symbol();
 const registeredRoutes = new Map<string, RouteHandler>();
 
 interface RequestContextDev extends RequestContext {
-  [classCacheSymbol]?: Map<object, UnknownRecord>;
+  [classCacheSymbol]?: Map<object, unknown>;
 }
 
-function getControllerCache(context: RequestContextDev): Map<object, UnknownRecord> {
+function getControllerCache(context: RequestContextDev): Map<object, unknown> {
   if (!context[classCacheSymbol]) {
-    context[classCacheSymbol] = new Map<object, UnknownRecord>();
+    context[classCacheSymbol] = new Map<object, unknown>();
   }
 
   return context[classCacheSymbol];
@@ -39,22 +42,24 @@ async function applyComputedProperties(
 }
 
 export async function GetControllerInstance(
-  controllerClass: ControllerConstructor,
-  context: RequestContextDev,
-): Promise<UnknownRecord> {
-  const controllerCache = getControllerCache(context);
-  const cachedController = controllerCache.get(controllerClass.prototype);
+  controllerClass: Class<unknown>,
+  context: RequestContext,
+): Promise<unknown> {
+  const controllerCache = getControllerCache(context as RequestContextDev);
+  const cacheKey = controllerClass.prototype;
+  const cachedController = controllerCache.get(cacheKey) as UnknownRecord | undefined;
 
   if (cachedController) {
     return cachedController;
   }
 
-  const controllerInstance = new controllerClass();
-  const controllerMetadata = GetMetadata(controllerClass, ControllerMeta) as ControllerMetadata;
+  const typedControllerClass = controllerClass as ControllerClass;
+  const controllerInstance = new typedControllerClass() as UnknownRecord;
+  const controllerMetadata = GetMetadata(typedControllerClass, ControllerMeta) as ControllerMetadata;
 
-  await applyComputedProperties(controllerInstance, controllerMetadata, context);
+  await applyComputedProperties(controllerInstance, controllerMetadata, context as RequestContextDev);
 
-  controllerCache.set(controllerClass.prototype, controllerInstance);
+  controllerCache.set(cacheKey, controllerInstance);
   return controllerInstance;
 }
 
@@ -68,7 +73,7 @@ interface RouteInfo {
 }
 
 async function invokeHandler(handler: RouteHandler, context: RequestContextDev): Promise<unknown> {
-  const controllerClass = handler.proto.constructor as ControllerConstructor;
+  const controllerClass = handler.proto.constructor as ControllerClass;
   const controllerInstance = await GetControllerInstance(controllerClass, context);
   const resolvedParameters = await Promise.all(
     handler.parameters.map((parameter) => computeParameter(context, parameter, controllerInstance)),
