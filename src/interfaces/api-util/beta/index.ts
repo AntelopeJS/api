@@ -55,13 +55,13 @@ export function assert<T>(condition: T, code: number, message: string): asserts 
 export function assertValidation<T>(
   body: unknown,
   validator: (body: unknown) => T,
-  errorFunc?: (err: any) => unknown,
+  errorFunc?: (err: unknown) => unknown,
   code = 400,
 ): T {
   try {
     return validator(body);
-  } catch (e: any) {
-    const errObj = errorFunc ? errorFunc(e) : 'toString' in e ? e.toString() : String(e);
+  } catch (e: unknown) {
+    const errObj = errorFunc ? errorFunc(e) : String(e);
     throw new HTTPResult(code, errObj);
   }
 }

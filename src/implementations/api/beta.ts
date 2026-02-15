@@ -1,34 +1,66 @@
-import { computeParameter, RouteHandler, ControllerMeta } from '@ajs.local/api/beta';
+import { computeParameter, RouteHandler, ControllerMeta, ComputedParameter } from '@ajs.local/api/beta';
 import { registerHandler, RequestContext, unregisterHandler } from '../../server';
 import { GetMetadata } from '@ajs/core/beta';
+import { Class } from '@ajs/core/beta/decorators';
+
+type UnknownRecord = Record<PropertyKey, unknown>;
+
+type ControllerClass = Class<unknown> & {
+  location: string;
+};
+
+interface ControllerMetadata {
+  computed_props: Record<PropertyKey, ComputedParameter>;
+}
 
 const classCacheSymbol = Symbol();
 const registeredRoutes = new Map<string, RouteHandler>();
 
 interface RequestContextDev extends RequestContext {
-  [classCacheSymbol]?: Map<any, any>;
+  [classCacheSymbol]?: Map<object, unknown>;
 }
 
-export async function GetControllerInstance(cl: any, context: RequestContextDev) {
-  if (!(classCacheSymbol in context)) {
-    context[classCacheSymbol] = new Map();
-  }
-  if (context[classCacheSymbol]!.has(cl.prototype)) {
-    return context[classCacheSymbol]!.get(cl.prototype)!;
+function getControllerCache(context: RequestContextDev): Map<object, unknown> {
+  if (!context[classCacheSymbol]) {
+    context[classCacheSymbol] = new Map<object, unknown>();
   }
 
-  const obj = new cl();
-  const meta = GetMetadata(cl, ControllerMeta);
+  return context[classCacheSymbol];
+}
 
+async function applyComputedProperties(
+  controllerInstance: UnknownRecord,
+  controllerMetadata: ControllerMetadata,
+  context: RequestContextDev,
+): Promise<void> {
   await Promise.all(
-    Object.entries(meta.computed_props).map(async ([key, param]) => {
-      const val = await computeParameter(context, param, obj);
-      obj[key] = val;
+    Object.entries(controllerMetadata.computed_props).map(async ([propertyKey, parameter]) => {
+      const computedValue = await computeParameter(context, parameter, controllerInstance);
+      controllerInstance[propertyKey] = computedValue;
     }),
   );
+}
 
-  context[classCacheSymbol]!.set(cl.prototype, obj);
-  return obj;
+export async function GetControllerInstance(
+  controllerClass: Class<unknown>,
+  context: RequestContext,
+): Promise<unknown> {
+  const controllerCache = getControllerCache(context as RequestContextDev);
+  const cacheKey = controllerClass.prototype;
+  const cachedController = controllerCache.get(cacheKey) as UnknownRecord | undefined;
+
+  if (cachedController) {
+    return cachedController;
+  }
+
+  const typedControllerClass = controllerClass as ControllerClass;
+  const controllerInstance = new typedControllerClass() as UnknownRecord;
+  const controllerMetadata = GetMetadata(typedControllerClass, ControllerMeta) as ControllerMetadata;
+
+  await applyComputedProperties(controllerInstance, controllerMetadata, context as RequestContextDev);
+
+  controllerCache.set(cacheKey, controllerInstance);
+  return controllerInstance;
 }
 
 interface RouteInfo {
@@ -40,23 +72,28 @@ interface RouteInfo {
   callbackName: string;
 }
 
+async function invokeHandler(handler: RouteHandler, context: RequestContextDev): Promise<unknown> {
+  const controllerClass = handler.proto.constructor as ControllerClass;
+  const controllerInstance = await GetControllerInstance(controllerClass, context);
+  const resolvedParameters = await Promise.all(
+    handler.parameters.map((parameter) => computeParameter(context, parameter, controllerInstance)),
+  );
+  return handler.callback.apply(controllerInstance, resolvedParameters);
+}
+
 export const routesProxy = {
-  register: (id: string, handler: RouteHandler) => {
+  register: (id: string, handler: RouteHandler): void => {
     registeredRoutes.set(id, handler);
     registerHandler(
       'dev/' + id,
       handler.mode,
       handler.method,
       handler.location,
-      async (context: RequestContextDev) => {
-        const thisObj = await GetControllerInstance(handler.proto.constructor, context);
-        const params = await Promise.all(handler.parameters.map((param) => computeParameter(context, param, thisObj)));
-        return handler.callback.apply(thisObj, params);
-      },
+      async (context: RequestContextDev) => invokeHandler(handler, context),
       handler.priority,
     );
   },
-  unregister: (id: string) => {
+  unregister: (id: string): void => {
     registeredRoutes.delete(id);
     unregisterHandler('dev/' + id);
   },

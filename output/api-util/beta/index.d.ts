@@ -45,4 +45,4 @@ export declare function assert<T>(condition: T, code: number, message: string): 
  * const { name } = assertValidation(requestBody, schema.parse);
  * ```
  */
-export declare function assertValidation<T>(body: unknown, validator: (body: unknown) => T, errorFunc?: (err: any) => unknown, code?: number): T;
+export declare function assertValidation<T>(body: unknown, validator: (body: unknown) => T, errorFunc?: (err: unknown) => unknown, code?: number): T;

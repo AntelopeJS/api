@@ -8,39 +8,102 @@ import { requestListener, upgradeListener } from './server';
 import './middlewares/cors';
 import { Logging } from '@ajs/logging/beta';
 
-interface HTTPConfig extends http.ServerOptions {
-  protocol: 'http';
+type ServerProtocol = 'http' | 'https';
+type SocketProtocol = 'ws' | 'wss';
+
+interface ServerNetworkConfig {
   host?: string;
   port?: number;
 }
 
-interface HTTPSConfig extends https.ServerOptions {
+interface HTTPConfig extends http.ServerOptions, ServerNetworkConfig {
+  protocol: 'http';
+}
+
+interface HTTPSConfig extends https.ServerOptions, ServerNetworkConfig {
   protocol: 'https';
-  host?: string;
-  port?: number;
+}
+
+type ServerConfig = HTTPConfig | HTTPSConfig;
+
+type AllowedOrigin = string | RegExp | Array<string | RegExp>;
+
+interface CorsConfig {
+  allowedOrigins?: AllowedOrigin;
+  allowedMethods?: string[];
 }
 
 interface Config {
-  servers?: (HTTPConfig | HTTPSConfig)[];
-  cors?: {
-    allowedOrigins?: string | RegExp | (string | RegExp)[];
-    allowedMethods?: string[];
-  };
+  servers?: ServerConfig[];
+  cors?: CorsConfig;
 }
 
-let conf: Config;
-let servers: net.Server[];
+type ServerFactory = (config: ServerConfig) => net.Server;
+
+const DEFAULT_HTTP_PORT = 80;
+const DEFAULT_HOST = 'localhost';
+const DEFAULT_SERVER_CONFIG: HTTPConfig = { protocol: 'http', port: DEFAULT_HTTP_PORT };
+
+const SERVER_FACTORY_BY_PROTOCOL: Record<ServerProtocol, ServerFactory> = {
+  http: (config) => createHTTPServer(config as HTTPConfig),
+  https: (config) => createHTTPSServer(config as HTTPSConfig),
+};
+
+let conf: Config = {
+  servers: [],
+};
+
+let servers: net.Server[] = [];
+
+function createHTTPServer(config: HTTPConfig): net.Server {
+  const server = http.createServer(config);
+  attachServerListeners(server, 'http', 'ws');
+  return server;
+}
+
+function createHTTPSServer(config: HTTPSConfig): net.Server {
+  const server = https.createServer(config);
+  attachServerListeners(server, 'https', 'wss');
+  return server;
+}
+
+function attachServerListeners(server: net.Server, protocol: ServerProtocol, socketProtocol: SocketProtocol): void {
+  server.on(
+    'request',
+    (req: http.IncomingMessage, res: http.ServerResponse) => void requestListener(req, res, protocol),
+  );
+  server.on(
+    'upgrade',
+    (req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) =>
+      void upgradeListener(req, socket, head, socketProtocol),
+  );
+}
+
+function resolveServers(config: Config): ServerConfig[] {
+  if (config.servers && config.servers.length > 0) {
+    return config.servers;
+  }
+
+  return [DEFAULT_SERVER_CONFIG];
+}
+
+function startConfiguredServer(config: ServerConfig): net.Server {
+  const serverFactory = SERVER_FACTORY_BY_PROTOCOL[config.protocol];
+  const server = serverFactory(config);
+  const listener = server.listen(config.port, config.host);
+  Logging.Info(`Server started, listening on ${config.protocol}://${config.host ?? DEFAULT_HOST}:${config.port}`);
+  return listener;
+}
 
 export function getConfig(): Config {
   return conf;
 }
 
 export async function construct(config: Config): Promise<void> {
-  conf = config;
-  conf.servers = conf.servers || [];
-  if (conf.servers.length === 0) {
-    conf.servers.push({ protocol: 'http', port: 80 });
-  }
+  conf = {
+    ...config,
+    servers: resolveServers(config),
+  };
 
   await ImplementInterface(import('@ajs.local/api/beta'), import('./implementations/api/beta'));
 }
@@ -48,37 +111,7 @@ export async function construct(config: Config): Promise<void> {
 export function destroy(): void {}
 
 export function start(): void {
-  servers = conf.servers!.map((config) => {
-    let server: net.Server;
-    switch (config.protocol) {
-      case 'http':
-        server = http.createServer(config);
-        server.on(
-          'request',
-          (req: http.IncomingMessage, res: http.ServerResponse) => void requestListener(req, res, 'http'),
-        );
-        server.on(
-          'upgrade',
-          (req: http.IncomingMessage, sock: stream.Duplex, head: Buffer) => void upgradeListener(req, sock, head, 'ws'),
-        );
-        break;
-      case 'https':
-        server = https.createServer(config);
-        server.on(
-          'request',
-          (req: http.IncomingMessage, res: http.ServerResponse) => void requestListener(req, res, 'https'),
-        );
-        server.on(
-          'upgrade',
-          (req: http.IncomingMessage, sock: stream.Duplex, head: Buffer) =>
-            void upgradeListener(req, sock, head, 'wss'),
-        );
-        break;
-    }
-    const server_listener = server.listen(config.port, config.host);
-    Logging.Info(`Server started, listening on ${config.protocol}://${config.host || 'localhost'}:${config.port}`);
-    return server_listener;
-  });
+  servers = (conf.servers ?? []).map((serverConfig) => startConfiguredServer(serverConfig));
 }
 
 export function stop(): void {
