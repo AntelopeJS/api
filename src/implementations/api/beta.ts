@@ -1,4 +1,5 @@
 import { computeParameter, RouteHandler, ControllerMeta, ComputedParameter } from '@ajs.local/api/beta';
+import { listenServers } from '../../index';
 import { registerHandler, RequestContext, unregisterHandler } from '../../server';
 import { GetMetadata } from '@ajs/core/beta';
 import { Class } from '@ajs/core/beta/decorators';
@@ -61,6 +62,10 @@ export async function GetControllerInstance(
 
   controllerCache.set(cacheKey, controllerInstance);
   return controllerInstance;
+}
+
+export async function Listen(): Promise<void> {
+  await listenServers();
 }
 
 interface RouteInfo {
