@@ -36,6 +36,7 @@ interface CorsConfig {
 interface Config {
   servers?: ServerConfig[];
   cors?: CorsConfig;
+  autoListen?: boolean;
 }
 
 type ServerFactory = (config: ServerConfig) => net.Server;
@@ -54,6 +55,7 @@ let conf: Config = {
 };
 
 let servers: net.Server[] = [];
+let listening = false;
 
 function createHTTPServer(config: HTTPConfig): net.Server {
   const server = http.createServer(config);
@@ -87,12 +89,37 @@ function resolveServers(config: Config): ServerConfig[] {
   return [DEFAULT_SERVER_CONFIG];
 }
 
-function startConfiguredServer(config: ServerConfig): net.Server {
+function createConfiguredServer(config: ServerConfig): net.Server {
   const serverFactory = SERVER_FACTORY_BY_PROTOCOL[config.protocol];
-  const server = serverFactory(config);
-  const listener = server.listen(config.port, config.host);
-  Logging.Info(`Server started, listening on ${config.protocol}://${config.host ?? DEFAULT_HOST}:${config.port}`);
-  return listener;
+  return serverFactory(config);
+}
+
+function listenServer(server: net.Server, config: ServerConfig): Promise<void> {
+  if (server.listening) {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const onListening = () => {
+      cleanup();
+      Logging.Info(`Server started, listening on ${config.protocol}://${config.host ?? DEFAULT_HOST}:${config.port}`);
+      resolve();
+    };
+
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    const cleanup = () => {
+      server.off('listening', onListening);
+      server.off('error', onError);
+    };
+
+    server.once('listening', onListening);
+    server.once('error', onError);
+    server.listen(config.port, config.host);
+  });
 }
 
 export function getConfig(): Config {
@@ -111,10 +138,34 @@ export async function construct(config: Config): Promise<void> {
 export function destroy(): void {}
 
 export function start(): void {
-  servers = (conf.servers ?? []).map((serverConfig) => startConfiguredServer(serverConfig));
+  servers = (conf.servers ?? []).map((serverConfig) => createConfiguredServer(serverConfig));
+  listening = false;
+
+  if (conf.autoListen !== false) {
+    void listenServers().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      Logging.Info(`Unable to start listening servers: ${message}`);
+    });
+  }
+}
+
+export async function listenServers(): Promise<void> {
+  if (listening || servers.length === 0) {
+    return;
+  }
+
+  listening = true;
+
+  try {
+    await Promise.all((conf.servers ?? []).map((serverConfig, index) => listenServer(servers[index], serverConfig)));
+  } catch (error) {
+    listening = false;
+    throw error;
+  }
 }
 
 export function stop(): void {
   servers.forEach((server) => server.close());
   servers = [];
+  listening = false;
 }

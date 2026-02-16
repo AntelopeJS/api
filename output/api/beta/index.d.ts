@@ -295,6 +295,10 @@ export declare function PartialController<T extends object>(controller: Controll
  */
 export declare const GetControllerInstance: <T>(cl: Class<T>, context: RequestContext) => Promise<T>;
 /**
+ * Start listening on all configured servers.
+ */
+export declare const Listen: () => Promise<void>;
+/**
  * Handler mode.
  */
 export type RouteHandlerMode = 'prefix' | 'postfix' | 'handler' | 'websocket';

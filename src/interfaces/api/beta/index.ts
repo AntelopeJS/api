@@ -461,6 +461,11 @@ export const GetControllerInstance: <T>(cl: Class<T>, context: RequestContext) =
   InterfaceFunction<(cl: any, context: RequestContext) => any>();
 
 /**
+ * Start listening on all configured servers.
+ */
+export const Listen: () => Promise<void> = InterfaceFunction();
+
+/**
  * Handler mode.
  */
 export type RouteHandlerMode = 'prefix' | 'postfix' | 'handler' | 'websocket';
