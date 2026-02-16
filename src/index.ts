@@ -154,8 +154,14 @@ export async function listenServers(): Promise<void> {
     return;
   }
 
-  await Promise.all((conf.servers ?? []).map((serverConfig, index) => listenServer(servers[index], serverConfig)));
   listening = true;
+
+  try {
+    await Promise.all((conf.servers ?? []).map((serverConfig, index) => listenServer(servers[index], serverConfig)));
+  } catch (error) {
+    listening = false;
+    throw error;
+  }
 }
 
 export function stop(): void {
