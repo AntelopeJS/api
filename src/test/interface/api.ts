@@ -669,7 +669,6 @@ describe('Execution', () => {
   });
 });
 
-
 // Monitor Tests
 
 const monitorHandlerErrorMessage = 'Monitor handler error';
@@ -1000,7 +999,6 @@ describe('Catch-All Routes', () => {
       status: 200,
       result: 'catchall:a/b',
     });
-
   });
 });
 
