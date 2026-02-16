@@ -7,6 +7,7 @@ import {
   HandlerPriority,
   HTTPResult,
   MultiParameter,
+  Monitor,
   Parameter,
   PartialController,
   Post,
@@ -665,6 +666,231 @@ describe('Execution', () => {
         assert.equal(res.headers.get('key3'), 'Ok', 'Postfix Header value');
       },
     });
+  });
+});
+
+// Monitor Tests
+
+const monitorHandlerErrorMessage = 'Monitor handler error';
+const monitorWebsocketErrorMessage = 'Monitor websocket error';
+
+export class TestMonitorController1 extends Controller('/monitor/controller1') {
+  @Get('success')
+  testSuccess() {
+    return 'Ok Monitor';
+  }
+
+  @Monitor('get', 'success')
+  @SpyMethod()
+  testMonitorSuccess(@Context() _ctx: RequestContext) {}
+
+  @Get('error')
+  testError() {
+    throw new Error(monitorHandlerErrorMessage);
+  }
+
+  @Monitor('get', 'error')
+  @SpyMethod()
+  testMonitorError(@Context() _ctx: RequestContext) {}
+
+  @Get('ignoreReturn')
+  testIgnoreReturn() {
+    return 'Handler Response';
+  }
+
+  @Monitor('get', 'ignoreReturn')
+  @SpyMethod()
+  testMonitorIgnoredReturn() {
+    return 'Monitor Response';
+  }
+
+  @Get('immutableResponse')
+  testImmutableResponse(@Result() response: HTTPResult) {
+    response.addHeader('x-handler', 'true');
+    return 'Immutable Response';
+  }
+
+  @Monitor('get', 'immutableResponse')
+  @SpyMethod()
+  testMonitorMutateResponse(@Result() response: HTTPResult) {
+    response.setStatus(201);
+    response.setBody('Mutated Response');
+    response.addHeader('x-monitor', 'true');
+  }
+
+  @Get('throwingMonitor')
+  testThrowingMonitor() {
+    return 'Stable Response';
+  }
+
+  @Monitor('get', 'throwingMonitor')
+  @SpyMethod()
+  testThrowingMonitorObserver() {
+    throw new Error('Monitor should not break response');
+  }
+
+  @Get('priority')
+  @SpyMethod()
+  testMonitorPriorityHandler() {
+    return 'Priority Response';
+  }
+
+  @Monitor('get', 'priority', HandlerPriority.HIGH)
+  @SpyMethod()
+  testMonitorPriorityHigh() {}
+
+  @Monitor('get', 'priority', HandlerPriority.LOW)
+  @SpyMethod()
+  testMonitorPriorityLow() {}
+
+  @WebsocketHandler('wsSuccess')
+  testWebsocketSuccess(@Connection() connection: WebSocket) {
+    connection.on('message', () => undefined);
+  }
+
+  @Monitor('get', 'wsSuccess')
+  @SpyMethod()
+  testMonitorWebsocketSuccess(@Context() _ctx: RequestContext) {}
+
+  @WebsocketHandler('wsError')
+  testWebsocketError() {
+    throw new Error(monitorWebsocketErrorMessage);
+  }
+
+  @Monitor('get', 'wsError')
+  @SpyMethod()
+  testMonitorWebsocketError(@Context() _ctx: RequestContext) {}
+}
+
+describe('Monitor', () => {
+  FetchTest('Runs after successful handler', {
+    route: '/monitor/controller1/success',
+    method: 'GET',
+    status: 200,
+    result: 'Ok Monitor',
+    prepare() {
+      (TestMonitorController1.prototype.testMonitorSuccess as SinonSpy).resetHistory();
+    },
+    postCheck() {
+      const spy = TestMonitorController1.prototype.testMonitorSuccess as SinonSpy;
+      sinon.assert.calledOnce(spy);
+      const context = spy.lastCall.args[0] as RequestContext;
+      assert.equal(context.error, undefined, 'Monitor context should not contain an error');
+    },
+  });
+
+  FetchTest('Runs after handler throw', {
+    route: '/monitor/controller1/error',
+    method: 'GET',
+    status: 500,
+    result: monitorHandlerErrorMessage,
+    prepare() {
+      (TestMonitorController1.prototype.testMonitorError as SinonSpy).resetHistory();
+    },
+    postCheck() {
+      const spy = TestMonitorController1.prototype.testMonitorError as SinonSpy;
+      sinon.assert.calledOnce(spy);
+      const context = spy.lastCall.args[0] as RequestContext;
+      assert(context.error instanceof Error, 'Monitor context should include thrown error');
+      assert.equal((context.error as Error).message, monitorHandlerErrorMessage, 'Monitor error message');
+    },
+  });
+
+  FetchTest('Ignores monitor return value', {
+    route: '/monitor/controller1/ignoreReturn',
+    method: 'GET',
+    status: 200,
+    result: 'Handler Response',
+    prepare() {
+      (TestMonitorController1.prototype.testMonitorIgnoredReturn as SinonSpy).resetHistory();
+    },
+    postCheck() {
+      sinon.assert.calledOnce(TestMonitorController1.prototype.testMonitorIgnoredReturn as SinonSpy);
+    },
+  });
+
+  FetchTest('Monitor cannot mutate response', {
+    route: '/monitor/controller1/immutableResponse',
+    method: 'GET',
+    status: 200,
+    result: 'Immutable Response',
+    prepare() {
+      (TestMonitorController1.prototype.testMonitorMutateResponse as SinonSpy).resetHistory();
+    },
+    postCheck(res) {
+      sinon.assert.calledOnce(TestMonitorController1.prototype.testMonitorMutateResponse as SinonSpy);
+      assert.equal(res.headers.get('x-handler'), 'true', 'Handler response header value');
+      assert.equal(res.headers.get('x-monitor'), null, 'Monitor must not mutate response headers');
+    },
+  });
+
+  FetchTest('Monitor throw does not change response', {
+    route: '/monitor/controller1/throwingMonitor',
+    method: 'GET',
+    status: 200,
+    result: 'Stable Response',
+    prepare() {
+      (TestMonitorController1.prototype.testThrowingMonitorObserver as SinonSpy).resetHistory();
+    },
+    postCheck() {
+      sinon.assert.calledOnce(TestMonitorController1.prototype.testThrowingMonitorObserver as SinonSpy);
+    },
+  });
+
+  FetchTest('Multiple monitors run by priority', {
+    route: '/monitor/controller1/priority',
+    method: 'GET',
+    status: 200,
+    result: 'Priority Response',
+    prepare() {
+      (TestMonitorController1.prototype.testMonitorPriorityHandler as SinonSpy).resetHistory();
+      (TestMonitorController1.prototype.testMonitorPriorityHigh as SinonSpy).resetHistory();
+      (TestMonitorController1.prototype.testMonitorPriorityLow as SinonSpy).resetHistory();
+    },
+    postCheck() {
+      sinon.assert.callOrder(
+        TestMonitorController1.prototype.testMonitorPriorityHandler as SinonSpy,
+        TestMonitorController1.prototype.testMonitorPriorityHigh as SinonSpy,
+        TestMonitorController1.prototype.testMonitorPriorityLow as SinonSpy,
+      );
+    },
+  });
+
+  it('Runs on websocket upgrade success', async () => {
+    const spy = TestMonitorController1.prototype.testMonitorWebsocketSuccess as SinonSpy;
+    spy.resetHistory();
+
+    const ws = new WebSocket(URL_BASE + '/monitor/controller1/wsSuccess');
+    await new Promise<void>((resolve, reject) => {
+      ws.on('open', () => resolve());
+      ws.on('error', reject);
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    sinon.assert.calledOnce(spy);
+    const context = spy.lastCall.args[0] as RequestContext;
+    assert.equal(context.error, undefined, 'Websocket monitor success should not have an error');
+
+    ws.close();
+    await new Promise<void>((resolve) => ws.on('close', () => resolve()));
+  });
+
+  it('Runs on websocket upgrade error', async () => {
+    const spy = TestMonitorController1.prototype.testMonitorWebsocketError as SinonSpy;
+    spy.resetHistory();
+
+    const ws = new WebSocket(URL_BASE + '/monitor/controller1/wsError');
+    await new Promise<void>((resolve) => {
+      ws.on('close', () => resolve());
+      ws.on('error', () => resolve());
+      ws.on('open', () => undefined);
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    sinon.assert.calledOnce(spy);
+    const context = spy.lastCall.args[0] as RequestContext;
+    assert(context.error instanceof Error, 'Websocket monitor should receive thrown error');
+    assert.equal((context.error as Error).message, monitorWebsocketErrorMessage, 'Websocket monitor error message');
   });
 });
 

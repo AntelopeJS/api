@@ -16,7 +16,8 @@ export interface RequestContext {
   url: URL;
   routeParameters: Record<string, string>;
   response: HTTPResult;
-  connection?: unknown;
+  error?: unknown;
+  connection?: unknown /* WebsocketConnection */;
 }
 
 interface DynamicRoute {
@@ -42,6 +43,7 @@ const roots: Record<string, Record<string, RouteLevel>> = {
   handler: {},
   prefix: {},
   postfix: {},
+  monitor: {},
   websocket: {},
 };
 
@@ -210,7 +212,7 @@ const special = {
 };
 export function registerHandler(
   id: string,
-  mode: 'prefix' | 'postfix' | 'handler' | 'websocket',
+  mode: 'prefix' | 'postfix' | 'handler' | 'monitor' | 'websocket',
   method: string | undefined,
   location: string,
   handler: RouteCallback,
@@ -319,12 +321,66 @@ function handleResult(isHeadRequest: boolean, response: HTTPResult, res: ServerR
   }
 }
 
-function resolveErrorBody(error: unknown): unknown {
-  if (error instanceof Error) {
-    return error.message;
+function extractError(error: unknown) {
+  if (typeof error === 'object' && error && 'message' in error) {
+    return (error as { message?: unknown }).message ?? error;
   }
-
   return error;
+}
+
+function setHandlerResponse(requestContext: RequestContext, result: unknown) {
+  if (requestContext.response.isStream()) {
+    return;
+  }
+  if (result) {
+    requestContext.response = HTTPResult.withHeaders(result, requestContext.response.getHeaders(), 200);
+    return;
+  }
+  requestContext.response = HTTPResult.withHeaders('', requestContext.response.getHeaders(), 200);
+}
+
+function cloneResponse(response: HTTPResult) {
+  const snapshot = new HTTPResult(response.getStatus(), response.getBody(), response.getContentType());
+  for (const [name, value] of Object.entries(response.getHeaders())) {
+    snapshot.addHeader(name, value);
+  }
+  return snapshot;
+}
+
+function getMultiHandlers(method: string, path: string[], source: Record<string, RouteLevel>) {
+  const handlers = getHandler(method, path, source, true);
+  return Array.isArray(handlers) ? handlers : [];
+}
+
+async function executePriorityHandlers(handlers: HandlerResult[], requestContext: RequestContext) {
+  handlers.sort((a, b) => a.priority - b.priority);
+  for (const { handler, parameters } of handlers) {
+    requestContext.routeParameters = parameters;
+    const result = await handler(requestContext);
+    if (result) {
+      return result;
+    }
+  }
+  return undefined;
+}
+
+async function executeMonitors(method: string, path: string[], requestContext: RequestContext) {
+  const monitors = getMultiHandlers(method, path, roots.monitor);
+  const monitorContext: RequestContext = {
+    ...requestContext,
+    routeParameters: {},
+    response: cloneResponse(requestContext.response),
+  };
+
+  monitors.sort((a, b) => a.priority - b.priority);
+  for (const { handler, parameters } of monitors) {
+    monitorContext.routeParameters = parameters;
+    try {
+      await handler(monitorContext);
+    } catch (error) {
+      console.error(error);
+    }
+  }
 }
 
 export async function requestListener(req: IncomingMessage, res: ServerResponse, protocol: 'http' | 'https') {
@@ -340,6 +396,7 @@ export async function requestListener(req: IncomingMessage, res: ServerResponse,
   const path = url.pathname.split('/').filter((part) => part);
   const method = req.method?.toLowerCase() || 'get';
   const isHeadRequest = method === 'head';
+  let requestError: unknown;
 
   try {
     let handler = getHandler(method, path, roots.handler, false);
@@ -347,60 +404,36 @@ export async function requestListener(req: IncomingMessage, res: ServerResponse,
       handler = getHandler('get', path, roots.handler, false);
     }
     if (!handler && method !== 'options') {
-      handleResult(isHeadRequest, requestContext.response, res);
-      return;
-    }
+      // Fall through to finally block to execute monitors.
+    } else {
+      const prefixResult = await executePriorityHandlers(getMultiHandlers(method, path, roots.prefix), requestContext);
+      if (prefixResult) {
+        requestContext.response = HTTPResult.withHeaders(prefixResult, requestContext.response.getHeaders(), 200);
+      } else if (!handler && method === 'options') {
+        // Fall through to finally block to execute monitors.
+      } else {
+        if (handler && !Array.isArray(handler)) {
+          requestContext.routeParameters = handler.parameters;
+          const result = await handler.handler(requestContext);
+          setHandlerResponse(requestContext, result);
+        }
 
-    const prefixHandler = getHandler(method, path, roots.prefix, true);
-    if (prefixHandler && Array.isArray(prefixHandler)) {
-      prefixHandler.sort((a, b) => a.priority - b.priority);
-      for (const { handler, parameters } of prefixHandler) {
-        requestContext.routeParameters = parameters;
-        const result = await handler(requestContext);
-        if (result) {
-          handleResult(isHeadRequest, HTTPResult.withHeaders(result, requestContext.response.getHeaders(), 200), res);
-          return;
+        const postfixResult = await executePriorityHandlers(
+          getMultiHandlers(method, path, roots.postfix),
+          requestContext,
+        );
+        if (postfixResult) {
+          requestContext.response = HTTPResult.withHeaders(postfixResult, requestContext.response.getHeaders(), 200);
         }
       }
     }
-
-    if (!handler && method === 'options') {
-      handleResult(isHeadRequest, requestContext.response, res);
-      return;
-    }
-
-    if (handler && !Array.isArray(handler)) {
-      requestContext.routeParameters = handler.parameters;
-      const result = await handler.handler(requestContext);
-      if (!requestContext.response.isStream()) {
-        if (result) {
-          requestContext.response = HTTPResult.withHeaders(result, requestContext.response.getHeaders(), 200);
-        } else {
-          requestContext.response = HTTPResult.withHeaders('', requestContext.response.getHeaders(), 200);
-        }
-      }
-    }
-
-    const postfixHandler = getHandler(method, path, roots.postfix, true);
-    if (postfixHandler && Array.isArray(postfixHandler)) {
-      postfixHandler.sort((a, b) => a.priority - b.priority);
-      for (const { handler, parameters } of postfixHandler) {
-        requestContext.routeParameters = parameters;
-        const result = await handler(requestContext);
-        if (result) {
-          handleResult(isHeadRequest, HTTPResult.withHeaders(result, requestContext.response.getHeaders(), 200), res);
-          return;
-        }
-      }
-    }
-
+  } catch (error: unknown) {
+    requestError = error;
+    requestContext.response = HTTPResult.withHeaders(extractError(error), requestContext.response.getHeaders(), 500);
+  } finally {
+    requestContext.error = requestError;
+    await executeMonitors(method, path, requestContext);
     handleResult(isHeadRequest, requestContext.response, res);
-  } catch (err: unknown) {
-    handleResult(
-      isHeadRequest,
-      HTTPResult.withHeaders(resolveErrorBody(err), requestContext.response.getHeaders(), 500),
-      res,
-    );
   }
 }
 
@@ -426,38 +459,46 @@ export async function upgradeListener(
 
   const path = url.pathname.split('/').filter((part) => part);
   const method = req.method?.toLowerCase() || 'get';
+  let requestError: unknown;
+  let hasUpgradedConnection = false;
+  let mustSendResponse = false;
+  let mustDestroySocket = false;
 
   try {
     const handler = getHandler(method, path, roots.websocket, false);
-    if (!handler) {
-      handleResult(false, requestContext.response, res);
-      socket.destroy();
-      return;
-    }
-
-    const prefixHandler = getHandler(method, path, roots.prefix, true);
-    if (prefixHandler && Array.isArray(prefixHandler)) {
-      prefixHandler.sort((a, b) => a.priority - b.priority);
-      for (const { handler, parameters } of prefixHandler) {
-        requestContext.routeParameters = parameters;
-        const result = await handler(requestContext);
-        if (result) {
-          handleResult(false, HTTPResult.withHeaders(result, requestContext.response.getHeaders(), 200), res);
-          socket.destroy();
-          return;
-        }
+    if (!handler || Array.isArray(handler)) {
+      mustSendResponse = true;
+      mustDestroySocket = true;
+      // Fall through to finally block to execute monitors.
+    } else {
+      const prefixResult = await executePriorityHandlers(getMultiHandlers(method, path, roots.prefix), requestContext);
+      if (prefixResult) {
+        requestContext.response = HTTPResult.withHeaders(prefixResult, requestContext.response.getHeaders(), 200);
+        mustSendResponse = true;
+        mustDestroySocket = true;
+        // Fall through to finally block to execute monitors.
+      } else {
+        requestContext.connection = await upgrader(req, socket, head);
+        hasUpgradedConnection = true;
+        requestContext.routeParameters = handler.parameters;
+        await handler.handler(requestContext);
       }
     }
-
-    if (handler && !Array.isArray(handler)) {
-      requestContext.connection = await upgrader(req, socket, head);
-      requestContext.routeParameters = handler.parameters;
-      await handler.handler(requestContext);
-    } else {
+  } catch (error: unknown) {
+    requestError = error;
+    mustDestroySocket = true;
+    if (!hasUpgradedConnection) {
+      requestContext.response = HTTPResult.withHeaders(extractError(error), requestContext.response.getHeaders(), 500);
+      mustSendResponse = true;
+    }
+  } finally {
+    requestContext.error = requestError;
+    await executeMonitors(method, path, requestContext);
+    if (mustSendResponse) {
+      handleResult(false, requestContext.response, res);
+    }
+    if (mustDestroySocket) {
       socket.destroy();
     }
-  } catch (err: unknown) {
-    handleResult(false, HTTPResult.withHeaders(resolveErrorBody(err), requestContext.response.getHeaders(), 500), res);
-    socket.destroy();
   }
 }

@@ -173,6 +173,10 @@ export interface RequestContext {
      */
     response: HTTPResult;
     /**
+     * Error thrown during request processing, if any.
+     */
+    error?: unknown;
+    /**
      * Websocket connection.
      */
     connection?: unknown;
@@ -301,13 +305,13 @@ export declare const Listen: () => Promise<void>;
 /**
  * Handler mode.
  */
-export type RouteHandlerMode = 'prefix' | 'postfix' | 'handler' | 'websocket';
+export type RouteHandlerMode = 'prefix' | 'postfix' | 'handler' | 'monitor' | 'websocket';
 /**
  * Route handler information.
  */
 export interface RouteHandler {
     /**
-     * Mode (prefix, handler, postfix, websocket).
+     * Mode (prefix, handler, postfix, monitor, websocket).
      */
     mode: RouteHandlerMode;
     /**
@@ -513,6 +517,27 @@ export declare const Prefix: (method: string, location?: string | undefined, pri
  * ```
  */
 export declare const Postfix: (method: string, location?: string | undefined, priority?: HandlerPriority | undefined) => import("@ajs/core/beta/decorators").MethodDecorator;
+/**
+ * Generic monitor route decorator.
+ *
+ * Attaches a handler that runs after request processing, regardless of success or failure.
+ * Monitor handlers are observation-only: their return value is ignored.
+ *
+ * @param method HTTP method
+ * @param location Endpoint location
+ * @param priority Handler priority
+ *
+ * Example:
+ * ```ts
+ * @Monitor('get', 'users/:id')
+ * logRequest(@Context() ctx: RequestContext) {
+ *   const status = ctx.response.getStatus();
+ *   const message = ctx.error ? String(ctx.error) : 'ok';
+ *   Logging.Info(`GET /users/:id -> ${status} (${message})`);
+ * }
+ * ```
+ */
+export declare const Monitor: (method: string, location?: string | undefined, priority?: HandlerPriority | undefined) => import("@ajs/core/beta/decorators").MethodDecorator;
 /**
  * Websocket endpoint (route) decorator.
  *
