@@ -8,6 +8,7 @@ import {
   HTTPResult,
   MultiParameter,
   Parameter,
+  PartialController,
   Post,
   Postfix,
   Prefix,
@@ -161,6 +162,35 @@ export class TestRoutingController3 extends Controller('///routing///controller2
   test() {}
 }
 
+export class TestPartialControllerParent extends Controller('/partial/controller') {
+  @Context()
+  declare ctx: RequestContext;
+}
+
+export class TestPartialControllerGetById extends PartialController(TestPartialControllerParent) {
+  @Get(':id')
+  @SpyMethod()
+  test(@Parameter('id') id: string) {
+    return `${id}:${this.ctx.url.pathname}`;
+  }
+}
+
+export class TestPartialControllerCreate extends PartialController(TestPartialControllerParent) {
+  @Post('')
+  @SpyMethod()
+  testCreate() {
+    return this.ctx.url.pathname;
+  }
+}
+
+export class TestPartialControllerClassic extends Controller('/partial/classic') {
+  @Get()
+  @SpyMethod()
+  testClassic() {
+    return 'classic';
+  }
+}
+
 describe('Routing', () => {
   describe('Controller', () => {
     FetchTest('Root Controller', { route: '/test', method: 'GET', status: 200 });
@@ -180,6 +210,42 @@ describe('Routing', () => {
     });
 
     FetchTest('Redundant Slash Controller', { route: '/routing/controller2/test', method: 'GET', status: 200 });
+
+    FetchTest('Partial Controller keeps parent location', {
+      route: '/partial/controller/123',
+      method: 'GET',
+      status: 200,
+      result: '123:/partial/controller/123',
+    });
+
+    FetchTest('Partial Controller inherits computed properties', {
+      route: '/partial/controller',
+      method: 'POST',
+      status: 200,
+      result: '/partial/controller',
+    });
+
+    FetchTest('Multiple partial controllers can coexist', {
+      route: '/partial/controller/hello',
+      method: 'GET',
+      status: 200,
+      result: 'hello:/partial/controller/hello',
+      prepare() {
+        (TestPartialControllerGetById.prototype.test as SinonSpy).resetHistory();
+        (TestPartialControllerCreate.prototype.testCreate as SinonSpy).resetHistory();
+      },
+      callCount: [TestPartialControllerGetById.prototype.test as unknown as () => any, 1],
+      postCheck() {
+        sinon.assert.notCalled(TestPartialControllerCreate.prototype.testCreate as SinonSpy);
+      },
+    });
+
+    FetchTest('Classic controller still works', {
+      route: '/partial/classic/testClassic',
+      method: 'GET',
+      status: 200,
+      result: 'classic',
+    });
   });
 
   describe('Handler', () => {

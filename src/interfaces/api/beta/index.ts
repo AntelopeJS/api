@@ -438,6 +438,19 @@ export function Controller<T extends object = object>(location: string, base?: C
 }
 
 /**
+ * Create a partial controller that reuses the same location as the given controller.
+ *
+ * This is useful when routes are split across multiple files while sharing the
+ * same controller context/computed properties.
+ *
+ * @param controller Base controller class
+ * @returns Controller class at the same location
+ */
+export function PartialController<T extends object>(controller: ControllerClass<T>): ControllerClass<T> {
+  return Controller(controller.location, controller);
+}
+
+/**
  * Gets the instance of a given Controller for the active request.
  *
  * @param cl Controller class

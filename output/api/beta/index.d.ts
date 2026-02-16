@@ -277,6 +277,16 @@ export declare class ControllerMeta {
  */
 export declare function Controller<T extends object = object>(location: string, base?: Class<T>): ControllerClass<T>;
 /**
+ * Create a partial controller that reuses the same location as the given controller.
+ *
+ * This is useful when routes are split across multiple files while sharing the
+ * same controller context/computed properties.
+ *
+ * @param controller Base controller class
+ * @returns Controller class at the same location
+ */
+export declare function PartialController<T extends object>(controller: ControllerClass<T>): ControllerClass<T>;
+/**
  * Gets the instance of a given Controller for the active request.
  *
  * @param cl Controller class
