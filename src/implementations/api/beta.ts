@@ -35,7 +35,7 @@ interface RouteInfo {
   id: string;
   uri: string;
   method: string;
-  mode: 'prefix' | 'postfix' | 'handler' | 'websocket';
+  mode: 'prefix' | 'postfix' | 'handler' | 'monitor' | 'websocket';
   priority?: number;
   callbackName: string;
 }
