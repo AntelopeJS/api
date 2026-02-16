@@ -404,28 +404,28 @@ export async function requestListener(req: IncomingMessage, res: ServerResponse,
       handler = getHandler('get', path, roots.handler, false);
     }
     if (!handler && method !== 'options') {
-      return;
-    }
+      // Fall through to finally block to execute monitors.
+    } else {
+      const prefixResult = await executePriorityHandlers(getMultiHandlers(method, path, roots.prefix), requestContext);
+      if (prefixResult) {
+        requestContext.response = HTTPResult.withHeaders(prefixResult, requestContext.response.getHeaders(), 200);
+      } else if (!handler && method === 'options') {
+        // Fall through to finally block to execute monitors.
+      } else {
+        if (handler && !Array.isArray(handler)) {
+          requestContext.routeParameters = handler.parameters;
+          const result = await handler.handler(requestContext);
+          setHandlerResponse(requestContext, result);
+        }
 
-    const prefixResult = await executePriorityHandlers(getMultiHandlers(method, path, roots.prefix), requestContext);
-    if (prefixResult) {
-      requestContext.response = HTTPResult.withHeaders(prefixResult, requestContext.response.getHeaders(), 200);
-      return;
-    }
-
-    if (!handler && method === 'options') {
-      return;
-    }
-
-    if (handler && !Array.isArray(handler)) {
-      requestContext.routeParameters = handler.parameters;
-      const result = await handler.handler(requestContext);
-      setHandlerResponse(requestContext, result);
-    }
-
-    const postfixResult = await executePriorityHandlers(getMultiHandlers(method, path, roots.postfix), requestContext);
-    if (postfixResult) {
-      requestContext.response = HTTPResult.withHeaders(postfixResult, requestContext.response.getHeaders(), 200);
+        const postfixResult = await executePriorityHandlers(
+          getMultiHandlers(method, path, roots.postfix),
+          requestContext,
+        );
+        if (postfixResult) {
+          requestContext.response = HTTPResult.withHeaders(postfixResult, requestContext.response.getHeaders(), 200);
+        }
+      }
     }
   } catch (error: unknown) {
     requestError = error;
@@ -469,21 +469,21 @@ export async function upgradeListener(
     if (!handler || Array.isArray(handler)) {
       mustSendResponse = true;
       mustDestroySocket = true;
-      return;
+      // Fall through to finally block to execute monitors.
+    } else {
+      const prefixResult = await executePriorityHandlers(getMultiHandlers(method, path, roots.prefix), requestContext);
+      if (prefixResult) {
+        requestContext.response = HTTPResult.withHeaders(prefixResult, requestContext.response.getHeaders(), 200);
+        mustSendResponse = true;
+        mustDestroySocket = true;
+        // Fall through to finally block to execute monitors.
+      } else {
+        requestContext.connection = await upgrader(req, socket, head);
+        hasUpgradedConnection = true;
+        requestContext.routeParameters = handler.parameters;
+        await handler.handler(requestContext);
+      }
     }
-
-    const prefixResult = await executePriorityHandlers(getMultiHandlers(method, path, roots.prefix), requestContext);
-    if (prefixResult) {
-      requestContext.response = HTTPResult.withHeaders(prefixResult, requestContext.response.getHeaders(), 200);
-      mustSendResponse = true;
-      mustDestroySocket = true;
-      return;
-    }
-
-    requestContext.connection = await upgrader(req, socket, head);
-    hasUpgradedConnection = true;
-    requestContext.routeParameters = handler.parameters;
-    await handler.handler(requestContext);
   } catch (error: unknown) {
     requestError = error;
     mustDestroySocket = true;
