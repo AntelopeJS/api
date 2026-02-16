@@ -892,6 +892,8 @@ describe('Monitor', () => {
     const context = spy.lastCall.args[0] as RequestContext;
     assert(context.error instanceof Error, 'Websocket monitor should receive thrown error');
     assert.equal((context.error as Error).message, monitorWebsocketErrorMessage, 'Websocket monitor error message');
+  });
+});
 
 // Catch-All Route Tests
 

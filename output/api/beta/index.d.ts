@@ -307,7 +307,7 @@ export type RouteHandlerMode = 'prefix' | 'postfix' | 'handler' | 'monitor' | 'w
  */
 export interface RouteHandler {
     /**
-     * Mode (prefix, handler, postfix, websocket).
+     * Mode (prefix, handler, postfix, monitor, websocket).
      */
     mode: RouteHandlerMode;
     /**
