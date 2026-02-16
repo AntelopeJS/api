@@ -2,13 +2,6 @@ name: ci
 
 on:
   push:
-    branches:
-      - main
-      - feat/*
-      - fix/*
-  pull_request:
-    branches:
-      - main
 
 jobs:
   ubuntu:
@@ -26,5 +19,4 @@ jobs:
       - run: pnpm prepack
       - run: pnpm lint
       - run: pnpm test
-      - name: Publish
-        run: pnpx pkg-pr-new publish --compact --no-template --pnpm
+      - run: pnpm test:coverage

@@ -3,7 +3,7 @@ import { IncomingMessage, ServerResponse } from 'http';
 import stream from 'stream';
 import { WebSocket, WebSocketServer } from 'ws';
 
-export type RouteCallback = (context: RequestContext) => any;
+export type RouteCallback = (context: RequestContext) => unknown;
 export interface IdentifiableRouteCallback {
   id: string;
   callback: RouteCallback;
@@ -20,10 +20,23 @@ export interface RequestContext {
   connection?: unknown /* WebsocketConnection */;
 }
 
+interface DynamicRoute {
+  match: RegExp;
+  sub: RouteLevel;
+  mapping: string[];
+}
+
+interface CatchAllRoute {
+  paramName: string;
+  suffix: string[];
+  level: RouteLevel;
+}
+
 class RouteLevel {
   handlers: IdentifiableRouteCallback[] = [];
   staticRoutes: Record<string, RouteLevel> = {};
-  dynamicRoutes: Record<string, { match: RegExp; sub: RouteLevel; mapping: string[] }> = {};
+  dynamicRoutes: Record<string, DynamicRoute> = {};
+  catchAllRoutes: CatchAllRoute[] = [];
 }
 
 const roots: Record<string, Record<string, RouteLevel>> = {
@@ -34,7 +47,14 @@ const roots: Record<string, Record<string, RouteLevel>> = {
   websocket: {},
 };
 
-type HandlerResult = { handler: RouteCallback; parameters: Record<string, string>; priority: HandlerPriority };
+interface HandlerResult {
+  handler: RouteCallback;
+  parameters: Record<string, string>;
+  priority: HandlerPriority;
+}
+
+type HandlerLookupResult = HandlerResult | HandlerResult[] | undefined;
+
 function findHandlers(
   path: string[],
   depth: number,
@@ -54,19 +74,26 @@ function findHandlers(
     }
     return;
   }
+
   const part = path[depth];
+
   if (part in level.staticRoutes) {
     findHandlers(path, depth + 1, level.staticRoutes[part], result, parameters, multi);
     if (result.length > 0 && !multi) {
       return;
     }
   }
+
   for (const { match, sub, mapping } of Object.values(level.dynamicRoutes)) {
     const res = match.exec(part);
     if (res) {
       const newParameters = { ...parameters };
       for (let i = 0; i < mapping.length; ++i) {
-        newParameters[mapping[i]] = res[i + 1];
+        const parameterName = mapping[i];
+        const parameterValue = res[i + 1];
+        if (parameterName !== undefined && parameterValue !== undefined) {
+          newParameters[parameterName] = parameterValue;
+        }
       }
       findHandlers(path, depth + 1, sub, result, newParameters, multi);
       if (result.length > 0 && !multi) {
@@ -74,18 +101,57 @@ function findHandlers(
       }
     }
   }
+
+  // Catch-all routes are evaluated last (after static and dynamic routes).
+  for (const catchAll of level.catchAllRoutes) {
+    const remaining = path.length - depth;
+    const suffixLen = catchAll.suffix.length;
+
+    // Need at least one segment captured by ::paramName.
+    if (remaining < 1 + suffixLen) {
+      continue;
+    }
+
+    if (suffixLen > 0) {
+      const suffixStart = path.length - suffixLen;
+      let matchesSuffix = true;
+      for (let i = 0; i < suffixLen; ++i) {
+        if (path[suffixStart + i] !== catchAll.suffix[i]) {
+          matchesSuffix = false;
+          break;
+        }
+      }
+      if (!matchesSuffix) {
+        continue;
+      }
+    }
+
+    const captured = path.slice(depth, path.length - suffixLen);
+    if (captured.length < 1) {
+      continue;
+    }
+
+    const newParameters = { ...parameters, [catchAll.paramName]: captured.join('/') };
+    findHandlers(path, path.length, catchAll.level, result, newParameters, multi);
+    if (result.length > 0 && !multi) {
+      return;
+    }
+  }
 }
 
-function getHandler(method: string, path: string[], source: Record<string, RouteLevel>, multi = false) {
+function getHandler(
+  method: string,
+  path: string[],
+  source: Record<string, RouteLevel>,
+  multi = false,
+): HandlerLookupResult {
   const result: Array<HandlerResult> = [];
-  // check source[method]
   if (method in source) {
     findHandlers(path, 0, source[method], result, {}, multi);
     if (result.length > 0 && !multi) {
       return result[0];
     }
   }
-  // if multi or not found: check source['any']
   if ('any' in source) {
     findHandlers(path, 0, source.any, result, {}, multi);
     if (result.length > 0 && !multi) {
@@ -118,6 +184,12 @@ function removeHandler(id: string, source: Record<string, RouteLevel>): boolean 
       )
     ) {
       return true;
+    }
+
+    for (const catchAll of level.catchAllRoutes) {
+      if (removeHandler(id, { _: catchAll.level })) {
+        return true;
+      }
     }
   }
 
@@ -153,7 +225,36 @@ export function registerHandler(
     level = new RouteLevel();
     source[method?.toLowerCase() || 'any'] = level;
   }
-  for (const part of parts) {
+  for (let i = 0; i < parts.length; ++i) {
+    const part = parts[i];
+
+    if (part.startsWith('::')) {
+      const paramName = part.slice(2);
+      if (!paramName) {
+        throw new Error('Catch-all parameter must have a name');
+      }
+
+      const suffix = parts.slice(i + 1);
+      for (const suffixPart of suffix) {
+        if (suffixPart.indexOf(':') >= 0) {
+          throw new Error('Dynamic segments after catch-all are not supported');
+        }
+      }
+
+      const suffixKey = suffix.join('/');
+      let catchAll = level.catchAllRoutes.find(
+        (route) => route.paramName === paramName && route.suffix.join('/') === suffixKey,
+      );
+
+      if (!catchAll) {
+        catchAll = { paramName, suffix, level: new RouteLevel() };
+        level.catchAllRoutes.push(catchAll);
+      }
+
+      level = catchAll.level;
+      break;
+    }
+
     if (part.indexOf(':') >= 0) {
       if (!(part in level.dynamicRoutes)) {
         const mapping = [];
@@ -401,8 +502,3 @@ export async function upgradeListener(
     }
   }
 }
-
-// Websocket: mode 'websocket', set context.connection to ws connection
-//  https://www.npmjs.com/package/ws -> Multiple servers sharing a single HTTP/S server
-
-// SSE: https://github.com/andywer/http-event-stream/blob/HEAD/dist/index.d.ts

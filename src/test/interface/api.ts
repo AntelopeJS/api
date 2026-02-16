@@ -9,6 +9,7 @@ import {
   MultiParameter,
   Monitor,
   Parameter,
+  PartialController,
   Post,
   Postfix,
   Prefix,
@@ -162,6 +163,35 @@ export class TestRoutingController3 extends Controller('///routing///controller2
   test() {}
 }
 
+export class TestPartialControllerParent extends Controller('/partial/controller') {
+  @Context()
+  declare ctx: RequestContext;
+}
+
+export class TestPartialControllerGetById extends PartialController(TestPartialControllerParent) {
+  @Get(':id')
+  @SpyMethod()
+  test(@Parameter('id') id: string) {
+    return `${id}:${this.ctx.url.pathname}`;
+  }
+}
+
+export class TestPartialControllerCreate extends PartialController(TestPartialControllerParent) {
+  @Post('')
+  @SpyMethod()
+  testCreate() {
+    return this.ctx.url.pathname;
+  }
+}
+
+export class TestPartialControllerClassic extends Controller('/partial/classic') {
+  @Get()
+  @SpyMethod()
+  testClassic() {
+    return 'classic';
+  }
+}
+
 describe('Routing', () => {
   describe('Controller', () => {
     FetchTest('Root Controller', { route: '/test', method: 'GET', status: 200 });
@@ -181,6 +211,42 @@ describe('Routing', () => {
     });
 
     FetchTest('Redundant Slash Controller', { route: '/routing/controller2/test', method: 'GET', status: 200 });
+
+    FetchTest('Partial Controller keeps parent location', {
+      route: '/partial/controller/123',
+      method: 'GET',
+      status: 200,
+      result: '123:/partial/controller/123',
+    });
+
+    FetchTest('Partial Controller inherits computed properties', {
+      route: '/partial/controller',
+      method: 'POST',
+      status: 200,
+      result: '/partial/controller',
+    });
+
+    FetchTest('Multiple partial controllers can coexist', {
+      route: '/partial/controller/hello',
+      method: 'GET',
+      status: 200,
+      result: 'hello:/partial/controller/hello',
+      prepare() {
+        (TestPartialControllerGetById.prototype.test as SinonSpy).resetHistory();
+        (TestPartialControllerCreate.prototype.testCreate as SinonSpy).resetHistory();
+      },
+      callCount: [TestPartialControllerGetById.prototype.test as unknown as () => any, 1],
+      postCheck() {
+        sinon.assert.notCalled(TestPartialControllerCreate.prototype.testCreate as SinonSpy);
+      },
+    });
+
+    FetchTest('Classic controller still works', {
+      route: '/partial/classic/testClassic',
+      method: 'GET',
+      status: 200,
+      result: 'classic',
+    });
   });
 
   describe('Handler', () => {
@@ -603,6 +669,7 @@ describe('Execution', () => {
   });
 });
 
+
 // Monitor Tests
 
 const monitorHandlerErrorMessage = 'Monitor handler error';
@@ -825,6 +892,113 @@ describe('Monitor', () => {
     const context = spy.lastCall.args[0] as RequestContext;
     assert(context.error instanceof Error, 'Websocket monitor should receive thrown error');
     assert.equal((context.error as Error).message, monitorWebsocketErrorMessage, 'Websocket monitor error message');
+
+// Catch-All Route Tests
+
+export class TestCatchAllController1 extends Controller('/catchall/terminal') {
+  @Get('/::path')
+  @SpyMethod()
+  testTerminal(@Parameter('path') path: string) {
+    return path;
+  }
+}
+
+export class TestCatchAllController2 extends Controller('/catchall/suffix') {
+  @Get('/::path/end')
+  @SpyMethod()
+  testSuffix(@Parameter('path') path: string) {
+    return path;
+  }
+}
+
+export class TestCatchAllController3 extends Controller('/catchall/priority') {
+  @Get('/static/end')
+  @SpyMethod()
+  testStatic() {
+    return 'static';
+  }
+
+  @Get('/:id/end')
+  @SpyMethod()
+  testDynamic(@Parameter('id') id: string) {
+    return `dynamic:${id}`;
+  }
+
+  @Get('/::path/end')
+  @SpyMethod()
+  testCatchAll(@Parameter('path') path: string) {
+    return `catchall:${path}`;
+  }
+}
+
+describe('Catch-All Routes', () => {
+  describe('Terminal', () => {
+    FetchTest('Single segment', {
+      route: '/catchall/terminal/hello',
+      method: 'GET',
+      status: 200,
+      result: 'hello',
+    });
+
+    FetchTest('Multiple segments', {
+      route: '/catchall/terminal/a/b/c',
+      method: 'GET',
+      status: 200,
+      result: 'a/b/c',
+    });
+
+    FetchTest('Deep path', {
+      route: '/catchall/terminal/docs/api/v2/readme.txt',
+      method: 'GET',
+      status: 200,
+      result: 'docs/api/v2/readme.txt',
+    });
+  });
+
+  describe('Suffix', () => {
+    FetchTest('Single segment before suffix', {
+      route: '/catchall/suffix/a/end',
+      method: 'GET',
+      status: 200,
+      result: 'a',
+    });
+
+    FetchTest('Multiple segments before suffix', {
+      route: '/catchall/suffix/a/b/c/end',
+      method: 'GET',
+      status: 200,
+      result: 'a/b/c',
+    });
+
+    FetchTest('Requires at least one captured segment', {
+      route: '/catchall/suffix/end',
+      method: 'GET',
+      status: 404,
+    });
+  });
+
+  describe('Priority', () => {
+    FetchTest('Static route is preferred over catch-all', {
+      route: '/catchall/priority/static/end',
+      method: 'GET',
+      status: 200,
+      result: 'static',
+    });
+
+    FetchTest('Dynamic route is preferred over catch-all', {
+      route: '/catchall/priority/abc/end',
+      method: 'GET',
+      status: 200,
+      result: 'dynamic:abc',
+    });
+
+    FetchTest('Catch-all is used as fallback', {
+      route: '/catchall/priority/a/b/end',
+      method: 'GET',
+      status: 200,
+      result: 'catchall:a/b',
+    });
+
   });
 });
 
