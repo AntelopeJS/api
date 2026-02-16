@@ -222,7 +222,7 @@ function handleResult(isHeadRequest: boolean, response: HTTPResult, res: ServerR
 
 function extractError(error: unknown) {
   if (typeof error === 'object' && error && 'message' in error) {
-    return (error as { message?: unknown }).message || error;
+    return (error as { message?: unknown }).message ?? error;
   }
   return error;
 }
