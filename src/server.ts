@@ -25,10 +25,17 @@ interface DynamicRoute {
   mapping: string[];
 }
 
+interface CatchAllRoute {
+  paramName: string;
+  suffix: string[];
+  level: RouteLevel;
+}
+
 class RouteLevel {
   handlers: IdentifiableRouteCallback[] = [];
   staticRoutes: Record<string, RouteLevel> = {};
   dynamicRoutes: Record<string, DynamicRoute> = {};
+  catchAllRoutes: CatchAllRoute[] = [];
 }
 
 const roots: Record<string, Record<string, RouteLevel>> = {
@@ -65,13 +72,16 @@ function findHandlers(
     }
     return;
   }
+
   const part = path[depth];
+
   if (part in level.staticRoutes) {
     findHandlers(path, depth + 1, level.staticRoutes[part], result, parameters, multi);
     if (result.length > 0 && !multi) {
       return;
     }
   }
+
   for (const { match, sub, mapping } of Object.values(level.dynamicRoutes)) {
     const res = match.exec(part);
     if (res) {
@@ -87,6 +97,42 @@ function findHandlers(
       if (result.length > 0 && !multi) {
         return;
       }
+    }
+  }
+
+  // Catch-all routes are evaluated last (after static and dynamic routes).
+  for (const catchAll of level.catchAllRoutes) {
+    const remaining = path.length - depth;
+    const suffixLen = catchAll.suffix.length;
+
+    // Need at least one segment captured by ::paramName.
+    if (remaining < 1 + suffixLen) {
+      continue;
+    }
+
+    if (suffixLen > 0) {
+      const suffixStart = path.length - suffixLen;
+      let matchesSuffix = true;
+      for (let i = 0; i < suffixLen; ++i) {
+        if (path[suffixStart + i] !== catchAll.suffix[i]) {
+          matchesSuffix = false;
+          break;
+        }
+      }
+      if (!matchesSuffix) {
+        continue;
+      }
+    }
+
+    const captured = path.slice(depth, path.length - suffixLen);
+    if (captured.length < 1) {
+      continue;
+    }
+
+    const newParameters = { ...parameters, [catchAll.paramName]: captured.join('/') };
+    findHandlers(path, path.length, catchAll.level, result, newParameters, multi);
+    if (result.length > 0 && !multi) {
+      return;
     }
   }
 }
@@ -137,6 +183,12 @@ function removeHandler(id: string, source: Record<string, RouteLevel>): boolean 
     ) {
       return true;
     }
+
+    for (const catchAll of level.catchAllRoutes) {
+      if (removeHandler(id, { _: catchAll.level })) {
+        return true;
+      }
+    }
   }
 
   return false;
@@ -171,7 +223,36 @@ export function registerHandler(
     level = new RouteLevel();
     source[method?.toLowerCase() || 'any'] = level;
   }
-  for (const part of parts) {
+  for (let i = 0; i < parts.length; ++i) {
+    const part = parts[i];
+
+    if (part.startsWith('::')) {
+      const paramName = part.slice(2);
+      if (!paramName) {
+        throw new Error('Catch-all parameter must have a name');
+      }
+
+      const suffix = parts.slice(i + 1);
+      for (const suffixPart of suffix) {
+        if (suffixPart.indexOf(':') >= 0) {
+          throw new Error('Dynamic segments after catch-all are not supported');
+        }
+      }
+
+      const suffixKey = suffix.join('/');
+      let catchAll = level.catchAllRoutes.find(
+        (route) => route.paramName === paramName && route.suffix.join('/') === suffixKey,
+      );
+
+      if (!catchAll) {
+        catchAll = { paramName, suffix, level: new RouteLevel() };
+        level.catchAllRoutes.push(catchAll);
+      }
+
+      level = catchAll.level;
+      break;
+    }
+
     if (part.indexOf(':') >= 0) {
       if (!(part in level.dynamicRoutes)) {
         const mapping = [];
