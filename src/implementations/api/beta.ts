@@ -1,8 +1,17 @@
-import { computeParameter, RouteHandler, ControllerMeta, ComputedParameter } from '@ajs.local/api/beta';
-import { listenServers } from '../../index';
-import { registerHandler, RequestContext, unregisterHandler } from '../../server';
-import { GetMetadata } from '@ajs/core/beta';
-import { Class } from '@ajs/core/beta/decorators';
+import { GetMetadata } from "@ajs/core/beta";
+import type { Class } from "@ajs/core/beta/decorators";
+import {
+  type ComputedParameter,
+  ControllerMeta,
+  computeParameter,
+  type RouteHandler,
+} from "@ajs.local/api/beta";
+import { listenServers } from "../../index";
+import {
+  type RequestContext,
+  registerHandler,
+  unregisterHandler,
+} from "../../server";
 
 type UnknownRecord = Record<PropertyKey, unknown>;
 
@@ -35,10 +44,16 @@ async function applyComputedProperties(
   context: RequestContextDev,
 ): Promise<void> {
   await Promise.all(
-    Object.entries(controllerMetadata.computed_props).map(async ([propertyKey, parameter]) => {
-      const computedValue = await computeParameter(context, parameter, controllerInstance);
-      controllerInstance[propertyKey] = computedValue;
-    }),
+    Object.entries(controllerMetadata.computed_props).map(
+      async ([propertyKey, parameter]) => {
+        const computedValue = await computeParameter(
+          context,
+          parameter,
+          controllerInstance,
+        );
+        controllerInstance[propertyKey] = computedValue;
+      },
+    ),
   );
 }
 
@@ -48,7 +63,9 @@ export async function GetControllerInstance(
 ): Promise<unknown> {
   const controllerCache = getControllerCache(context as RequestContextDev);
   const cacheKey = controllerClass.prototype;
-  const cachedController = controllerCache.get(cacheKey) as UnknownRecord | undefined;
+  const cachedController = controllerCache.get(cacheKey) as
+    | UnknownRecord
+    | undefined;
 
   if (cachedController) {
     return cachedController;
@@ -56,9 +73,16 @@ export async function GetControllerInstance(
 
   const typedControllerClass = controllerClass as ControllerClass;
   const controllerInstance = new typedControllerClass() as UnknownRecord;
-  const controllerMetadata = GetMetadata(typedControllerClass, ControllerMeta) as ControllerMetadata;
+  const controllerMetadata = GetMetadata(
+    typedControllerClass,
+    ControllerMeta,
+  ) as ControllerMetadata;
 
-  await applyComputedProperties(controllerInstance, controllerMetadata, context as RequestContextDev);
+  await applyComputedProperties(
+    controllerInstance,
+    controllerMetadata,
+    context as RequestContextDev,
+  );
 
   controllerCache.set(cacheKey, controllerInstance);
   return controllerInstance;
@@ -72,16 +96,24 @@ interface RouteInfo {
   id: string;
   uri: string;
   method: string;
-  mode: 'prefix' | 'postfix' | 'handler' | 'monitor' | 'websocket';
+  mode: "prefix" | "postfix" | "handler" | "monitor" | "websocket";
   priority?: number;
   callbackName: string;
 }
 
-async function invokeHandler(handler: RouteHandler, context: RequestContextDev): Promise<unknown> {
+async function invokeHandler(
+  handler: RouteHandler,
+  context: RequestContextDev,
+): Promise<unknown> {
   const controllerClass = handler.proto.constructor as ControllerClass;
-  const controllerInstance = await GetControllerInstance(controllerClass, context);
+  const controllerInstance = await GetControllerInstance(
+    controllerClass,
+    context,
+  );
   const resolvedParameters = await Promise.all(
-    handler.parameters.map((parameter) => computeParameter(context, parameter, controllerInstance)),
+    handler.parameters.map((parameter) =>
+      computeParameter(context, parameter, controllerInstance),
+    ),
   );
   return handler.callback.apply(controllerInstance, resolvedParameters);
 }
@@ -90,7 +122,7 @@ export const routesProxy = {
   register: (id: string, handler: RouteHandler): void => {
     registeredRoutes.set(id, handler);
     registerHandler(
-      'dev/' + id,
+      `dev/${id}`,
       handler.mode,
       handler.method,
       handler.location,
@@ -100,7 +132,7 @@ export const routesProxy = {
   },
   unregister: (id: string): void => {
     registeredRoutes.delete(id);
-    unregisterHandler('dev/' + id);
+    unregisterHandler(`dev/${id}`);
   },
   getRoutes: (): RouteInfo[] => {
     const routes: RouteInfo[] = [];
@@ -112,7 +144,7 @@ export const routesProxy = {
         method: handler.method,
         mode: handler.mode,
         priority: handler.priority,
-        callbackName: handler.callback.name || 'anonymous',
+        callbackName: handler.callback.name || "anonymous",
       });
     });
 
