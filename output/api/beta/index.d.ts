@@ -1,6 +1,6 @@
-import { Class } from '@ajs/core/beta/decorators';
-import { IncomingMessage, ServerResponse } from 'http';
-import { PassThrough } from 'stream';
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { PassThrough } from "node:stream";
+import { type Class } from "@ajs/core/beta/decorators";
 export type ControllerClass<T = Record<string, any>> = Class<T> & {
     /**
      * Create a sub-controller at the given sub-location.
@@ -305,7 +305,7 @@ export declare const Listen: () => Promise<void>;
 /**
  * Handler mode.
  */
-export type RouteHandlerMode = 'prefix' | 'postfix' | 'handler' | 'monitor' | 'websocket';
+export type RouteHandlerMode = "prefix" | "postfix" | "handler" | "monitor" | "websocket";
 /**
  * Route handler information.
  */

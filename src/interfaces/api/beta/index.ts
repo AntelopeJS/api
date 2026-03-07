@@ -1,19 +1,25 @@
-import { RegisteringProxy, GetMetadata, InterfaceFunction } from '@ajs/core/beta';
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { PassThrough } from "node:stream";
 import {
-  Class,
+  GetMetadata,
+  InterfaceFunction,
+  RegisteringProxy,
+} from "@ajs/core/beta";
+import {
+  type Class,
   MakeMethodDecorator,
   MakeParameterAndPropertyDecorator,
   MakeParameterDecorator,
-} from '@ajs/core/beta/decorators';
-import { IncomingMessage, ServerResponse } from 'http';
-import { PassThrough } from 'stream';
-import Logging from '@ajs/logging/beta';
+} from "@ajs/core/beta/decorators";
+import Logging from "@ajs/logging/beta";
 
 /**
  * @internal
  */
 export namespace internal {
-  export const routesProxy = new RegisteringProxy<(id: string, handler: RouteHandler) => void>();
+  export const routesProxy = new RegisteringProxy<
+    (id: string, handler: RouteHandler) => void
+  >();
 }
 
 export type ControllerClass<T = Record<string, any>> = Class<T> & {
@@ -49,8 +55,8 @@ export type ControllerClass<T = Record<string, any>> = Class<T> & {
  */
 export class HTTPResult {
   private status = 200;
-  private body = '';
-  private contentType = 'text/plain';
+  private body = "";
+  private contentType = "text/plain";
   private stream?: PassThrough;
   /**
    * Additional response headers
@@ -65,8 +71,13 @@ export class HTTPResult {
    * @param defaultStatus Status code to use if creating a new HTTPResult (default: 200)
    * @returns New HTTPResult with the specified headers
    */
-  public static withHeaders(res: any, headers: Record<string, string>, defaultStatus = 200) {
-    const result = res instanceof HTTPResult ? res : new HTTPResult(defaultStatus, res);
+  public static withHeaders(
+    res: any,
+    headers: Record<string, string>,
+    defaultStatus = 200,
+  ) {
+    const result =
+      res instanceof HTTPResult ? res : new HTTPResult(defaultStatus, res);
     for (const [key, val] of Object.entries(headers)) {
       result.addHeader(key, val);
     }
@@ -111,12 +122,12 @@ export class HTTPResult {
    * @param type Content type
    */
   public setBody(body: any, type?: string) {
-    if (body === undefined || typeof body === 'string') {
-      this.body = body || '';
-      this.contentType = type ?? 'text/plain';
+    if (body === undefined || typeof body === "string") {
+      this.body = body || "";
+      this.contentType = type ?? "text/plain";
     } else {
       this.body = JSON.stringify(body);
-      this.contentType = type ?? 'application/json';
+      this.contentType = type ?? "application/json";
     }
   }
 
@@ -174,13 +185,13 @@ export class HTTPResult {
    * @param status HTTP status code for the response (default: 200)
    * @returns Response write stream for sending data
    */
-  public getWriteStream(type = 'text/plain', status = 200): PassThrough {
+  public getWriteStream(type = "text/plain", status = 200): PassThrough {
     if (!this.stream) {
       this.stream = new PassThrough();
     }
     this.contentType = type;
     this.status = status;
-    this.body = '';
+    this.body = "";
     return this.stream;
   }
 
@@ -199,7 +210,12 @@ export class HTTPResult {
    * @param res Response object
    */
   public sendHeadResponse(res: ServerResponse) {
-    res.writeHead(this.status, { ...this.headers, 'Content-Type': this.contentType }).end();
+    res
+      .writeHead(this.status, {
+        ...this.headers,
+        "Content-Type": this.contentType,
+      })
+      .end();
     if (this.stream) {
       this.stream.end();
     }
@@ -211,7 +227,10 @@ export class HTTPResult {
    * @param res Response object
    */
   public sendResponse(res: ServerResponse, abortStream = false) {
-    res.writeHead(this.status, { ...this.headers, 'Content-Type': this.contentType });
+    res.writeHead(this.status, {
+      ...this.headers,
+      "Content-Type": this.contentType,
+    });
     if (this.stream && !abortStream) {
       this.stream.pipe(res);
     } else {
@@ -297,7 +316,10 @@ export type ParameterProvider = (context: RequestContext) => unknown;
  * @param previous Previous value in the chain (Return value of provider or previous modifier)
  * @returns Value passed to next modifier or handler
  */
-export type ParameterModifier = (context: RequestContext, previous: unknown) => unknown;
+export type ParameterModifier = (
+  context: RequestContext,
+  previous: unknown,
+) => unknown;
 
 /**
  * Combination of a parameter provider and zero or more parameter modifiers.
@@ -315,7 +337,11 @@ export interface ComputedParameter {
  * @param obj this Object for provider/modifier calls
  * @returns Result
  */
-export async function computeParameter(context: RequestContext, param: ComputedParameter | null, obj: unknown) {
+export async function computeParameter(
+  context: RequestContext,
+  param: ComputedParameter | null,
+  obj: unknown,
+) {
   if (!param || !param.provider) {
     return undefined;
   }
@@ -348,7 +374,10 @@ export class ControllerMeta {
   /**
    * Computed parameters (available only to its handler)
    */
-  public computed_params: Record<PropertyKey, Record<number, ComputedParameter>> = {};
+  public computed_params: Record<
+    PropertyKey,
+    Record<number, ComputedParameter>
+  > = {};
 
   constructor(target: { location: string }) {
     this.location = target.location;
@@ -356,7 +385,10 @@ export class ControllerMeta {
 
   inherit(parent: ControllerMeta) {
     this.computed_props = { ...parent.computed_props, ...this.computed_props };
-    this.computed_params = { ...parent.computed_params, ...this.computed_params };
+    this.computed_params = {
+      ...parent.computed_params,
+      ...this.computed_params,
+    };
   }
 
   /**
@@ -390,7 +422,11 @@ export class ControllerMeta {
    * @param param If used on a handler, parameter index
    * @param modifier Parameter provider
    */
-  setProvider(key: PropertyKey, param: number | undefined, provider: ParameterProvider) {
+  setProvider(
+    key: PropertyKey,
+    param: number | undefined,
+    provider: ParameterProvider,
+  ) {
     this.getComputedParameter(key, param).provider = provider;
   }
 
@@ -401,7 +437,11 @@ export class ControllerMeta {
    * @param param If used on a handler, parameter index
    * @param modifier Parameter modifier
    */
-  addModifier(key: PropertyKey, param: number | undefined, modifier: ParameterModifier) {
+  addModifier(
+    key: PropertyKey,
+    param: number | undefined,
+    modifier: ParameterModifier,
+  ) {
     this.getComputedParameter(key, param).modifiers.push(modifier);
   }
 
@@ -414,7 +454,7 @@ export class ControllerMeta {
   getParameterArray(key: PropertyKey) {
     const paramsMap = this.computed_params[key] || {};
     const paramsMax = Object.keys(paramsMap)
-      .map((val) => parseInt(val))
+      .map((val) => parseInt(val, 10))
       .reduce((a, b) => Math.max(a, b), 0);
     const params = [];
     for (let i = 0; i <= paramsMax; ++i) {
@@ -431,12 +471,18 @@ export class ControllerMeta {
  * @param base Optional base Controller to inherit properties from
  * @returns New Controller
  */
-export function Controller<T extends object = object>(location: string, base?: Class<T>): ControllerClass<T> {
+export function Controller<T extends object = object>(
+  location: string,
+  base?: Class<T>,
+): ControllerClass<T> {
   const c: any = base ? class extends base {} : class {};
 
   c.location = location;
   c.extend = function (location: string) {
-    return Controller(this.location + '/' + location, this as ControllerClass<T>);
+    return Controller(
+      `${this.location}/${location}`,
+      this as ControllerClass<T>,
+    );
   };
 
   return c as ControllerClass<T>;
@@ -451,7 +497,9 @@ export function Controller<T extends object = object>(location: string, base?: C
  * @param controller Base controller class
  * @returns Controller class at the same location
  */
-export function PartialController<T extends object>(controller: ControllerClass<T>): ControllerClass<T> {
+export function PartialController<T extends object>(
+  controller: ControllerClass<T>,
+): ControllerClass<T> {
   return Controller(controller.location, controller);
 }
 
@@ -462,7 +510,10 @@ export function PartialController<T extends object>(controller: ControllerClass<
  * @param context Request context
  * @returns Controller instance
  */
-export const GetControllerInstance: <T>(cl: Class<T>, context: RequestContext) => Promise<T> =
+export const GetControllerInstance: <T>(
+  cl: Class<T>,
+  context: RequestContext,
+) => Promise<T> =
   InterfaceFunction<(cl: any, context: RequestContext) => any>();
 
 /**
@@ -473,7 +524,12 @@ export const Listen: () => Promise<void> = InterfaceFunction();
 /**
  * Handler mode.
  */
-export type RouteHandlerMode = 'prefix' | 'postfix' | 'handler' | 'monitor' | 'websocket';
+export type RouteHandlerMode =
+  | "prefix"
+  | "postfix"
+  | "handler"
+  | "monitor"
+  | "websocket";
 
 /**
  * Route handler information.
@@ -526,7 +582,9 @@ export interface RouteHandler {
 /**
  * @internal
  */
-export const routesProxy = new RegisteringProxy<(id: string, handler: RouteHandler) => void>();
+export const routesProxy = new RegisteringProxy<
+  (id: string, handler: RouteHandler) => void
+>();
 const routesList: Array<RouteHandler & { id: number }> = [];
 let nextId = 0;
 /**
@@ -538,7 +596,7 @@ let nextId = 0;
 export function RegisterRoute(handler: RouteHandler) {
   const id = nextId++;
   Logging.Debug(
-    `Registered ${handler.method.toUpperCase()} ${handler.location} (${handler.callback.name || 'anonymous'})`,
+    `Registered ${handler.method.toUpperCase()} ${handler.location} (${handler.callback.name || "anonymous"})`,
   );
   routesProxy.register(id.toString(), handler);
   routesList.push({ ...handler, id });
@@ -562,7 +620,7 @@ export function getRegisteredRoutes(): Array<{
     id: handler.id.toString(),
     location: handler.location,
     method: handler.method,
-    callbackName: handler.callback.name || 'anonymous',
+    callbackName: handler.callback.name || "anonymous",
     parameters: handler.parameters,
     properties: handler.properties,
     priority: handler.priority,
@@ -590,8 +648,12 @@ export function ProcessCallback(
   location?: string,
   priority?: HandlerPriority,
 ) {
-  const meta = GetMetadata(target.constructor as ControllerClass, ControllerMeta);
-  const fullLocation = `${meta.location}/${location ?? (key as string)}`.replace(/\/+/g, '/');
+  const meta = GetMetadata(
+    target.constructor as ControllerClass,
+    ControllerMeta,
+  );
+  const fullLocation =
+    `${meta.location}/${location ?? (key as string)}`.replace(/\/+/g, "/");
 
   // Method decorator need an object as return value
   return {
@@ -640,8 +702,14 @@ export const Route = MakeMethodDecorator(ProcessCallback);
  * ```
  */
 export const Delete = MakeMethodDecorator(
-  (target, key, descriptor, location?: string, mode: RouteHandlerMode = 'handler') => {
-    ProcessCallback(target, key, descriptor, mode, 'delete', location);
+  (
+    target,
+    key,
+    descriptor,
+    location?: string,
+    mode: RouteHandlerMode = "handler",
+  ) => {
+    ProcessCallback(target, key, descriptor, mode, "delete", location);
   },
 );
 
@@ -664,8 +732,14 @@ export const Delete = MakeMethodDecorator(
  * ```
  */
 export const Get = MakeMethodDecorator(
-  (target, key, descriptor, location?: string, mode: RouteHandlerMode = 'handler') => {
-    ProcessCallback(target, key, descriptor, mode, 'get', location);
+  (
+    target,
+    key,
+    descriptor,
+    location?: string,
+    mode: RouteHandlerMode = "handler",
+  ) => {
+    ProcessCallback(target, key, descriptor, mode, "get", location);
   },
 );
 
@@ -688,8 +762,14 @@ export const Get = MakeMethodDecorator(
  * ```
  */
 export const Post = MakeMethodDecorator(
-  (target, key, descriptor, location?: string, mode: RouteHandlerMode = 'handler') => {
-    ProcessCallback(target, key, descriptor, mode, 'post', location);
+  (
+    target,
+    key,
+    descriptor,
+    location?: string,
+    mode: RouteHandlerMode = "handler",
+  ) => {
+    ProcessCallback(target, key, descriptor, mode, "post", location);
   },
 );
 
@@ -716,8 +796,14 @@ export const Post = MakeMethodDecorator(
  * ```
  */
 export const Put = MakeMethodDecorator(
-  (target, key, descriptor, location?: string, mode: RouteHandlerMode = 'handler') => {
-    ProcessCallback(target, key, descriptor, mode, 'put', location);
+  (
+    target,
+    key,
+    descriptor,
+    location?: string,
+    mode: RouteHandlerMode = "handler",
+  ) => {
+    ProcessCallback(target, key, descriptor, mode, "put", location);
   },
 );
 
@@ -744,8 +830,23 @@ export const Put = MakeMethodDecorator(
  * ```
  */
 export const Prefix = MakeMethodDecorator(
-  (target, key, descriptor, method: string, location?: string, priority?: HandlerPriority) => {
-    ProcessCallback(target, key, descriptor, 'prefix', method, location, priority);
+  (
+    target,
+    key,
+    descriptor,
+    method: string,
+    location?: string,
+    priority?: HandlerPriority,
+  ) => {
+    ProcessCallback(
+      target,
+      key,
+      descriptor,
+      "prefix",
+      method,
+      location,
+      priority,
+    );
   },
 );
 
@@ -770,8 +871,23 @@ export const Prefix = MakeMethodDecorator(
  * ```
  */
 export const Postfix = MakeMethodDecorator(
-  (target, key, descriptor, method: string, location?: string, priority?: HandlerPriority) => {
-    ProcessCallback(target, key, descriptor, 'postfix', method, location, priority);
+  (
+    target,
+    key,
+    descriptor,
+    method: string,
+    location?: string,
+    priority?: HandlerPriority,
+  ) => {
+    ProcessCallback(
+      target,
+      key,
+      descriptor,
+      "postfix",
+      method,
+      location,
+      priority,
+    );
   },
 );
 
@@ -796,8 +912,23 @@ export const Postfix = MakeMethodDecorator(
  * ```
  */
 export const Monitor = MakeMethodDecorator(
-  (target, key, descriptor, method: string, location?: string, priority?: HandlerPriority) => {
-    ProcessCallback(target, key, descriptor, 'monitor', method, location, priority);
+  (
+    target,
+    key,
+    descriptor,
+    method: string,
+    location?: string,
+    priority?: HandlerPriority,
+  ) => {
+    ProcessCallback(
+      target,
+      key,
+      descriptor,
+      "monitor",
+      method,
+      location,
+      priority,
+    );
   },
 );
 
@@ -821,9 +952,11 @@ export const Monitor = MakeMethodDecorator(
  * }
  * ```
  */
-export const WebsocketHandler = MakeMethodDecorator((target, key, descriptor, location?: string) => {
-  ProcessCallback(target, key, descriptor, 'websocket', 'get', location);
-});
+export const WebsocketHandler = MakeMethodDecorator(
+  (target, key, descriptor, location?: string) => {
+    ProcessCallback(target, key, descriptor, "websocket", "get", location);
+  },
+);
 
 /**
  * Get the body from a RequestContext object.
@@ -835,18 +968,21 @@ export function ReadBody(context: RequestContext): Promise<Buffer> {
   if (context.body === undefined) {
     context.body = new Promise((resolve, reject) => {
       const buffers: Buffer[] = [];
-      context.rawRequest.on('readable', () => {
-        let chunk: Buffer | null;
-        while ((chunk = context.rawRequest.read() as Buffer)) {
+      context.rawRequest.on("readable", () => {
+        while (true) {
+          const chunk = context.rawRequest.read() as Buffer | null;
+          if (!chunk) {
+            break;
+          }
           buffers.push(chunk);
         }
       });
 
-      context.rawRequest.on('end', () => {
+      context.rawRequest.on("end", () => {
         resolve(Buffer.concat(buffers));
       });
 
-      context.rawRequest.on('error', reject);
+      context.rawRequest.on("error", reject);
     });
   }
   return context.body as Promise<Buffer>;
@@ -880,7 +1016,10 @@ export function SetParameterProvider(
   index: number | undefined,
   provider: ParameterProvider,
 ) {
-  GetMetadata(target.constructor as ControllerClass, ControllerMeta).setProvider(key, index, provider);
+  GetMetadata(
+    target.constructor as ControllerClass,
+    ControllerMeta,
+  ).setProvider(key, index, provider);
 }
 
 /**
@@ -910,7 +1049,10 @@ export function AddParameterModifier(
   index: number | undefined,
   transformer: ParameterModifier,
 ) {
-  GetMetadata(target.constructor as ControllerClass, ControllerMeta).addModifier(key, index, transformer);
+  GetMetadata(
+    target.constructor as ControllerClass,
+    ControllerMeta,
+  ).addModifier(key, index, transformer);
 }
 
 /**
@@ -950,19 +1092,21 @@ export const RawBody = MakeParameterAndPropertyDecorator((target, key, param) =>
  * }
  * ```
  */
-export const JSONBody = MakeParameterAndPropertyDecorator((target, key, index) => {
-  SetParameterProvider(target, key, index, (ctx: RequestContext) =>
-    ReadBody(ctx).then((body: unknown) => {
-      if (!body || (body instanceof Buffer && body.length === 0)) {
-        return undefined;
-      }
-      if (typeof body === 'string' || body instanceof Buffer) {
-        return JSON.parse(body.toString());
-      }
-      throw new Error('Unable to parse JSON: Invalid body type');
-    }),
-  );
-});
+export const JSONBody = MakeParameterAndPropertyDecorator(
+  (target, key, index) => {
+    SetParameterProvider(target, key, index, (ctx: RequestContext) =>
+      ReadBody(ctx).then((body: unknown) => {
+        if (!body || (body instanceof Buffer && body.length === 0)) {
+          return undefined;
+        }
+        if (typeof body === "string" || body instanceof Buffer) {
+          return JSON.parse(body.toString());
+        }
+        throw new Error("Unable to parse JSON: Invalid body type");
+      }),
+    );
+  },
+);
 
 /**
  * Parameter Provider: Request Parameter.
@@ -997,16 +1141,22 @@ export const JSONBody = MakeParameterAndPropertyDecorator((target, key, index) =
  * ```
  */
 export const Parameter = MakeParameterAndPropertyDecorator(
-  (target, key, param, name: string, source: 'param' | 'query' | 'header' = 'param') => {
+  (
+    target,
+    key,
+    param,
+    name: string,
+    source: "param" | "query" | "header" = "param",
+  ) => {
     SetParameterProvider(target, key, param, (context) => {
       switch (source) {
-        case 'param':
+        case "param":
           return context.routeParameters[name];
-        case 'query': {
+        case "query": {
           const val = context.url.searchParams.get(name);
           return val === null ? undefined : val || true;
         }
-        case 'header': {
+        case "header": {
           const val2 = context.rawRequest.headers[name.toLowerCase()];
           return Array.isArray(val2) ? val2[0] : val2;
         }
@@ -1076,8 +1226,11 @@ export const Result = MakeParameterDecorator((target, key, param) =>
  * }
  * ```
  */
-export const WriteStream = MakeParameterDecorator((target, key, param, type?: string) =>
-  SetParameterProvider(target, key, param, (context) => context.response.getWriteStream(type)),
+export const WriteStream = MakeParameterDecorator(
+  (target, key, param, type?: string) =>
+    SetParameterProvider(target, key, param, (context) =>
+      context.response.getWriteStream(type),
+    ),
 );
 
 /**
@@ -1103,8 +1256,9 @@ export const WriteStream = MakeParameterDecorator((target, key, param, type?: st
  * }
  * ```
  */
-export const Transform = MakeParameterAndPropertyDecorator((target, key, param, transformer: ParameterModifier) =>
-  AddParameterModifier(target, key, param, transformer),
+export const Transform = MakeParameterAndPropertyDecorator(
+  (target, key, param, transformer: ParameterModifier) =>
+    AddParameterModifier(target, key, param, transformer),
 );
 
 /**
@@ -1131,8 +1285,9 @@ export const Transform = MakeParameterAndPropertyDecorator((target, key, param, 
  * }
  * ```
  */
-export const Connection = MakeParameterAndPropertyDecorator((target, key, param) =>
-  SetParameterProvider(target, key, param, (context) => context.connection),
+export const Connection = MakeParameterAndPropertyDecorator(
+  (target, key, param) =>
+    SetParameterProvider(target, key, param, (context) => context.connection),
 );
 
 /**
@@ -1164,12 +1319,12 @@ export const Connection = MakeParameterAndPropertyDecorator((target, key, param)
  * ```
  */
 export const MultiParameter = MakeParameterAndPropertyDecorator(
-  (target, key, param, name: string, source: 'query' | 'header' = 'query') => {
+  (target, key, param, name: string, source: "query" | "header" = "query") => {
     SetParameterProvider(target, key, param, (context) => {
       switch (source) {
-        case 'query':
+        case "query":
           return context.url.searchParams.getAll(name);
-        case 'header': {
+        case "header": {
           const val = context.rawRequest.headers[name.toLowerCase()];
           return Array.isArray(val) ? val : val ? [val] : [];
         }

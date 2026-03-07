@@ -1,15 +1,14 @@
-import * as net from 'net';
-import * as http from 'http';
-import * as https from 'https';
-import stream from 'stream';
+import * as http from "node:http";
+import * as https from "node:https";
+import type * as net from "node:net";
+import type stream from "node:stream";
+import { ImplementInterface } from "@ajs/core/beta";
+import { requestListener, upgradeListener } from "./server";
+import "./middlewares/cors";
+import { Logging } from "@ajs/logging/beta";
 
-import { ImplementInterface } from '@ajs/core/beta';
-import { requestListener, upgradeListener } from './server';
-import './middlewares/cors';
-import { Logging } from '@ajs/logging/beta';
-
-type ServerProtocol = 'http' | 'https';
-type SocketProtocol = 'ws' | 'wss';
+type ServerProtocol = "http" | "https";
+type SocketProtocol = "ws" | "wss";
 
 interface ServerNetworkConfig {
   host?: string;
@@ -17,11 +16,11 @@ interface ServerNetworkConfig {
 }
 
 interface HTTPConfig extends http.ServerOptions, ServerNetworkConfig {
-  protocol: 'http';
+  protocol: "http";
 }
 
 interface HTTPSConfig extends https.ServerOptions, ServerNetworkConfig {
-  protocol: 'https';
+  protocol: "https";
 }
 
 type ServerConfig = HTTPConfig | HTTPSConfig;
@@ -42,8 +41,11 @@ interface Config {
 type ServerFactory = (config: ServerConfig) => net.Server;
 
 const DEFAULT_HTTP_PORT = 80;
-const DEFAULT_HOST = 'localhost';
-const DEFAULT_SERVER_CONFIG: HTTPConfig = { protocol: 'http', port: DEFAULT_HTTP_PORT };
+const DEFAULT_HOST = "localhost";
+const DEFAULT_SERVER_CONFIG: HTTPConfig = {
+  protocol: "http",
+  port: DEFAULT_HTTP_PORT,
+};
 
 const SERVER_FACTORY_BY_PROTOCOL: Record<ServerProtocol, ServerFactory> = {
   http: (config) => createHTTPServer(config as HTTPConfig),
@@ -59,23 +61,28 @@ let listening = false;
 
 function createHTTPServer(config: HTTPConfig): net.Server {
   const server = http.createServer(config);
-  attachServerListeners(server, 'http', 'ws');
+  attachServerListeners(server, "http", "ws");
   return server;
 }
 
 function createHTTPSServer(config: HTTPSConfig): net.Server {
   const server = https.createServer(config);
-  attachServerListeners(server, 'https', 'wss');
+  attachServerListeners(server, "https", "wss");
   return server;
 }
 
-function attachServerListeners(server: net.Server, protocol: ServerProtocol, socketProtocol: SocketProtocol): void {
+function attachServerListeners(
+  server: net.Server,
+  protocol: ServerProtocol,
+  socketProtocol: SocketProtocol,
+): void {
   server.on(
-    'request',
-    (req: http.IncomingMessage, res: http.ServerResponse) => void requestListener(req, res, protocol),
+    "request",
+    (req: http.IncomingMessage, res: http.ServerResponse) =>
+      void requestListener(req, res, protocol),
   );
   server.on(
-    'upgrade',
+    "upgrade",
     (req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) =>
       void upgradeListener(req, socket, head, socketProtocol),
   );
@@ -102,7 +109,9 @@ function listenServer(server: net.Server, config: ServerConfig): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const onListening = () => {
       cleanup();
-      Logging.Info(`Server started, listening on ${config.protocol}://${config.host ?? DEFAULT_HOST}:${config.port}`);
+      Logging.Info(
+        `Server started, listening on ${config.protocol}://${config.host ?? DEFAULT_HOST}:${config.port}`,
+      );
       resolve();
     };
 
@@ -112,12 +121,12 @@ function listenServer(server: net.Server, config: ServerConfig): Promise<void> {
     };
 
     const cleanup = () => {
-      server.off('listening', onListening);
-      server.off('error', onError);
+      server.off("listening", onListening);
+      server.off("error", onError);
     };
 
-    server.once('listening', onListening);
-    server.once('error', onError);
+    server.once("listening", onListening);
+    server.once("error", onError);
     server.listen(config.port, config.host);
   });
 }
@@ -132,13 +141,18 @@ export async function construct(config: Config): Promise<void> {
     servers: resolveServers(config),
   };
 
-  await ImplementInterface(import('@ajs.local/api/beta'), import('./implementations/api/beta'));
+  await ImplementInterface(
+    import("@ajs.local/api/beta"),
+    import("./implementations/api/beta"),
+  );
 }
 
 export function destroy(): void {}
 
 export function start(): void {
-  servers = (conf.servers ?? []).map((serverConfig) => createConfiguredServer(serverConfig));
+  servers = (conf.servers ?? []).map((serverConfig) =>
+    createConfiguredServer(serverConfig),
+  );
   listening = false;
 
   if (conf.autoListen !== false) {
@@ -157,7 +171,11 @@ export async function listenServers(): Promise<void> {
   listening = true;
 
   try {
-    await Promise.all((conf.servers ?? []).map((serverConfig, index) => listenServer(servers[index], serverConfig)));
+    await Promise.all(
+      (conf.servers ?? []).map((serverConfig, index) =>
+        listenServer(servers[index], serverConfig),
+      ),
+    );
   } catch (error) {
     listening = false;
     throw error;
@@ -165,7 +183,9 @@ export async function listenServers(): Promise<void> {
 }
 
 export function stop(): void {
-  servers.forEach((server) => server.close());
+  for (const server of servers) {
+    server.close();
+  }
   servers = [];
   listening = false;
 }

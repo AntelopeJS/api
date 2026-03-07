@@ -1,7 +1,7 @@
-import { HTTPResult, HandlerPriority } from '@ajs.local/api/beta';
-import { IncomingMessage, ServerResponse } from 'http';
-import stream from 'stream';
-import { WebSocket, WebSocketServer } from 'ws';
+import { type IncomingMessage, ServerResponse } from "node:http";
+import type stream from "node:stream";
+import { HandlerPriority, HTTPResult } from "@ajs.local/api/beta";
+import { type WebSocket, WebSocketServer } from "ws";
 
 export type RouteCallback = (context: RequestContext) => unknown;
 export interface IdentifiableRouteCallback {
@@ -65,12 +65,20 @@ function findHandlers(
 ) {
   if (multi) {
     result.push(
-      ...level.handlers.map((handler) => ({ handler: handler.callback, parameters, priority: handler.priority })),
+      ...level.handlers.map((handler) => ({
+        handler: handler.callback,
+        parameters,
+        priority: handler.priority,
+      })),
     );
   }
   if (depth >= path.length) {
     if (!multi && level.handlers.length > 0) {
-      result.push({ handler: level.handlers[0].callback, parameters, priority: level.handlers[0].priority });
+      result.push({
+        handler: level.handlers[0].callback,
+        parameters,
+        priority: level.handlers[0].priority,
+      });
     }
     return;
   }
@@ -78,7 +86,14 @@ function findHandlers(
   const part = path[depth];
 
   if (part in level.staticRoutes) {
-    findHandlers(path, depth + 1, level.staticRoutes[part], result, parameters, multi);
+    findHandlers(
+      path,
+      depth + 1,
+      level.staticRoutes[part],
+      result,
+      parameters,
+      multi,
+    );
     if (result.length > 0 && !multi) {
       return;
     }
@@ -131,8 +146,18 @@ function findHandlers(
       continue;
     }
 
-    const newParameters = { ...parameters, [catchAll.paramName]: captured.join('/') };
-    findHandlers(path, path.length, catchAll.level, result, newParameters, multi);
+    const newParameters = {
+      ...parameters,
+      [catchAll.paramName]: captured.join("/"),
+    };
+    findHandlers(
+      path,
+      path.length,
+      catchAll.level,
+      result,
+      newParameters,
+      multi,
+    );
     if (result.length > 0 && !multi) {
       return;
     }
@@ -152,7 +177,7 @@ function getHandler(
       return result[0];
     }
   }
-  if ('any' in source) {
+  if ("any" in source) {
     findHandlers(path, 0, source.any, result, {}, multi);
     if (result.length > 0 && !multi) {
       return result[0];
@@ -161,7 +186,10 @@ function getHandler(
   return multi ? result : undefined;
 }
 
-function removeHandler(id: string, source: Record<string, RouteLevel>): boolean {
+function removeHandler(
+  id: string,
+  source: Record<string, RouteLevel>,
+): boolean {
   for (const level of Object.values(source)) {
     const handlerLength = level.handlers.length;
     level.handlers = level.handlers.filter((handler) => handler.id !== id);
@@ -198,52 +226,53 @@ function removeHandler(id: string, source: Record<string, RouteLevel>): boolean 
 
 const special = {
   $: true,
-  '-': true,
+  "-": true,
   _: true,
-  '.': true,
-  '+': true,
-  '!': true,
-  ' ': true,
-  '*': true,
+  ".": true,
+  "+": true,
+  "!": true,
+  " ": true,
+  "*": true,
   "'": true,
-  '(': true,
-  ')': true,
-  ',': true,
+  "(": true,
+  ")": true,
+  ",": true,
 };
 export function registerHandler(
   id: string,
-  mode: 'prefix' | 'postfix' | 'handler' | 'monitor' | 'websocket',
+  mode: "prefix" | "postfix" | "handler" | "monitor" | "websocket",
   method: string | undefined,
   location: string,
   handler: RouteCallback,
   priority = HandlerPriority.NORMAL,
 ) {
-  const parts = location.split('/').filter((part) => part);
+  const parts = location.split("/").filter((part) => part);
   const source = roots[mode];
-  let level = source[method?.toLowerCase() || 'any'];
+  let level = source[method?.toLowerCase() || "any"];
   if (!level) {
     level = new RouteLevel();
-    source[method?.toLowerCase() || 'any'] = level;
+    source[method?.toLowerCase() || "any"] = level;
   }
   for (let i = 0; i < parts.length; ++i) {
     const part = parts[i];
 
-    if (part.startsWith('::')) {
+    if (part.startsWith("::")) {
       const paramName = part.slice(2);
       if (!paramName) {
-        throw new Error('Catch-all parameter must have a name');
+        throw new Error("Catch-all parameter must have a name");
       }
 
       const suffix = parts.slice(i + 1);
       for (const suffixPart of suffix) {
-        if (suffixPart.indexOf(':') >= 0) {
-          throw new Error('Dynamic segments after catch-all are not supported');
+        if (suffixPart.indexOf(":") >= 0) {
+          throw new Error("Dynamic segments after catch-all are not supported");
         }
       }
 
-      const suffixKey = suffix.join('/');
+      const suffixKey = suffix.join("/");
       let catchAll = level.catchAllRoutes.find(
-        (route) => route.paramName === paramName && route.suffix.join('/') === suffixKey,
+        (route) =>
+          route.paramName === paramName && route.suffix.join("/") === suffixKey,
       );
 
       if (!catchAll) {
@@ -255,22 +284,22 @@ export function registerHandler(
       break;
     }
 
-    if (part.indexOf(':') >= 0) {
+    if (part.indexOf(":") >= 0) {
       if (!(part in level.dynamicRoutes)) {
         const mapping = [];
-        const match = ['^'];
-        let word: string[] | undefined = undefined;
+        const match = ["^"];
+        let word: string[] | undefined;
         for (const char of part) {
           if (char in special) {
             if (word) {
-              mapping.push(word.join(''));
+              mapping.push(word.join(""));
               match.push(`([^\\${char}]*)`);
               word = undefined;
             }
-            match.push('\\' + char);
-          } else if (char === ':') {
+            match.push(`\\${char}`);
+          } else if (char === ":") {
             if (word) {
-              throw new Error('Invalid URL parameter');
+              throw new Error("Invalid URL parameter");
             }
             word = [];
           } else if (char.match(/[a-zA-Z0-9]/)) {
@@ -280,16 +309,16 @@ export function registerHandler(
               match.push(char);
             }
           } else {
-            throw new Error('Invalid character in URL');
+            throw new Error("Invalid character in URL");
           }
         }
         if (word) {
-          mapping.push(word.join(''));
+          mapping.push(word.join(""));
           match.push(`(.*)`);
         }
-        match.push('$');
+        match.push("$");
         level.dynamicRoutes[part] = {
-          match: new RegExp(match.join('')),
+          match: new RegExp(match.join("")),
           sub: new RouteLevel(),
           mapping,
         };
@@ -313,7 +342,11 @@ export function unregisterHandler(id: string) {
   }
 }
 
-function handleResult(isHeadRequest: boolean, response: HTTPResult, res: ServerResponse) {
+function handleResult(
+  isHeadRequest: boolean,
+  response: HTTPResult,
+  res: ServerResponse,
+) {
   if (isHeadRequest) {
     response.sendHeadResponse(res);
   } else {
@@ -322,7 +355,7 @@ function handleResult(isHeadRequest: boolean, response: HTTPResult, res: ServerR
 }
 
 function extractError(error: unknown) {
-  if (typeof error === 'object' && error && 'message' in error) {
+  if (typeof error === "object" && error && "message" in error) {
     return (error as { message?: unknown }).message ?? error;
   }
   return error;
@@ -333,26 +366,45 @@ function setHandlerResponse(requestContext: RequestContext, result: unknown) {
     return;
   }
   if (result) {
-    requestContext.response = HTTPResult.withHeaders(result, requestContext.response.getHeaders(), 200);
+    requestContext.response = HTTPResult.withHeaders(
+      result,
+      requestContext.response.getHeaders(),
+      200,
+    );
     return;
   }
-  requestContext.response = HTTPResult.withHeaders('', requestContext.response.getHeaders(), 200);
+  requestContext.response = HTTPResult.withHeaders(
+    "",
+    requestContext.response.getHeaders(),
+    200,
+  );
 }
 
 function cloneResponse(response: HTTPResult) {
-  const snapshot = new HTTPResult(response.getStatus(), response.getBody(), response.getContentType());
+  const snapshot = new HTTPResult(
+    response.getStatus(),
+    response.getBody(),
+    response.getContentType(),
+  );
   for (const [name, value] of Object.entries(response.getHeaders())) {
     snapshot.addHeader(name, value);
   }
   return snapshot;
 }
 
-function getMultiHandlers(method: string, path: string[], source: Record<string, RouteLevel>) {
+function getMultiHandlers(
+  method: string,
+  path: string[],
+  source: Record<string, RouteLevel>,
+) {
   const handlers = getHandler(method, path, source, true);
   return Array.isArray(handlers) ? handlers : [];
 }
 
-async function executePriorityHandlers(handlers: HandlerResult[], requestContext: RequestContext) {
+async function executePriorityHandlers(
+  handlers: HandlerResult[],
+  requestContext: RequestContext,
+) {
   handlers.sort((a, b) => a.priority - b.priority);
   for (const { handler, parameters } of handlers) {
     requestContext.routeParameters = parameters;
@@ -364,7 +416,11 @@ async function executePriorityHandlers(handlers: HandlerResult[], requestContext
   return undefined;
 }
 
-async function executeMonitors(method: string, path: string[], requestContext: RequestContext) {
+async function executeMonitors(
+  method: string,
+  path: string[],
+  requestContext: RequestContext,
+) {
   const monitors = getMultiHandlers(method, path, roots.monitor);
   const monitorContext: RequestContext = {
     ...requestContext,
@@ -383,33 +439,47 @@ async function executeMonitors(method: string, path: string[], requestContext: R
   }
 }
 
-export async function requestListener(req: IncomingMessage, res: ServerResponse, protocol: 'http' | 'https') {
-  const url = new URL(req.url || '', `${protocol}://${req.headers.host || 'localhost'}`);
+export async function requestListener(
+  req: IncomingMessage,
+  res: ServerResponse,
+  protocol: "http" | "https",
+) {
+  const url = new URL(
+    req.url || "",
+    `${protocol}://${req.headers.host || "localhost"}`,
+  );
   const requestContext: RequestContext = {
     rawRequest: req,
     rawResponse: res,
     url,
     routeParameters: {},
-    response: new HTTPResult(404, 'Not Found'),
+    response: new HTTPResult(404, "Not Found"),
   };
 
-  const path = url.pathname.split('/').filter((part) => part);
-  const method = req.method?.toLowerCase() || 'get';
-  const isHeadRequest = method === 'head';
+  const path = url.pathname.split("/").filter((part) => part);
+  const method = req.method?.toLowerCase() || "get";
+  const isHeadRequest = method === "head";
   let requestError: unknown;
 
   try {
     let handler = getHandler(method, path, roots.handler, false);
-    if (!handler && method === 'head') {
-      handler = getHandler('get', path, roots.handler, false);
+    if (!handler && method === "head") {
+      handler = getHandler("get", path, roots.handler, false);
     }
-    if (!handler && method !== 'options') {
+    if (!handler && method !== "options") {
       // Fall through to finally block to execute monitors.
     } else {
-      const prefixResult = await executePriorityHandlers(getMultiHandlers(method, path, roots.prefix), requestContext);
+      const prefixResult = await executePriorityHandlers(
+        getMultiHandlers(method, path, roots.prefix),
+        requestContext,
+      );
       if (prefixResult) {
-        requestContext.response = HTTPResult.withHeaders(prefixResult, requestContext.response.getHeaders(), 200);
-      } else if (!handler && method === 'options') {
+        requestContext.response = HTTPResult.withHeaders(
+          prefixResult,
+          requestContext.response.getHeaders(),
+          200,
+        );
+      } else if (!handler && method === "options") {
         // Fall through to finally block to execute monitors.
       } else {
         if (handler && !Array.isArray(handler)) {
@@ -423,13 +493,21 @@ export async function requestListener(req: IncomingMessage, res: ServerResponse,
           requestContext,
         );
         if (postfixResult) {
-          requestContext.response = HTTPResult.withHeaders(postfixResult, requestContext.response.getHeaders(), 200);
+          requestContext.response = HTTPResult.withHeaders(
+            postfixResult,
+            requestContext.response.getHeaders(),
+            200,
+          );
         }
       }
     }
   } catch (error: unknown) {
     requestError = error;
-    requestContext.response = HTTPResult.withHeaders(extractError(error), requestContext.response.getHeaders(), 500);
+    requestContext.response = HTTPResult.withHeaders(
+      extractError(error),
+      requestContext.response.getHeaders(),
+      500,
+    );
   } finally {
     requestContext.error = requestError;
     await executeMonitors(method, path, requestContext);
@@ -439,26 +517,31 @@ export async function requestListener(req: IncomingMessage, res: ServerResponse,
 
 const wss = new WebSocketServer({ noServer: true });
 const upgrader = (req: IncomingMessage, socket: stream.Duplex, head: Buffer) =>
-  new Promise<WebSocket>((resolve) => wss.handleUpgrade(req, socket, head, resolve));
+  new Promise<WebSocket>((resolve) =>
+    wss.handleUpgrade(req, socket, head, resolve),
+  );
 
 export async function upgradeListener(
   req: IncomingMessage,
   socket: stream.Duplex,
   head: Buffer,
-  protocol: 'ws' | 'wss',
+  protocol: "ws" | "wss",
 ) {
   const res = new ServerResponse(req);
-  const url = new URL(req.url || '', `${protocol}://${req.headers.host || 'localhost'}`);
+  const url = new URL(
+    req.url || "",
+    `${protocol}://${req.headers.host || "localhost"}`,
+  );
   const requestContext: RequestContext = {
     rawRequest: req,
     rawResponse: res,
     url,
     routeParameters: {},
-    response: new HTTPResult(404, 'Not Found'),
+    response: new HTTPResult(404, "Not Found"),
   };
 
-  const path = url.pathname.split('/').filter((part) => part);
-  const method = req.method?.toLowerCase() || 'get';
+  const path = url.pathname.split("/").filter((part) => part);
+  const method = req.method?.toLowerCase() || "get";
   let requestError: unknown;
   let hasUpgradedConnection = false;
   let mustSendResponse = false;
@@ -471,9 +554,16 @@ export async function upgradeListener(
       mustDestroySocket = true;
       // Fall through to finally block to execute monitors.
     } else {
-      const prefixResult = await executePriorityHandlers(getMultiHandlers(method, path, roots.prefix), requestContext);
+      const prefixResult = await executePriorityHandlers(
+        getMultiHandlers(method, path, roots.prefix),
+        requestContext,
+      );
       if (prefixResult) {
-        requestContext.response = HTTPResult.withHeaders(prefixResult, requestContext.response.getHeaders(), 200);
+        requestContext.response = HTTPResult.withHeaders(
+          prefixResult,
+          requestContext.response.getHeaders(),
+          200,
+        );
         mustSendResponse = true;
         mustDestroySocket = true;
         // Fall through to finally block to execute monitors.
@@ -488,7 +578,11 @@ export async function upgradeListener(
     requestError = error;
     mustDestroySocket = true;
     if (!hasUpgradedConnection) {
-      requestContext.response = HTTPResult.withHeaders(extractError(error), requestContext.response.getHeaders(), 500);
+      requestContext.response = HTTPResult.withHeaders(
+        extractError(error),
+        requestContext.response.getHeaders(),
+        500,
+      );
       mustSendResponse = true;
     }
   } finally {

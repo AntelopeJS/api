@@ -1,4 +1,4 @@
-import { HTTPResult } from '@ajs/api/beta';
+import { HTTPResult } from "@ajs/api/beta";
 
 /**
  * Assert a condition is truthy, throwing an HTTPResult error if false.
@@ -22,7 +22,11 @@ import { HTTPResult } from '@ajs/api/beta';
  * }
  * ```
  */
-export function assert<T>(condition: T, code: number, message: string): asserts condition {
+export function assert<T>(
+  condition: T,
+  code: number,
+  message: string,
+): asserts condition {
   if (!condition) {
     throw new HTTPResult(code, message);
   }
