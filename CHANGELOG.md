@@ -1,5 +1,48 @@
 # Changelog
 
+## v1.0.0
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v0.2.0...v1.0.0)
+
+### 🚀 Enhancements
+
+- **api:** Add PartialController helper ([#17](https://github.com/AntelopeJS/api/pull/17))
+- **api:** Add catch-all route parameter support ([#16](https://github.com/AntelopeJS/api/pull/16))
+- **api:** Add manual listen control for server startup ([#18](https://github.com/AntelopeJS/api/pull/18))
+- **api:** Add @Monitor decorator for always-run observers ([#19](https://github.com/AntelopeJS/api/pull/19))
+
+### 🩹 Fixes
+
+- Handle empty body in JSONBody decorator ([ab6eee8](https://github.com/AntelopeJS/api/commit/ab6eee8))
+
+### 📦 Build
+
+- Upgrade api-util to beta version ([bfc9577](https://github.com/AntelopeJS/api/commit/bfc9577))
+- Replace rm -rf with rimraf ([#13](https://github.com/AntelopeJS/api/pull/13))
+
+### 🏡 Chore
+
+- Remove unused script ([80db286](https://github.com/AntelopeJS/api/commit/80db286))
+- Replicate ai agent config files (.agents/.claude) ([#14](https://github.com/AntelopeJS/api/pull/14))
+- Simplify CI workflow triggers and update AGENTS.md ([0f1137b](https://github.com/AntelopeJS/api/commit/0f1137b))
+- Migrate from eslint and prettier to biome ([#20](https://github.com/AntelopeJS/api/pull/20))
+- Migrate from local beta interfaces to published @antelopejs packages ([55a3d1e](https://github.com/AntelopeJS/api/commit/55a3d1e))
+- Bump release-it to 19.2.4 ([12c85ce](https://github.com/AntelopeJS/api/commit/12c85ce))
+
+### 🎨 Styles
+
+- Format destroy function ([feec286](https://github.com/AntelopeJS/api/commit/feec286))
+
+### 🤖 CI
+
+- Remove test:coverage step from CI workflow ([3803084](https://github.com/AntelopeJS/api/commit/3803084))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <upd4ting@gmail.com>
+- MrSociety404 <fabrice@altab.be>
+- Glastis ([@Glastis](http://github.com/Glastis))
+
 ## v0.2.0
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v0.1.0...v0.2.0)
