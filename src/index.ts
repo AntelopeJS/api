@@ -147,7 +147,7 @@ export async function construct(config: Config): Promise<void> {
   );
 }
 
-export function destroy(): void { }
+export function destroy(): void {}
 
 export function start(): void {
   servers = (conf.servers ?? []).map((serverConfig) =>
