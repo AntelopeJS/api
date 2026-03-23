@@ -1,5 +1,4 @@
 import {
-  assert,
   Controller,
   Delete,
   Get,
@@ -7,7 +6,8 @@ import {
   Parameter,
   Post,
   Put,
-} from "@ajs/api/beta";
+} from "@antelopejs/interface-api";
+import { assert } from "@antelopejs/interface-api-util";
 
 export class PlaygroundController extends Controller("/playground") {
   @Get("/hello")

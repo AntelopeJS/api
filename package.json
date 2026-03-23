@@ -24,24 +24,20 @@
   "packageManager": "pnpm@10.6.5",
   "scripts": {
     "build": "rimraf dist && tsc",
-    "dev:prepare": "cd playground && ajs module imports install",
     "dev": "ajs project run -w -p playground",
     "format": "biome format --write .",
-    "generate": "ajs module exports generate",
     "lint:fix": "biome check --write .",
     "lint": "biome check .",
     "prepack": "pnpm run build",
-    "prepare": "ajs module imports install",
     "release": "pnpm run lint && pnpm run test && pnpm run prepack && release-it",
     "test": "ajs module test ."
   },
   "antelopeJs": {
-    "exportsPath": "dist/interfaces",
-    "imports": [
-      "core@beta",
-      "logging@beta"
+    "implements": [
+      "@antelopejs/interface-api",
+      "@antelopejs/interface-api-util"
     ],
-    "importsOptional": [],
+    "test": "src/test/antelope.test.ts",
     "defaultConfig": {
       "servers": [
         {
@@ -50,29 +46,24 @@
           "port": 8080
         }
       ]
-    },
-    "test": {
-      "project": "src/test/antelope.test.json",
-      "folder": "dist/test"
     }
   },
   "dependencies": {
+    "@antelopejs/interface-api": "^0.0.2",
+    "@antelopejs/interface-api-util": "^0.0.2",
+    "@antelopejs/interface-core": "^0.0.2",
     "reflect-metadata": "^0.2.2",
     "ws": "^8.18.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.2",
-    "rimraf": "^6.0.1",
-    "@types/chai": "^5.2.2",
-    "@types/express": "^5.0.1",
-    "@types/mocha": "^10.0.10",
     "@types/node": "^22.14.1",
-    "@types/sinon": "^17.0.4",
+    "@types/sinon": "^21.0.0",
     "@types/ws": "^8.18.1",
-    "chai": "^5.2.0",
     "release-it": "^19.0.2",
     "release-it-changelogen": "^0.1.0",
-    "sinon": "^20.0.0",
+    "rimraf": "^6.0.1",
+    "sinon": "^21.0.3",
     "typescript": "^5.8.3"
   }
 }

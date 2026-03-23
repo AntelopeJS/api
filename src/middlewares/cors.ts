@@ -5,7 +5,7 @@ import {
   HTTPResult,
   Prefix,
   type RequestContext,
-} from "@ajs.local/api/beta";
+} from "@antelopejs/interface-api";
 import { getConfig } from "..";
 
 type AllowedOrigin = string | RegExp | Array<string | RegExp>;

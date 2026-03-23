@@ -5,28 +5,22 @@
   "scripts": {
     "dev": "ajs project run -w"
   },
+  "dependencies": {
+    "@antelopejs/interface-api": "^0.0.2",
+    "@antelopejs/interface-api-util": "^0.0.2",
+    "@antelopejs/interface-core": "^0.0.2"
+  },
   "devDependencies": {
     "@types/node": "^20.5.7",
     "prettier": "^2.6.1",
     "typescript": "^5.8.3"
   },
   "antelopeJs": {
-    "imports": [
-      {
-        "name": "core@beta",
-        "skipInstall": true
-      },
-      {
-        "name": "api@beta",
-        "skipInstall": true
-      }
-    ],
     "baseUrl": "dist",
     "paths": {
       "@/*": [
         "*"
       ]
-    },
-    "importsOptional": []
+    }
   }
 }

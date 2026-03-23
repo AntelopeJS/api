@@ -1,6 +1,6 @@
 import { type IncomingMessage, ServerResponse } from "node:http";
 import type stream from "node:stream";
-import { HandlerPriority, HTTPResult } from "@ajs.local/api/beta";
+import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 import { type WebSocket, WebSocketServer } from "ws";
 
 export type RouteCallback = (context: RequestContext) => unknown;

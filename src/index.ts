@@ -2,10 +2,10 @@ import * as http from "node:http";
 import * as https from "node:https";
 import type * as net from "node:net";
 import type stream from "node:stream";
-import { ImplementInterface } from "@ajs/core/beta";
+import { ImplementInterface } from "@antelopejs/interface-core";
 import { requestListener, upgradeListener } from "./server";
 import "./middlewares/cors";
-import { Logging } from "@ajs/logging/beta";
+import { Logging } from "@antelopejs/interface-core/logging";
 
 type ServerProtocol = "http" | "https";
 type SocketProtocol = "ws" | "wss";
@@ -141,13 +141,13 @@ export async function construct(config: Config): Promise<void> {
     servers: resolveServers(config),
   };
 
-  await ImplementInterface(
-    import("@ajs.local/api/beta"),
-    import("./implementations/api/beta"),
+  void ImplementInterface(
+    await import("@antelopejs/interface-api"),
+    await import("./implementations/api"),
   );
 }
 
-export function destroy(): void {}
+export function destroy(): void { }
 
 export function start(): void {
   servers = (conf.servers ?? []).map((serverConfig) =>

@@ -1,11 +1,11 @@
-import { GetMetadata } from "@ajs/core/beta";
-import type { Class } from "@ajs/core/beta/decorators";
 import {
   type ComputedParameter,
   ControllerMeta,
   computeParameter,
   type RouteHandler,
-} from "@ajs.local/api/beta";
+} from "@antelopejs/interface-api";
+import { GetMetadata } from "@antelopejs/interface-core";
+import type { Class } from "@antelopejs/interface-core/decorators";
 import { listenServers } from "../../index";
 import {
   type RequestContext,
