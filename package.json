@@ -30,7 +30,7 @@
     "lint": "biome check .",
     "prepack": "pnpm run build",
     "release": "pnpm run lint && pnpm run test && pnpm run prepack && release-it",
-    "test": "ajs module test ."
+    "test": "pnpm run build && ajs module test ."
   },
   "antelopeJs": {
     "implements": [
