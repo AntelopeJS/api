@@ -3,6 +3,11 @@ import * as https from "node:https";
 import type * as net from "node:net";
 import type stream from "node:stream";
 import { ImplementInterface } from "@antelopejs/interface-core";
+import {
+  isDevRuntime,
+  registerDevServer,
+  type ServerEndpoint,
+} from "./runtime";
 import { requestListener, upgradeListener } from "./server";
 import "./middlewares/cors";
 import { Logging } from "@antelopejs/interface-core/logging";
@@ -36,12 +41,16 @@ interface Config {
   servers?: ServerConfig[];
   cors?: CorsConfig;
   autoListen?: boolean;
+  strictPort?: boolean;
 }
 
 type ServerFactory = (config: ServerConfig) => net.Server;
 
 const DEFAULT_HTTP_PORT = 80;
 const DEFAULT_HOST = "localhost";
+const MAX_PORT_FALLBACK_OFFSET = 20;
+const RANDOM_PORT = 0;
+const DEV_SERVER_NAME = "api";
 const DEFAULT_SERVER_CONFIG: HTTPConfig = {
   protocol: "http",
   port: DEFAULT_HTTP_PORT,
@@ -101,17 +110,14 @@ function createConfiguredServer(config: ServerConfig): net.Server {
   return serverFactory(config);
 }
 
-function listenServer(server: net.Server, config: ServerConfig): Promise<void> {
-  if (server.listening) {
-    return Promise.resolve();
-  }
-
+function listenOnce(
+  server: net.Server,
+  port: number,
+  host?: string,
+): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const onListening = () => {
       cleanup();
-      Logging.Info(
-        `Server started, listening on ${config.protocol}://${config.host ?? DEFAULT_HOST}:${config.port}`,
-      );
       resolve();
     };
 
@@ -127,19 +133,111 @@ function listenServer(server: net.Server, config: ServerConfig): Promise<void> {
 
     server.once("listening", onListening);
     server.once("error", onError);
-    server.listen(config.port, config.host);
+    server.listen(port, host);
   });
+}
+
+function isPortInUseError(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException)?.code === "EADDRINUSE";
+}
+
+function resolveBoundPort(server: net.Server, fallbackPort: number): number {
+  const address = server.address();
+  if (address && typeof address === "object") {
+    return address.port;
+  }
+
+  return fallbackPort;
+}
+
+function buildCandidatePorts(
+  requestedPort: number,
+  allowPortFallback: boolean,
+): number[] {
+  if (!allowPortFallback) {
+    return [requestedPort];
+  }
+
+  const sequentialPorts = Array.from(
+    { length: MAX_PORT_FALLBACK_OFFSET + 1 },
+    (_, offset) => requestedPort + offset,
+  );
+  return [...sequentialPorts, RANDOM_PORT];
+}
+
+async function listenServerWithFallback(
+  server: net.Server,
+  config: ServerConfig,
+  allowPortFallback: boolean,
+): Promise<number> {
+  const requestedPort = config.port ?? DEFAULT_HTTP_PORT;
+  const candidatePorts = buildCandidatePorts(requestedPort, allowPortFallback);
+  const lastCandidatePort = candidatePorts[candidatePorts.length - 1];
+
+  for (const candidatePort of candidatePorts) {
+    try {
+      await listenOnce(server, candidatePort, config.host);
+      return resolveBoundPort(server, candidatePort);
+    } catch (error) {
+      if (!isPortInUseError(error) || candidatePort === lastCandidatePort) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error(
+    `Unable to bind ${config.protocol} server on port ${requestedPort}`,
+  );
+}
+
+function logServerStarted(
+  config: ServerConfig,
+  requestedPort: number,
+  boundPort: number,
+): void {
+  const serverUrl = `${config.protocol}://${config.host ?? DEFAULT_HOST}:${boundPort}`;
+  if (boundPort === requestedPort || requestedPort === RANDOM_PORT) {
+    Logging.Info(`Server started, listening on ${serverUrl}`);
+    return;
+  }
+
+  Logging.Info(
+    `Port ${requestedPort} in use, listening on ${serverUrl} instead`,
+  );
+}
+
+async function listenServer(
+  server: net.Server,
+  config: ServerConfig,
+  allowPortFallback: boolean,
+): Promise<void> {
+  if (server.listening) {
+    return;
+  }
+
+  const requestedPort = config.port ?? DEFAULT_HTTP_PORT;
+  const boundPort = await listenServerWithFallback(
+    server,
+    config,
+    allowPortFallback,
+  );
+  config.port = boundPort;
+  logServerStarted(config, requestedPort, boundPort);
 }
 
 export function getConfig(): Config {
   return conf;
 }
 
-export async function construct(config: Config): Promise<void> {
+export function configure(config: Config): void {
   conf = {
     ...config,
     servers: resolveServers(config),
   };
+}
+
+export async function construct(config: Config): Promise<void> {
+  configure(config);
 
   void ImplementInterface(
     await import("@antelopejs/interface-api"),
@@ -149,17 +247,64 @@ export async function construct(config: Config): Promise<void> {
 
 export function destroy(): void {}
 
+function closeServers(): void {
+  for (const server of servers) {
+    server.close();
+  }
+  servers = [];
+  listening = false;
+}
+
 export function start(): void {
+  closeServers();
   servers = (conf.servers ?? []).map((serverConfig) =>
     createConfiguredServer(serverConfig),
   );
-  listening = false;
 
   if (conf.autoListen !== false) {
     void listenServers().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       Logging.Info(`Unable to start listening servers: ${message}`);
     });
+  }
+}
+
+async function shouldAllowPortFallback(): Promise<boolean> {
+  if (conf.strictPort) {
+    return false;
+  }
+
+  return isDevRuntime();
+}
+
+function buildEndpoint(
+  server: net.Server,
+  config?: ServerConfig,
+): ServerEndpoint | null {
+  if (!config || !server.listening) {
+    return null;
+  }
+
+  const port = resolveBoundPort(server, config.port ?? DEFAULT_HTTP_PORT);
+  return {
+    protocol: config.protocol,
+    host: config.host ?? DEFAULT_HOST,
+    port,
+  };
+}
+
+export function getListeningEndpoints(): ServerEndpoint[] {
+  return servers
+    .map((server, index) => buildEndpoint(server, conf.servers?.[index]))
+    .filter((endpoint): endpoint is ServerEndpoint => endpoint !== null);
+}
+
+async function registerDevServerEndpoints(): Promise<void> {
+  try {
+    await registerDevServer(DEV_SERVER_NAME, getListeningEndpoints());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    Logging.Warn(`Unable to register dev server endpoints: ${message}`);
   }
 }
 
@@ -171,21 +316,20 @@ export async function listenServers(): Promise<void> {
   listening = true;
 
   try {
+    const allowPortFallback = await shouldAllowPortFallback();
     await Promise.all(
       (conf.servers ?? []).map((serverConfig, index) =>
-        listenServer(servers[index], serverConfig),
+        listenServer(servers[index], serverConfig, allowPortFallback),
       ),
     );
   } catch (error) {
     listening = false;
     throw error;
   }
+
+  await registerDevServerEndpoints();
 }
 
 export function stop(): void {
-  for (const server of servers) {
-    server.close();
-  }
-  servers = [];
-  listening = false;
+  closeServers();
 }
