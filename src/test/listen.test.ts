@@ -80,13 +80,19 @@ describe("Port fallback", () => {
   });
 
   after(async () => {
+    if (!originalConfig.servers?.length) {
+      return;
+    }
+
     configure(originalConfig);
     start();
-    await waitForListening();
+    if (originalConfig.autoListen !== false) {
+      await waitForListening();
+    }
   });
 
   afterEach(async () => {
-    stop();
+    await stop();
     sinon.restore();
     await Promise.all(blockers.map((blocker) => closeServer(blocker)));
     blockers.length = 0;
@@ -165,7 +171,7 @@ describe("Port fallback", () => {
 
     configureSingleServer(RANDOM_PORT);
     await listenServers();
-    stop();
+    await stop();
 
     assert.deepEqual(getListeningEndpoints(), []);
   });

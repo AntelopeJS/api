@@ -172,22 +172,23 @@ async function listenServerWithFallback(
 ): Promise<number> {
   const requestedPort = config.port ?? DEFAULT_HTTP_PORT;
   const candidatePorts = buildCandidatePorts(requestedPort, allowPortFallback);
-  const lastCandidatePort = candidatePorts[candidatePorts.length - 1];
+  let portInUseError: unknown = new Error(
+    `Unable to bind ${config.protocol} server on port ${requestedPort}`,
+  );
 
   for (const candidatePort of candidatePorts) {
     try {
       await listenOnce(server, candidatePort, config.host);
       return resolveBoundPort(server, candidatePort);
     } catch (error) {
-      if (!isPortInUseError(error) || candidatePort === lastCandidatePort) {
+      if (!isPortInUseError(error)) {
         throw error;
       }
+      portInUseError = error;
     }
   }
 
-  throw new Error(
-    `Unable to bind ${config.protocol} server on port ${requestedPort}`,
-  );
+  throw portInUseError;
 }
 
 function logServerStarted(
@@ -247,25 +248,31 @@ export async function construct(config: Config): Promise<void> {
 
 export function destroy(): void {}
 
-function closeServers(): void {
-  for (const server of servers) {
-    server.close();
-  }
+function closeServers(): Promise<void> {
+  const closing = servers.map(
+    (server) =>
+      new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      }),
+  );
   servers = [];
   listening = false;
+  return Promise.all(closing).then(() => undefined);
 }
 
 export function start(): void {
-  closeServers();
+  const serversClosed = closeServers();
   servers = (conf.servers ?? []).map((serverConfig) =>
     createConfiguredServer(serverConfig),
   );
 
   if (conf.autoListen !== false) {
-    void listenServers().catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      Logging.Info(`Unable to start listening servers: ${message}`);
-    });
+    void serversClosed
+      .then(() => listenServers())
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        Logging.Info(`Unable to start listening servers: ${message}`);
+      });
   }
 }
 
@@ -330,6 +337,6 @@ export async function listenServers(): Promise<void> {
   await registerDevServerEndpoints();
 }
 
-export function stop(): void {
-  closeServers();
+export function stop(): Promise<void> {
+  return closeServers();
 }
