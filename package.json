@@ -57,6 +57,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.2",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^22.19.15",
     "@types/sinon": "^21.0.0",
     "@types/ws": "^8.18.1",
