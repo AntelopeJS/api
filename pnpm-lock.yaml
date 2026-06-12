@@ -15,8 +15,8 @@ importers:
         specifier: ^0.0.2
         version: 0.0.2
       '@antelopejs/interface-core':
-        specifier: ^0.0.2
-        version: 0.0.2
+        specifier: ^0.0.5
+        version: 0.0.5
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -87,6 +87,9 @@ packages:
 
   '@antelopejs/interface-core@0.0.2':
     resolution: {integrity: sha512-CmtOJvSCRj20GOQhrE0PpHybGaW1G1lrepiKHVJa/bclhrvFYgHV0MH84TMpMOHESQT/+wuup007tfXAwaI+Eg==}
+
+  '@antelopejs/interface-core@0.0.5':
+    resolution: {integrity: sha512-4H6hpFfiK2+DE8vL2mEtPbq1WNch9lt40QNr9KjBrOAtnuq/zMfIlzhbEsda39m+FVkMWXfUYoVolRogVKCLIQ==}
 
   '@biomejs/biome@2.3.2':
     resolution: {integrity: sha512-8e9tzamuDycx7fdrcJ/F/GDZ8SYukc5ud6tDicjjFqURKYFSWMl0H0iXNXZEGmcmNUmABgGuHThPykcM41INgg==}
@@ -1231,6 +1234,10 @@ snapshots:
       '@antelopejs/interface-core': 0.0.2
 
   '@antelopejs/interface-core@0.0.2':
+    dependencies:
+      reflect-metadata: 0.2.2
+
+  '@antelopejs/interface-core@0.0.5':
     dependencies:
       reflect-metadata: 0.2.2
 

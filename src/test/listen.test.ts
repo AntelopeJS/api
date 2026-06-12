@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import * as net from "node:net";
+import * as coreRuntime from "@antelopejs/interface-core/runtime";
 import sinon from "sinon";
 import {
   configure,
@@ -9,7 +10,6 @@ import {
   start,
   stop,
 } from "../index";
-import * as runtime from "../runtime";
 
 const TEST_HOST = "127.0.0.1";
 const FALLBACK_BASE_PORT = 25040;
@@ -48,6 +48,13 @@ function configureSingleServer(port: number, strictPort?: boolean): void {
 
 function isPortInUseError(error: unknown): boolean {
   return (error as PortInUseError).code === "EADDRINUSE";
+}
+
+function stubRuntime(dev: boolean): sinon.SinonStub {
+  sinon
+    .stub(coreRuntime, "GetRuntimeInfo")
+    .resolves({ dev, projectPath: "", env: "test" });
+  return sinon.stub(coreRuntime, "RegisterDevServer").resolves();
 }
 
 const LISTEN_POLL_INTERVAL_MS = 50;
@@ -99,8 +106,7 @@ describe("Port fallback", () => {
   });
 
   it("falls back to the next available port in dev runtime", async () => {
-    sinon.stub(runtime, "isDevRuntime").resolves(true);
-    const registerStub = sinon.stub(runtime, "registerDevServer").resolves();
+    const registerStub = stubRuntime(true);
     await blockPort(FALLBACK_BASE_PORT);
 
     configureSingleServer(FALLBACK_BASE_PORT);
@@ -115,8 +121,7 @@ describe("Port fallback", () => {
   });
 
   it("falls back to a random port when the whole range is occupied", async () => {
-    sinon.stub(runtime, "isDevRuntime").resolves(true);
-    sinon.stub(runtime, "registerDevServer").resolves();
+    stubRuntime(true);
     const occupiedPorts = Array.from(
       { length: EXHAUSTED_RANGE_SIZE },
       (_, offset) => EXHAUSTED_BASE_PORT + offset,
@@ -133,7 +138,7 @@ describe("Port fallback", () => {
   });
 
   it("rejects when the port is in use and strictPort is enabled", async () => {
-    sinon.stub(runtime, "isDevRuntime").resolves(true);
+    stubRuntime(true);
     await blockPort(STRICT_PORT);
 
     configureSingleServer(STRICT_PORT, true);
@@ -142,7 +147,7 @@ describe("Port fallback", () => {
   });
 
   it("rejects when the port is in use outside of dev runtime", async () => {
-    sinon.stub(runtime, "isDevRuntime").resolves(false);
+    stubRuntime(false);
     await blockPort(PROD_PORT);
 
     configureSingleServer(PROD_PORT);
@@ -151,8 +156,7 @@ describe("Port fallback", () => {
   });
 
   it("reports actual endpoints when listening on a random port", async () => {
-    sinon.stub(runtime, "isDevRuntime").resolves(false);
-    sinon.stub(runtime, "registerDevServer").resolves();
+    stubRuntime(false);
 
     configureSingleServer(RANDOM_PORT);
     await listenServers();
@@ -166,8 +170,7 @@ describe("Port fallback", () => {
   });
 
   it("clears endpoints after stop", async () => {
-    sinon.stub(runtime, "isDevRuntime").resolves(false);
-    sinon.stub(runtime, "registerDevServer").resolves();
+    stubRuntime(false);
 
     configureSingleServer(RANDOM_PORT);
     await listenServers();

@@ -7,6 +7,7 @@ export default defineConfig({
     local: {
       source: { type: "local", path: "." },
       config: {
+        strictPort: true,
         servers: [
           {
             protocol: "http",

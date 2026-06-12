@@ -4,10 +4,10 @@ import type * as net from "node:net";
 import type stream from "node:stream";
 import { ImplementInterface } from "@antelopejs/interface-core";
 import {
-  isDevRuntime,
-  registerDevServer,
-  type ServerEndpoint,
-} from "./runtime";
+  type DevServerEndpoint,
+  GetRuntimeInfo,
+  RegisterDevServer,
+} from "@antelopejs/interface-core/runtime";
 import { requestListener, upgradeListener } from "./server";
 import "./middlewares/cors";
 import { Logging } from "@antelopejs/interface-core/logging";
@@ -281,13 +281,14 @@ async function shouldAllowPortFallback(): Promise<boolean> {
     return false;
   }
 
-  return isDevRuntime();
+  const runtimeInfo = await GetRuntimeInfo();
+  return runtimeInfo.dev;
 }
 
 function buildEndpoint(
   server: net.Server,
   config?: ServerConfig,
-): ServerEndpoint | null {
+): DevServerEndpoint | null {
   if (!config || !server.listening) {
     return null;
   }
@@ -300,15 +301,15 @@ function buildEndpoint(
   };
 }
 
-export function getListeningEndpoints(): ServerEndpoint[] {
+export function getListeningEndpoints(): DevServerEndpoint[] {
   return servers
     .map((server, index) => buildEndpoint(server, conf.servers?.[index]))
-    .filter((endpoint): endpoint is ServerEndpoint => endpoint !== null);
+    .filter((endpoint): endpoint is DevServerEndpoint => endpoint !== null);
 }
 
 async function registerDevServerEndpoints(): Promise<void> {
   try {
-    await registerDevServer(DEV_SERVER_NAME, getListeningEndpoints());
+    await RegisterDevServer(DEV_SERVER_NAME, getListeningEndpoints());
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     Logging.Warn(`Unable to register dev server endpoints: ${message}`);
