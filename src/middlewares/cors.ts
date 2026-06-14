@@ -62,12 +62,17 @@ function addCredentialsHeader(response: HTTPResult, cors: CorsConfig): void {
   }
 }
 
+function hasStaticAllowedHeaders(cors: CorsConfig): boolean {
+  return Boolean(cors.allowedHeaders && cors.allowedHeaders.length > 0);
+}
+
 function resolveAllowedHeaders(
   cors: CorsConfig,
   requestContext: RequestContext,
 ): string {
-  if (cors.allowedHeaders && cors.allowedHeaders.length > 0) {
-    return cors.allowedHeaders.join(",");
+  const { allowedHeaders } = cors;
+  if (allowedHeaders && allowedHeaders.length > 0) {
+    return allowedHeaders.join(",");
   }
 
   return toHeaderValue(
@@ -92,7 +97,9 @@ function addPreflightHeaders(
     "Access-Control-Allow-Headers",
     resolveAllowedHeaders(cors, requestContext),
   );
-  response.addHeader("Vary", "Access-Control-Request-Headers");
+  if (!hasStaticAllowedHeaders(cors)) {
+    response.addHeader("Vary", "Access-Control-Request-Headers");
+  }
 
   if (cors.maxAge !== undefined) {
     response.addHeader("Access-Control-Max-Age", String(cors.maxAge));

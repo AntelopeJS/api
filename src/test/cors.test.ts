@@ -132,6 +132,7 @@ describe("CORS", () => {
     });
 
     assert.equal(headers["Access-Control-Allow-Headers"], REQUESTED_HEADERS);
+    assert.equal(headers.Vary, "Access-Control-Request-Headers");
   });
 
   it("uses the configured allowed headers over the requested ones", () => {
@@ -146,6 +147,7 @@ describe("CORS", () => {
     });
 
     assert.equal(headers["Access-Control-Allow-Headers"], "X-A,X-B");
+    assert.equal(headers.Vary, "Origin");
   });
 
   it("omits the max-age header when it is not configured", () => {
