@@ -19,6 +19,8 @@ const STRICT_PORT = 25080;
 const PROD_PORT = 25090;
 const EXHAUSTED_BASE_PORT = 25100;
 const EXHAUSTED_RANGE_SIZE = 21;
+const MULTI_OCCUPIED_PORT = 25140;
+const MULTI_FREE_PORT = 25150;
 const RANDOM_PORT = 0;
 
 interface PortInUseError {
@@ -193,6 +195,30 @@ describe("Port fallback", () => {
     assert.equal(endpoints[0].protocol, "http");
     assert.equal(endpoints[0].host, TEST_HOST);
     assert.equal(getConfig().servers?.[0].port, endpoints[0].port);
+  });
+
+  it("falls back per server when multiple servers are configured", async () => {
+    const registerStub = stubRuntime(true);
+    await blockPort(MULTI_OCCUPIED_PORT);
+
+    configure({
+      autoListen: false,
+      servers: [
+        { protocol: "http", host: TEST_HOST, port: MULTI_OCCUPIED_PORT },
+        { protocol: "http", host: TEST_HOST, port: MULTI_FREE_PORT },
+      ],
+    });
+    start();
+    await listenServers();
+
+    const endpoints = getListeningEndpoints();
+    assert.equal(endpoints.length, 2);
+    assert.equal(endpoints[0].port, MULTI_OCCUPIED_PORT + 1);
+    assert.equal(endpoints[1].port, MULTI_FREE_PORT);
+    assert.equal(getConfig().servers?.[0].port, MULTI_OCCUPIED_PORT + 1);
+    assert.equal(getConfig().servers?.[1].port, MULTI_FREE_PORT);
+    sinon.assert.calledOnce(registerStub);
+    assert.deepEqual(registerStub.firstCall.args, ["api", endpoints]);
   });
 
   it("clears endpoints after stop", async () => {
