@@ -13,6 +13,8 @@ import {
 
 const TEST_HOST = "127.0.0.1";
 const FALLBACK_BASE_PORT = 25040;
+const EXPLICIT_FALSE_PORT = 25060;
+const STRICT_FREE_PORT = 25070;
 const STRICT_PORT = 25080;
 const PROD_PORT = 25090;
 const EXHAUSTED_BASE_PORT = 25100;
@@ -137,6 +139,18 @@ describe("Port fallback", () => {
     assert.ok(!occupiedPorts.includes(endpoints[0].port));
   });
 
+  it("falls back when strictPort is explicitly false in dev runtime", async () => {
+    stubRuntime(true);
+    await blockPort(EXPLICIT_FALSE_PORT);
+
+    configureSingleServer(EXPLICIT_FALSE_PORT, false);
+    await listenServers();
+
+    const endpoints = getListeningEndpoints();
+    assert.equal(endpoints.length, 1);
+    assert.equal(endpoints[0].port, EXPLICIT_FALSE_PORT + 1);
+  });
+
   it("rejects when the port is in use and strictPort is enabled", async () => {
     stubRuntime(true);
     await blockPort(STRICT_PORT);
@@ -144,6 +158,18 @@ describe("Port fallback", () => {
     configureSingleServer(STRICT_PORT, true);
 
     await assert.rejects(listenServers(), isPortInUseError);
+  });
+
+  it("binds the requested port when strictPort is enabled and the port is free", async () => {
+    stubRuntime(true);
+
+    configureSingleServer(STRICT_FREE_PORT, true);
+    await listenServers();
+
+    const endpoints = getListeningEndpoints();
+    assert.equal(endpoints.length, 1);
+    assert.equal(endpoints[0].port, STRICT_FREE_PORT);
+    assert.equal(getConfig().servers?.[0].port, STRICT_FREE_PORT);
   });
 
   it("rejects when the port is in use outside of dev runtime", async () => {
