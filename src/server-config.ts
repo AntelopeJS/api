@@ -1,5 +1,6 @@
 import type * as http from "node:http";
 import type * as https from "node:https";
+import type { CorsConfig } from "@antelopejs/interface-api";
 
 export type ServerProtocol = "http" | "https";
 export type SocketProtocol = "ws" | "wss";
@@ -18,13 +19,6 @@ export interface HTTPSConfig extends https.ServerOptions, ServerNetworkConfig {
 }
 
 export type ServerConfig = HTTPConfig | HTTPSConfig;
-
-type AllowedOrigin = string | RegExp | Array<string | RegExp>;
-
-interface CorsConfig {
-  allowedOrigins?: AllowedOrigin;
-  allowedMethods?: string[];
-}
 
 export interface Config {
   servers?: ServerConfig[];

@@ -1,4 +1,5 @@
 import type * as net from "node:net";
+import type { CorsConfig } from "@antelopejs/interface-api";
 import { ImplementInterface } from "@antelopejs/interface-core";
 import { Logging } from "@antelopejs/interface-core/logging";
 import type { DevServerEndpoint } from "@antelopejs/interface-core/runtime";
@@ -28,6 +29,10 @@ export function configure(config: Config): void {
     ...config,
     servers: resolveServers(config),
   };
+}
+
+export function setCorsConfig(cors: CorsConfig): void {
+  conf = { ...conf, cors };
 }
 
 export async function construct(config: Config): Promise<void> {
