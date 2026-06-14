@@ -1,56 +1,16 @@
-import * as http from "node:http";
-import * as https from "node:https";
 import type * as net from "node:net";
-import type stream from "node:stream";
 import { ImplementInterface } from "@antelopejs/interface-core";
-import { requestListener, upgradeListener } from "./server";
-import "./middlewares/cors";
 import { Logging } from "@antelopejs/interface-core/logging";
-
-type ServerProtocol = "http" | "https";
-type SocketProtocol = "ws" | "wss";
-
-interface ServerNetworkConfig {
-  host?: string;
-  port?: number;
-}
-
-interface HTTPConfig extends http.ServerOptions, ServerNetworkConfig {
-  protocol: "http";
-}
-
-interface HTTPSConfig extends https.ServerOptions, ServerNetworkConfig {
-  protocol: "https";
-}
-
-type ServerConfig = HTTPConfig | HTTPSConfig;
-
-type AllowedOrigin = string | RegExp | Array<string | RegExp>;
-
-interface CorsConfig {
-  allowedOrigins?: AllowedOrigin;
-  allowedMethods?: string[];
-}
-
-interface Config {
-  servers?: ServerConfig[];
-  cors?: CorsConfig;
-  autoListen?: boolean;
-}
-
-type ServerFactory = (config: ServerConfig) => net.Server;
-
-const DEFAULT_HTTP_PORT = 80;
-const DEFAULT_HOST = "localhost";
-const DEFAULT_SERVER_CONFIG: HTTPConfig = {
-  protocol: "http",
-  port: DEFAULT_HTTP_PORT,
-};
-
-const SERVER_FACTORY_BY_PROTOCOL: Record<ServerProtocol, ServerFactory> = {
-  http: (config) => createHTTPServer(config as HTTPConfig),
-  https: (config) => createHTTPSServer(config as HTTPSConfig),
-};
+import type { DevServerEndpoint } from "@antelopejs/interface-core/runtime";
+import {
+  collectListeningEndpoints,
+  registerDevServerEndpoints,
+  shouldAllowPortFallback,
+} from "./dev-registry";
+import { listenServer } from "./port-binding";
+import { type Config, resolveServers } from "./server-config";
+import { createConfiguredServer } from "./server-factory";
+import "./middlewares/cors";
 
 let conf: Config = {
   servers: [],
@@ -59,87 +19,19 @@ let conf: Config = {
 let servers: net.Server[] = [];
 let listening = false;
 
-function createHTTPServer(config: HTTPConfig): net.Server {
-  const server = http.createServer(config);
-  attachServerListeners(server, "http", "ws");
-  return server;
-}
-
-function createHTTPSServer(config: HTTPSConfig): net.Server {
-  const server = https.createServer(config);
-  attachServerListeners(server, "https", "wss");
-  return server;
-}
-
-function attachServerListeners(
-  server: net.Server,
-  protocol: ServerProtocol,
-  socketProtocol: SocketProtocol,
-): void {
-  server.on(
-    "request",
-    (req: http.IncomingMessage, res: http.ServerResponse) =>
-      void requestListener(req, res, protocol),
-  );
-  server.on(
-    "upgrade",
-    (req: http.IncomingMessage, socket: stream.Duplex, head: Buffer) =>
-      void upgradeListener(req, socket, head, socketProtocol),
-  );
-}
-
-function resolveServers(config: Config): ServerConfig[] {
-  if (config.servers && config.servers.length > 0) {
-    return config.servers;
-  }
-
-  return [DEFAULT_SERVER_CONFIG];
-}
-
-function createConfiguredServer(config: ServerConfig): net.Server {
-  const serverFactory = SERVER_FACTORY_BY_PROTOCOL[config.protocol];
-  return serverFactory(config);
-}
-
-function listenServer(server: net.Server, config: ServerConfig): Promise<void> {
-  if (server.listening) {
-    return Promise.resolve();
-  }
-
-  return new Promise<void>((resolve, reject) => {
-    const onListening = () => {
-      cleanup();
-      Logging.Info(
-        `Server started, listening on ${config.protocol}://${config.host ?? DEFAULT_HOST}:${config.port}`,
-      );
-      resolve();
-    };
-
-    const onError = (error: Error) => {
-      cleanup();
-      reject(error);
-    };
-
-    const cleanup = () => {
-      server.off("listening", onListening);
-      server.off("error", onError);
-    };
-
-    server.once("listening", onListening);
-    server.once("error", onError);
-    server.listen(config.port, config.host);
-  });
-}
-
 export function getConfig(): Config {
   return conf;
 }
 
-export async function construct(config: Config): Promise<void> {
+export function configure(config: Config): void {
   conf = {
     ...config,
     servers: resolveServers(config),
   };
+}
+
+export async function construct(config: Config): Promise<void> {
+  configure(config);
 
   void ImplementInterface(
     await import("@antelopejs/interface-api"),
@@ -149,18 +41,36 @@ export async function construct(config: Config): Promise<void> {
 
 export function destroy(): void {}
 
+function closeServers(): Promise<void> {
+  const closing = servers.map(
+    (server) =>
+      new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      }),
+  );
+  servers = [];
+  listening = false;
+  return Promise.all(closing).then(() => undefined);
+}
+
 export function start(): void {
+  const serversClosed = closeServers();
   servers = (conf.servers ?? []).map((serverConfig) =>
     createConfiguredServer(serverConfig),
   );
-  listening = false;
 
   if (conf.autoListen !== false) {
-    void listenServers().catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      Logging.Info(`Unable to start listening servers: ${message}`);
-    });
+    void serversClosed
+      .then(() => listenServers())
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        Logging.Error(`Unable to start listening servers: ${message}`);
+      });
   }
+}
+
+export function getListeningEndpoints(): DevServerEndpoint[] {
+  return collectListeningEndpoints(servers, conf.servers);
 }
 
 export async function listenServers(): Promise<void> {
@@ -171,21 +81,20 @@ export async function listenServers(): Promise<void> {
   listening = true;
 
   try {
+    const allowPortFallback = await shouldAllowPortFallback(conf);
     await Promise.all(
       (conf.servers ?? []).map((serverConfig, index) =>
-        listenServer(servers[index], serverConfig),
+        listenServer(servers[index], serverConfig, allowPortFallback),
       ),
     );
   } catch (error) {
     listening = false;
     throw error;
   }
+
+  await registerDevServerEndpoints(getListeningEndpoints());
 }
 
-export function stop(): void {
-  for (const server of servers) {
-    server.close();
-  }
-  servers = [];
-  listening = false;
+export function stop(): Promise<void> {
+  return closeServers();
 }

@@ -15,8 +15,8 @@ importers:
         specifier: ^0.0.2
         version: 0.0.2
       '@antelopejs/interface-core':
-        specifier: ^0.0.2
-        version: 0.0.2
+        specifier: ^0.0.5
+        version: 0.0.5
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -27,6 +27,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.3.2
         version: 2.3.2
+      '@types/mocha':
+        specifier: ^10.0.10
+        version: 10.0.10
       '@types/node':
         specifier: ^22.19.15
         version: 22.19.15
@@ -84,6 +87,9 @@ packages:
 
   '@antelopejs/interface-core@0.0.2':
     resolution: {integrity: sha512-CmtOJvSCRj20GOQhrE0PpHybGaW1G1lrepiKHVJa/bclhrvFYgHV0MH84TMpMOHESQT/+wuup007tfXAwaI+Eg==}
+
+  '@antelopejs/interface-core@0.0.5':
+    resolution: {integrity: sha512-4H6hpFfiK2+DE8vL2mEtPbq1WNch9lt40QNr9KjBrOAtnuq/zMfIlzhbEsda39m+FVkMWXfUYoVolRogVKCLIQ==}
 
   '@biomejs/biome@2.3.2':
     resolution: {integrity: sha512-8e9tzamuDycx7fdrcJ/F/GDZ8SYukc5ud6tDicjjFqURKYFSWMl0H0iXNXZEGmcmNUmABgGuHThPykcM41INgg==}
@@ -343,6 +349,9 @@ packages:
   '@tootallnate/quickjs-emscripten@0.23.0':
     resolution: {integrity: sha512-C5Mc6rdnsaJDjO3UpGW/CQTHtCKaYlScZTly4JIu97Jxo/odCiH0ITnDXSJPTOrEKk/ycSZ0AOgTmkDtkOsvIA==}
 
+  '@types/mocha@10.0.10':
+    resolution: {integrity: sha512-xPyYSz1cMPnJQhl0CLMH68j3gprKZaTjG3s5Vi+fDgx+uhG9NOXwbVt52eFS8ECyXhyKcjDLCBEqBExKuiZb7Q==}
+
   '@types/node@20.17.30':
     resolution: {integrity: sha512-7zf4YyHA+jvBNfVrk2Gtvs6x7E8V+YDW05bNfG2XkWDJfYRXrTiP/DsB2zSYTaHX0bGIujTBQdMVAhb+j7mwpg==}
 
@@ -401,6 +410,7 @@ packages:
   basic-ftp@5.2.0:
     resolution: {integrity: sha512-VoMINM2rqJwJgfdHq6RiUudKt2BV+FY5ZFezP/ypmwayk68+NzzAQy4XXLlqsGD4MCzq3DrmNFD/uUmBJuGoXw==}
     engines: {node: '>=10.0.0'}
+    deprecated: Security vulnerability fixed in 5.2.1, please upgrade
 
   before-after-hook@4.0.0:
     resolution: {integrity: sha512-q6tR3RPqIB1pMiTRMFcZwuG5T8vwp+vUvEG0vuI6B+Rikh5BfPp2fQ82c925FOs+b0lcFQ8CFrL+KbilfZFhOQ==}
@@ -1227,6 +1237,10 @@ snapshots:
     dependencies:
       reflect-metadata: 0.2.2
 
+  '@antelopejs/interface-core@0.0.5':
+    dependencies:
+      reflect-metadata: 0.2.2
+
   '@biomejs/biome@2.3.2':
     optionalDependencies:
       '@biomejs/cli-darwin-arm64': 2.3.2
@@ -1470,6 +1484,8 @@ snapshots:
       type-detect: 4.1.0
 
   '@tootallnate/quickjs-emscripten@0.23.0': {}
+
+  '@types/mocha@10.0.10': {}
 
   '@types/node@20.17.30':
     dependencies:
