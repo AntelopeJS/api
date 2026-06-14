@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.1.0
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.0.0...v1.1.0)
+
+### 🚀 Enhancements
+
+- **server:** Fall back to free ports in dev and expose listening endpoints ([#21](https://github.com/AntelopeJS/api/pull/21))
+- **cors:** Make credentials, max-age and allowed headers configurable ([#22](https://github.com/AntelopeJS/api/pull/22))
+
+### 🏡 Chore
+
+- Update package.json ([ca657fa](https://github.com/AntelopeJS/api/commit/ca657fa))
+- Update dependencies ([8a5ffb9](https://github.com/AntelopeJS/api/commit/8a5ffb9))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <upd4ting@gmail.com>
+
 ## v1.0.0
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v0.2.0...v1.0.0)
