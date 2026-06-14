@@ -20,7 +20,7 @@ export default defineConfig({
         servers: [
           {
             protocol: "http",
-            port: "5010",
+            port: 5010,
           },
         ],
       },
