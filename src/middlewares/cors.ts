@@ -1,6 +1,8 @@
 import {
+  type AllowedOrigin,
   Context,
   Controller,
+  type CorsConfig,
   HandlerPriority,
   HTTPResult,
   Prefix,
@@ -8,14 +10,13 @@ import {
 } from "@antelopejs/interface-api";
 import { getConfig } from "..";
 
-type AllowedOrigin = string | RegExp | Array<string | RegExp>;
-
 type RequestHeaderValue = string | string[] | undefined;
 
 const DEFAULT_ALLOWED_METHODS = "GET,HEAD,PUT,PATCH,POST,DELETE";
 const FALSE_ORIGIN = "false";
-const TRUE_CREDENTIALS = "true";
+const CREDENTIALS_ENABLED_VALUE = "true";
 const NO_BODY_LENGTH = "0";
+const DEFAULT_CREDENTIALS = true;
 
 function isString(value: unknown): value is string {
   return typeof value === "string" || value instanceof String;
@@ -48,65 +49,101 @@ function isOriginAllowed(
   return Boolean(allowedOrigin);
 }
 
+function isCredentialsEnabled(cors: CorsConfig): boolean {
+  return cors.credentials ?? DEFAULT_CREDENTIALS;
+}
+
+function addCredentialsHeader(response: HTTPResult, cors: CorsConfig): void {
+  if (isCredentialsEnabled(cors)) {
+    response.addHeader(
+      "Access-Control-Allow-Credentials",
+      CREDENTIALS_ENABLED_VALUE,
+    );
+  }
+}
+
+function hasStaticAllowedHeaders(cors: CorsConfig): boolean {
+  return Boolean(cors.allowedHeaders && cors.allowedHeaders.length > 0);
+}
+
+function resolveAllowedHeaders(
+  cors: CorsConfig,
+  requestContext: RequestContext,
+): string {
+  const { allowedHeaders } = cors;
+  if (allowedHeaders && allowedHeaders.length > 0) {
+    return allowedHeaders.join(",");
+  }
+
+  return toHeaderValue(
+    requestContext.rawRequest.headers["access-control-request-headers"],
+  );
+}
+
 function addPreflightHeaders(
   response: HTTPResult,
   requestContext: RequestContext,
   allowedOriginHeader: string,
+  cors: CorsConfig,
 ): void {
-  const config = getConfig();
   const allowedMethods =
-    config.cors?.allowedMethods?.join(",") ?? DEFAULT_ALLOWED_METHODS;
-  const requestedHeaders = toHeaderValue(
-    requestContext.rawRequest.headers["access-control-request-headers"],
-  );
+    cors.allowedMethods?.join(",") ?? DEFAULT_ALLOWED_METHODS;
 
   response.addHeader("Access-Control-Allow-Origin", allowedOriginHeader);
   response.addHeader("Vary", "Origin");
   response.addHeader("Access-Control-Allow-Methods", allowedMethods);
-  response.addHeader("Access-Control-Allow-Credentials", TRUE_CREDENTIALS);
-  response.addHeader("Access-Control-Allow-Headers", requestedHeaders);
-  response.addHeader("Vary", "Access-Control-Request-Headers");
+  addCredentialsHeader(response, cors);
+  response.addHeader(
+    "Access-Control-Allow-Headers",
+    resolveAllowedHeaders(cors, requestContext),
+  );
+  if (!hasStaticAllowedHeaders(cors)) {
+    response.addHeader("Vary", "Access-Control-Request-Headers");
+  }
+
+  if (cors.maxAge !== undefined) {
+    response.addHeader("Access-Control-Max-Age", String(cors.maxAge));
+  }
+
   response.addHeader("Content-Length", NO_BODY_LENGTH);
 }
 
 function addStandardCorsHeaders(
   requestContext: RequestContext,
   allowedOriginHeader: string,
+  cors: CorsConfig,
 ): void {
   requestContext.response.addHeader(
     "Access-Control-Allow-Origin",
     allowedOriginHeader,
   );
   requestContext.response.addHeader("Vary", "Origin");
-  requestContext.response.addHeader(
-    "Access-Control-Allow-Credentials",
-    TRUE_CREDENTIALS,
-  );
+  addCredentialsHeader(requestContext.response, cors);
 }
 
 export class Cors extends Controller("") {
   @Prefix("any", "/", HandlerPriority.HIGHEST)
   cors(@Context() requestContext: RequestContext): HTTPResult | undefined {
-    const config = getConfig();
+    const cors = getConfig().cors;
 
-    if (!config.cors) {
+    if (!cors) {
       return undefined;
     }
 
     const requestOrigin = requestContext.rawRequest.headers.origin;
     const isAllowed = requestOrigin
-      ? isOriginAllowed(requestOrigin, config.cors.allowedOrigins)
+      ? isOriginAllowed(requestOrigin, cors.allowedOrigins)
       : false;
     const allowedOriginHeader =
       isAllowed && requestOrigin ? requestOrigin : FALSE_ORIGIN;
 
     if (requestContext.rawRequest.method === "OPTIONS") {
       const response = new HTTPResult(204, null);
-      addPreflightHeaders(response, requestContext, allowedOriginHeader);
+      addPreflightHeaders(response, requestContext, allowedOriginHeader, cors);
       return response;
     }
 
-    addStandardCorsHeaders(requestContext, allowedOriginHeader);
+    addStandardCorsHeaders(requestContext, allowedOriginHeader, cors);
     return undefined;
   }
 }

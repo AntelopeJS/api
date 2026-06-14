@@ -1,12 +1,13 @@
 import {
   type ComputedParameter,
   ControllerMeta,
+  type CorsConfig,
   computeParameter,
   type RouteHandler,
 } from "@antelopejs/interface-api";
 import { GetMetadata } from "@antelopejs/interface-core";
 import type { Class } from "@antelopejs/interface-core/decorators";
-import { listenServers } from "../../index";
+import { getConfig, listenServers, setCorsConfig } from "../../index";
 import {
   type RequestContext,
   registerHandler,
@@ -90,6 +91,14 @@ export async function GetControllerInstance(
 
 export async function Listen(): Promise<void> {
   await listenServers();
+}
+
+export function GetCorsConfig(): CorsConfig {
+  return getConfig().cors ?? {};
+}
+
+export function SetCorsConfig(config: CorsConfig): void {
+  setCorsConfig(config);
 }
 
 interface RouteInfo {
