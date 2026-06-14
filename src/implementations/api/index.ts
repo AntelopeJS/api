@@ -6,8 +6,7 @@ import {
 } from "@antelopejs/interface-api";
 import { GetMetadata } from "@antelopejs/interface-core";
 import type { Class } from "@antelopejs/interface-core/decorators";
-import type { DevServerEndpoint } from "@antelopejs/interface-core/runtime";
-import { getListeningEndpoints, listenServers } from "../../index";
+import { listenServers } from "../../index";
 import {
   type RequestContext,
   registerHandler,
@@ -91,10 +90,6 @@ export async function GetControllerInstance(
 
 export async function Listen(): Promise<void> {
   await listenServers();
-}
-
-export function GetListeningEndpoints(): DevServerEndpoint[] {
-  return getListeningEndpoints();
 }
 
 interface RouteInfo {
