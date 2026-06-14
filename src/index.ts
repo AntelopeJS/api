@@ -154,7 +154,7 @@ function buildCandidatePorts(
   requestedPort: number,
   allowPortFallback: boolean,
 ): number[] {
-  if (!allowPortFallback) {
+  if (!allowPortFallback || requestedPort === RANDOM_PORT) {
     return [requestedPort];
   }
 

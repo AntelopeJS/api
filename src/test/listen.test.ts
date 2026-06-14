@@ -197,6 +197,18 @@ describe("Port fallback", () => {
     assert.equal(getConfig().servers?.[0].port, endpoints[0].port);
   });
 
+  it("binds a single random port when port 0 is requested in dev runtime", async () => {
+    stubRuntime(true);
+
+    configureSingleServer(RANDOM_PORT);
+    await listenServers();
+
+    const endpoints = getListeningEndpoints();
+    assert.equal(endpoints.length, 1);
+    assert.ok(endpoints[0].port > 0);
+    assert.equal(getConfig().servers?.[0].port, endpoints[0].port);
+  });
+
   it("falls back per server when multiple servers are configured", async () => {
     const registerStub = stubRuntime(true);
     await blockPort(MULTI_OCCUPIED_PORT);
