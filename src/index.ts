@@ -64,7 +64,7 @@ export function start(): void {
       .then(() => listenServers())
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
-        Logging.Info(`Unable to start listening servers: ${message}`);
+        Logging.Error(`Unable to start listening servers: ${message}`);
       });
   }
 }
