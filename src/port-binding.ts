@@ -52,6 +52,19 @@ export function resolveBoundPort(
   return fallbackPort;
 }
 
+const MAX_PORT = 65535;
+
+function resolveRequestedPort(config: ServerConfig): number {
+  const rawPort = config.port ?? DEFAULT_HTTP_PORT;
+  const port = Number(rawPort);
+  if (!Number.isInteger(port) || port < RANDOM_PORT || port > MAX_PORT) {
+    throw new Error(
+      `Invalid ${config.protocol} server port: ${JSON.stringify(rawPort)}`,
+    );
+  }
+  return port;
+}
+
 function buildCandidatePorts(
   requestedPort: number,
   allowPortFallback: boolean,
@@ -70,9 +83,9 @@ function buildCandidatePorts(
 async function listenServerWithFallback(
   server: net.Server,
   config: ServerConfig,
+  requestedPort: number,
   allowPortFallback: boolean,
 ): Promise<number> {
-  const requestedPort = config.port ?? DEFAULT_HTTP_PORT;
   const candidatePorts = buildCandidatePorts(requestedPort, allowPortFallback);
   let portInUseError: unknown = new Error(
     `Unable to bind ${config.protocol} server on port ${requestedPort}`,
@@ -118,10 +131,11 @@ export async function listenServer(
     return;
   }
 
-  const requestedPort = config.port ?? DEFAULT_HTTP_PORT;
+  const requestedPort = resolveRequestedPort(config);
   const boundPort = await listenServerWithFallback(
     server,
     config,
+    requestedPort,
     allowPortFallback,
   );
   config.port = boundPort;

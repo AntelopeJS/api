@@ -21,6 +21,7 @@ const EXHAUSTED_BASE_PORT = 25100;
 const EXHAUSTED_RANGE_SIZE = 21;
 const MULTI_OCCUPIED_PORT = 25140;
 const MULTI_FREE_PORT = 25150;
+const STRING_PORT = 25160;
 const RANDOM_PORT = 0;
 
 interface PortInUseError {
@@ -231,6 +232,36 @@ describe("Port fallback", () => {
     assert.equal(getConfig().servers?.[1].port, MULTI_FREE_PORT);
     sinon.assert.calledOnce(registerStub);
     assert.deepEqual(registerStub.firstCall.args, ["api", endpoints]);
+  });
+
+  it("binds the numeric port when the configured port is a string", async () => {
+    stubRuntime(true);
+
+    configure({
+      autoListen: false,
+      servers: [
+        { protocol: "http", host: TEST_HOST, port: String(STRING_PORT) },
+      ],
+    } as unknown as Parameters<typeof configure>[0]);
+    start();
+    await listenServers();
+
+    const endpoints = getListeningEndpoints();
+    assert.equal(endpoints.length, 1);
+    assert.equal(endpoints[0].port, STRING_PORT);
+    assert.equal(getConfig().servers?.[0].port, STRING_PORT);
+  });
+
+  it("rejects when the configured port is not a valid number", async () => {
+    stubRuntime(true);
+
+    configure({
+      autoListen: false,
+      servers: [{ protocol: "http", host: TEST_HOST, port: "not-a-port" }],
+    } as unknown as Parameters<typeof configure>[0]);
+    start();
+
+    await assert.rejects(listenServers(), /Invalid http server port/);
   });
 
   it("clears endpoints after stop", async () => {
