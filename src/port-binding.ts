@@ -83,9 +83,9 @@ function buildCandidatePorts(
 async function listenServerWithFallback(
   server: net.Server,
   config: ServerConfig,
+  requestedPort: number,
   allowPortFallback: boolean,
 ): Promise<number> {
-  const requestedPort = resolveRequestedPort(config);
   const candidatePorts = buildCandidatePorts(requestedPort, allowPortFallback);
   let portInUseError: unknown = new Error(
     `Unable to bind ${config.protocol} server on port ${requestedPort}`,
@@ -135,6 +135,7 @@ export async function listenServer(
   const boundPort = await listenServerWithFallback(
     server,
     config,
+    requestedPort,
     allowPortFallback,
   );
   config.port = boundPort;
