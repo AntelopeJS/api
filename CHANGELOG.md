@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.1.1
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.1.0...v1.1.1)
+
+### 🩹 Fixes
+
+- **server:** Coerce configured port to a number before fallback ([#23](https://github.com/AntelopeJS/api/pull/23))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <upd4ting@gmail.com>
+
 ## v1.1.0
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.0.0...v1.1.0)
