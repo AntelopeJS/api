@@ -49,8 +49,8 @@
     }
   },
   "dependencies": {
-    "@antelopejs/interface-api": "^0.0.4",
-    "@antelopejs/interface-api-util": "^0.0.2",
+    "@antelopejs/interface-api": "^0.0.5",
+    "@antelopejs/interface-api-util": "^0.1.1",
     "@antelopejs/interface-core": "^0.0.5",
     "reflect-metadata": "^0.2.2",
     "ws": "^8.20.0"
