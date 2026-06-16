@@ -1,6 +1,6 @@
 {
   "name": "@antelopejs/api",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "A flexible API module that implements the API interfaces of antelopejs with HTTP and WebSocket support",
   "keywords": [
     "antelopejs",
