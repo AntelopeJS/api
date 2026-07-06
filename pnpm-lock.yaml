@@ -9,14 +9,14 @@ importers:
   .:
     dependencies:
       '@antelopejs/interface-api':
-        specifier: ^0.0.5
-        version: 0.0.5(@antelopejs/interface-core@0.0.5)
+        specifier: ^0.0.7
+        version: 0.0.7(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-api-util':
         specifier: ^0.1.1
-        version: 0.1.1(@antelopejs/interface-api@0.0.5(@antelopejs/interface-core@0.0.5))(@antelopejs/interface-core@0.0.5)
+        version: 0.1.1(@antelopejs/interface-api@0.0.7(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-core':
-        specifier: ^0.0.5
-        version: 0.0.5
+        specifier: ^0.0.6
+        version: 0.0.6
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -58,14 +58,14 @@ importers:
   playground:
     dependencies:
       '@antelopejs/interface-api':
-        specifier: ^0.0.5
-        version: 0.0.5(@antelopejs/interface-core@0.0.5)
+        specifier: ^0.0.7
+        version: 0.0.7(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-api-util':
         specifier: ^0.1.1
-        version: 0.1.1(@antelopejs/interface-api@0.0.5(@antelopejs/interface-core@0.0.5))(@antelopejs/interface-core@0.0.5)
+        version: 0.1.1(@antelopejs/interface-api@0.0.7(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-core':
-        specifier: ^0.0.5
-        version: 0.0.5
+        specifier: ^0.0.6
+        version: 0.0.6
     devDependencies:
       '@types/node':
         specifier: ^20.5.7
@@ -85,13 +85,13 @@ packages:
       '@antelopejs/interface-api': '>=0.0.3 <1.0.0'
       '@antelopejs/interface-core': '>=0.0.3 <1.0.0'
 
-  '@antelopejs/interface-api@0.0.5':
-    resolution: {integrity: sha512-BApviHE1vVkORDWtC8x8N2xCxBdFZZnhgMlxDuUmlXz2fGlYqBX1inIQQrEyOY31Zc/WN7nJpcA0zjjwk7Sp9A==}
+  '@antelopejs/interface-api@0.0.7':
+    resolution: {integrity: sha512-RaepQjtHJsXMvr5+bNT8UA/BnZJn63PsdXWl010QeImONdf9vczlXX55oCh/kjo5lS2RdCa33YaF/gvTqo2Ikg==}
     peerDependencies:
       '@antelopejs/interface-core': '>=0.0.3 <1.0.0'
 
-  '@antelopejs/interface-core@0.0.5':
-    resolution: {integrity: sha512-4H6hpFfiK2+DE8vL2mEtPbq1WNch9lt40QNr9KjBrOAtnuq/zMfIlzhbEsda39m+FVkMWXfUYoVolRogVKCLIQ==}
+  '@antelopejs/interface-core@0.0.6':
+    resolution: {integrity: sha512-OMna86iT/ylL6wJl6FCPw9ieddULXGs4jTmeiDBNEXYQ9acnVXjS/+SaN0UR0h7oY7WTD9VwKXVwG95qjNIA1w==}
 
   '@biomejs/biome@2.3.2':
     resolution: {integrity: sha512-8e9tzamuDycx7fdrcJ/F/GDZ8SYukc5ud6tDicjjFqURKYFSWMl0H0iXNXZEGmcmNUmABgGuHThPykcM41INgg==}
@@ -1226,16 +1226,16 @@ packages:
 
 snapshots:
 
-  '@antelopejs/interface-api-util@0.1.1(@antelopejs/interface-api@0.0.5(@antelopejs/interface-core@0.0.5))(@antelopejs/interface-core@0.0.5)':
+  '@antelopejs/interface-api-util@0.1.1(@antelopejs/interface-api@0.0.7(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)':
     dependencies:
-      '@antelopejs/interface-api': 0.0.5(@antelopejs/interface-core@0.0.5)
-      '@antelopejs/interface-core': 0.0.5
+      '@antelopejs/interface-api': 0.0.7(@antelopejs/interface-core@0.0.6)
+      '@antelopejs/interface-core': 0.0.6
 
-  '@antelopejs/interface-api@0.0.5(@antelopejs/interface-core@0.0.5)':
+  '@antelopejs/interface-api@0.0.7(@antelopejs/interface-core@0.0.6)':
     dependencies:
-      '@antelopejs/interface-core': 0.0.5
+      '@antelopejs/interface-core': 0.0.6
 
-  '@antelopejs/interface-core@0.0.5':
+  '@antelopejs/interface-core@0.0.6':
     dependencies:
       reflect-metadata: 0.2.2
 
