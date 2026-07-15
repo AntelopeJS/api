@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@antelopejs/interface-api':
-        specifier: ^0.0.7
-        version: 0.0.7(@antelopejs/interface-core@0.0.6)
+        specifier: ^0.0.8
+        version: 0.0.8(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-api-util':
         specifier: ^0.1.1
-        version: 0.1.1(@antelopejs/interface-api@0.0.7(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)
+        version: 0.1.1(@antelopejs/interface-api@0.0.8(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-core':
         specifier: ^0.0.6
         version: 0.0.6
@@ -58,11 +58,11 @@ importers:
   playground:
     dependencies:
       '@antelopejs/interface-api':
-        specifier: ^0.0.7
-        version: 0.0.7(@antelopejs/interface-core@0.0.6)
+        specifier: ^0.0.8
+        version: 0.0.8(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-api-util':
         specifier: ^0.1.1
-        version: 0.1.1(@antelopejs/interface-api@0.0.7(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)
+        version: 0.1.1(@antelopejs/interface-api@0.0.8(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-core':
         specifier: ^0.0.6
         version: 0.0.6
@@ -85,8 +85,8 @@ packages:
       '@antelopejs/interface-api': '>=0.0.3 <1.0.0'
       '@antelopejs/interface-core': '>=0.0.3 <1.0.0'
 
-  '@antelopejs/interface-api@0.0.7':
-    resolution: {integrity: sha512-RaepQjtHJsXMvr5+bNT8UA/BnZJn63PsdXWl010QeImONdf9vczlXX55oCh/kjo5lS2RdCa33YaF/gvTqo2Ikg==}
+  '@antelopejs/interface-api@0.0.8':
+    resolution: {integrity: sha512-LWXPsbvkCG2AblP6r0+h4K0v3jxSpAoE/1SG5pkTPspaSa+H3aYvBiRwKphmISw0/4YU801OG5dfxeV5gNu/jA==}
     peerDependencies:
       '@antelopejs/interface-core': '>=0.0.3 <1.0.0'
 
@@ -1226,12 +1226,12 @@ packages:
 
 snapshots:
 
-  '@antelopejs/interface-api-util@0.1.1(@antelopejs/interface-api@0.0.7(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)':
+  '@antelopejs/interface-api-util@0.1.1(@antelopejs/interface-api@0.0.8(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)':
     dependencies:
-      '@antelopejs/interface-api': 0.0.7(@antelopejs/interface-core@0.0.6)
+      '@antelopejs/interface-api': 0.0.8(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-core': 0.0.6
 
-  '@antelopejs/interface-api@0.0.7(@antelopejs/interface-core@0.0.6)':
+  '@antelopejs/interface-api@0.0.8(@antelopejs/interface-core@0.0.6)':
     dependencies:
       '@antelopejs/interface-core': 0.0.6
 
