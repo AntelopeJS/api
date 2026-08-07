@@ -27,7 +27,10 @@ const LOOKALIKE_ORIGINS = [
 interface RequestHeaders {
   origin?: string;
   "access-control-request-headers"?: string;
+  "access-control-request-method"?: string;
 }
+
+const PREFLIGHT_REQUESTED_METHOD = "GET";
 
 const corsController = new Cors();
 
@@ -39,7 +42,11 @@ function buildContext(method: string, headers: RequestHeaders): RequestContext {
 }
 
 function preflightHeaders(headers: RequestHeaders): Record<string, string> {
-  const result = corsController.cors(buildContext("OPTIONS", headers));
+  const preflight: RequestHeaders = {
+    "access-control-request-method": PREFLIGHT_REQUESTED_METHOD,
+    ...headers,
+  };
+  const result = corsController.cors(buildContext("OPTIONS", preflight));
   assert.ok(result instanceof HTTPResult);
   return result.getHeaders();
 }
@@ -139,7 +146,10 @@ describe("CORS", () => {
     });
 
     const result = corsController.cors(
-      buildContext("OPTIONS", { origin: ALLOWED_ORIGIN }),
+      buildContext("OPTIONS", {
+        origin: ALLOWED_ORIGIN,
+        "access-control-request-method": PREFLIGHT_REQUESTED_METHOD,
+      }),
     );
 
     assert.ok(result instanceof HTTPResult);
@@ -259,6 +269,33 @@ describe("CORS loopback origins", () => {
     const headers = standardHeaders({ origin: DISALLOWED_ORIGIN });
 
     assert.equal(headers["Access-Control-Allow-Origin"], "false");
+  });
+
+  it("lets an ordinary OPTIONS request reach routing", () => {
+    const context = buildContext("OPTIONS", { origin: LOOPBACK_ORIGIN });
+
+    const result = corsController.cors(context);
+
+    assert.equal(result, undefined);
+    assert.equal(
+      context.response.getHeaders()["Access-Control-Allow-Origin"],
+      LOOPBACK_ORIGIN,
+    );
+  });
+
+  it("lets an ordinary OPTIONS request through with a configured allow list", () => {
+    setDevMode(false);
+    setCorsConfig({ allowedOrigins: ALLOWED_ORIGIN });
+
+    const context = buildContext("OPTIONS", { origin: ALLOWED_ORIGIN });
+
+    const result = corsController.cors(context);
+
+    assert.equal(result, undefined);
+    assert.equal(
+      context.response.getHeaders()["Access-Control-Allow-Origin"],
+      ALLOWED_ORIGIN,
+    );
   });
 
   it("rejects origins that only look like loopback ones", () => {
