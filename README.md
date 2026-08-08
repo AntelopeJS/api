@@ -81,6 +81,8 @@ The API module automatically adds a middleware for CORS support, which can be co
 - `allowedOrigins`: An array of allowed origins or regular expressions
 - `allowedMethods`: An array of allowed HTTP methods
 
+In development (when the runtime reports `dev`), loopback origins — `localhost`, `127.0.0.1` and `[::1]`, on any port — are accepted automatically, with or without a `cors` block, so local frontends need no configuration. The request origin is reflected as-is, never `*`. In production, and for non-loopback development frontends (e.g. a LAN address), origins must be listed explicitly in `allowedOrigins`.
+
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
