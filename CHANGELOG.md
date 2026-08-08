@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.0
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.1.3...v1.2.0)
+
+### 🚀 Enhancements
+
+- **cors:** Reflect loopback origins in development mode ([#26](https://github.com/AntelopeJS/api/pull/26))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <upd4ting@gmail.com>
+
 ## v1.1.3
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.1.2...v1.1.3)
