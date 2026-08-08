@@ -9,6 +9,7 @@ import {
   type RequestContext,
 } from "@antelopejs/interface-api";
 import { getConfig } from "..";
+import { isDevMode } from "../dev-mode";
 
 type RequestHeaderValue = string | string[] | undefined;
 
@@ -17,6 +18,11 @@ const FALSE_ORIGIN = "false";
 const CREDENTIALS_ENABLED_VALUE = "true";
 const NO_BODY_LENGTH = "0";
 const DEFAULT_CREDENTIALS = true;
+const LOOPBACK_PROTOCOLS = ["http:", "https:"];
+const LOOPBACK_HOSTNAMES = ["localhost", "127.0.0.1", "::1", "[::1]"];
+const DEV_FALLBACK_CORS_CONFIG: CorsConfig = {};
+const PREFLIGHT_METHOD = "OPTIONS";
+const PREFLIGHT_REQUEST_METHOD_HEADER = "access-control-request-method";
 
 function isString(value: unknown): value is string {
   return typeof value === "string" || value instanceof String;
@@ -47,6 +53,47 @@ function isOriginAllowed(
   }
 
   return Boolean(allowedOrigin);
+}
+
+function isLoopbackOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    if (url.origin !== origin) {
+      return false;
+    }
+
+    return (
+      LOOPBACK_PROTOCOLS.includes(url.protocol) &&
+      LOOPBACK_HOSTNAMES.includes(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isPreflightRequest(requestContext: RequestContext): boolean {
+  return (
+    requestContext.rawRequest.method === PREFLIGHT_METHOD &&
+    requestContext.rawRequest.headers[PREFLIGHT_REQUEST_METHOD_HEADER] !==
+      undefined
+  );
+}
+
+function isRequestOriginAllowed(origin: string, cors: CorsConfig): boolean {
+  if (isOriginAllowed(origin, cors.allowedOrigins)) {
+    return true;
+  }
+
+  return isDevMode() && isLoopbackOrigin(origin);
+}
+
+function resolveCorsConfig(): CorsConfig | undefined {
+  const cors = getConfig().cors;
+  if (cors) {
+    return cors;
+  }
+
+  return isDevMode() ? DEV_FALLBACK_CORS_CONFIG : undefined;
 }
 
 function isCredentialsEnabled(cors: CorsConfig): boolean {
@@ -124,7 +171,7 @@ function addStandardCorsHeaders(
 export class Cors extends Controller("") {
   @Prefix("any", "/", HandlerPriority.HIGHEST)
   cors(@Context() requestContext: RequestContext): HTTPResult | undefined {
-    const cors = getConfig().cors;
+    const cors = resolveCorsConfig();
 
     if (!cors) {
       return undefined;
@@ -132,12 +179,12 @@ export class Cors extends Controller("") {
 
     const requestOrigin = requestContext.rawRequest.headers.origin;
     const isAllowed = requestOrigin
-      ? isOriginAllowed(requestOrigin, cors.allowedOrigins)
+      ? isRequestOriginAllowed(requestOrigin, cors)
       : false;
     const allowedOriginHeader =
       isAllowed && requestOrigin ? requestOrigin : FALSE_ORIGIN;
 
-    if (requestContext.rawRequest.method === "OPTIONS") {
+    if (isPreflightRequest(requestContext)) {
       const response = new HTTPResult(204, null);
       addPreflightHeaders(response, requestContext, allowedOriginHeader, cors);
       return response;

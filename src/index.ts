@@ -3,6 +3,7 @@ import type { CorsConfig } from "@antelopejs/interface-api";
 import { ImplementInterface } from "@antelopejs/interface-core";
 import { Logging } from "@antelopejs/interface-core/logging";
 import type { DevServerEndpoint } from "@antelopejs/interface-core/runtime";
+import { resolveDevMode } from "./dev-mode";
 import {
   collectListeningEndpoints,
   registerDevServerEndpoints,
@@ -37,6 +38,7 @@ export function setCorsConfig(cors: CorsConfig): void {
 
 export async function construct(config: Config): Promise<void> {
   configure(config);
+  await resolveDevMode();
 
   void ImplementInterface(
     await import("@antelopejs/interface-api"),
