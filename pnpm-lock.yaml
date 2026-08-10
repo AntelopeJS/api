@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@antelopejs/interface-api':
-        specifier: ^0.0.8
-        version: 0.0.8(@antelopejs/interface-core@0.0.6)
+        specifier: '>=0.0.10 <1.0.0'
+        version: 0.0.10(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-api-util':
         specifier: ^0.1.1
-        version: 0.1.1(@antelopejs/interface-api@0.0.8(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)
+        version: 0.1.1(@antelopejs/interface-api@0.0.10(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)
       '@antelopejs/interface-core':
         specifier: ^0.0.6
         version: 0.0.6
@@ -83,6 +83,11 @@ packages:
     resolution: {integrity: sha512-8q1diSFuq5CULr9T/Dzo3DAOKmoN3zu84w3PgV2aGRPT3nMujcOxHyR+DEv9iA1ZxirUx5oskBmWVCaXtHNLVQ==}
     peerDependencies:
       '@antelopejs/interface-api': '>=0.0.3 <1.0.0'
+      '@antelopejs/interface-core': '>=0.0.3 <1.0.0'
+
+  '@antelopejs/interface-api@0.0.10':
+    resolution: {integrity: sha512-nToojyDDp/175hR3ryuxFxlU9zyKcSr2/V+ftEySlpVHO469skNkG9s9U8OPmFMH9wj/t2iul9gNB6/NvNo7KQ==}
+    peerDependencies:
       '@antelopejs/interface-core': '>=0.0.3 <1.0.0'
 
   '@antelopejs/interface-api@0.0.8':
@@ -1226,9 +1231,18 @@ packages:
 
 snapshots:
 
+  '@antelopejs/interface-api-util@0.1.1(@antelopejs/interface-api@0.0.10(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)':
+    dependencies:
+      '@antelopejs/interface-api': 0.0.10(@antelopejs/interface-core@0.0.6)
+      '@antelopejs/interface-core': 0.0.6
+
   '@antelopejs/interface-api-util@0.1.1(@antelopejs/interface-api@0.0.8(@antelopejs/interface-core@0.0.6))(@antelopejs/interface-core@0.0.6)':
     dependencies:
       '@antelopejs/interface-api': 0.0.8(@antelopejs/interface-core@0.0.6)
+      '@antelopejs/interface-core': 0.0.6
+
+  '@antelopejs/interface-api@0.0.10(@antelopejs/interface-core@0.0.6)':
+    dependencies:
       '@antelopejs/interface-core': 0.0.6
 
   '@antelopejs/interface-api@0.0.8(@antelopejs/interface-core@0.0.6)':
