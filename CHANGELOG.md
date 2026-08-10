@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.1
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.2.0...v1.2.1)
+
+### 📖 Documentation
+
+- **readme:** Document dev loopback origin reflection in CORS section ([#27](https://github.com/AntelopeJS/api/pull/27))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <upd4ting@gmail.com>
+
 ## v1.2.0
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.1.3...v1.2.0)
