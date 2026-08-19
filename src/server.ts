@@ -547,23 +547,37 @@ function extractError(error: unknown) {
   return error;
 }
 
+function copyHeaders(source: HTTPResult, target: HTTPResult) {
+  if (source === target) {
+    return;
+  }
+  for (const [name, value] of Object.entries(source.peekHeaders() ?? {})) {
+    target.addHeader(name, value);
+  }
+}
+
+function replaceResponse(
+  requestContext: RequestContext,
+  result: unknown,
+  status: number,
+) {
+  const previousResponse = requestContext.response;
+  const response =
+    result instanceof HTTPResult ? result : new HTTPResult(status, result);
+  copyHeaders(previousResponse, response);
+  requestContext.response = response;
+}
+
 function setHandlerResponse(requestContext: RequestContext, result: unknown) {
   if (requestContext.response.isStream()) {
     return;
   }
-  if (result) {
-    requestContext.response = HTTPResult.withHeaders(
-      result,
-      requestContext.response.getHeaders(),
-      200,
-    );
+  if (result instanceof HTTPResult) {
+    replaceResponse(requestContext, result, 200);
     return;
   }
-  requestContext.response = HTTPResult.withHeaders(
-    "",
-    requestContext.response.getHeaders(),
-    200,
-  );
+  requestContext.response.setBody(result || "");
+  requestContext.response.setStatus(200);
 }
 
 function cloneResponse(response: HTTPResult) {
@@ -572,9 +586,7 @@ function cloneResponse(response: HTTPResult) {
     response.getBody(),
     response.getContentType(),
   );
-  for (const [name, value] of Object.entries(response.getHeaders())) {
-    snapshot.addHeader(name, value);
-  }
+  copyHeaders(response, snapshot);
   return snapshot;
 }
 
@@ -731,13 +743,15 @@ function setMiddlewareResponse(
   requestContext: RequestContext,
   result: unknown,
 ): void {
-  if (result) {
-    requestContext.response = HTTPResult.withHeaders(
-      result,
-      requestContext.response.getHeaders(),
-      200,
-    );
+  if (!result) {
+    return;
   }
+  if (result instanceof HTTPResult || requestContext.response.isStream()) {
+    replaceResponse(requestContext, result, 200);
+    return;
+  }
+  requestContext.response.setBody(result);
+  requestContext.response.setStatus(200);
 }
 
 function executePostfix(
@@ -775,6 +789,10 @@ function executeRequest(
     handler = getHandler("get", path, roots.handler, false, exactPath);
   }
   const selectedHandler = Array.isArray(handler) ? undefined : handler;
+  if (!selectedHandler) {
+    requestContext.response.setBody("Not Found");
+    requestContext.response.setStatus(404);
+  }
   if (!selectedHandler && method !== "options") {
     return;
   }
@@ -806,11 +824,7 @@ function completeRequest(
   requestContext: RequestContext,
 ): Awaitable<void> {
   if (didFail) {
-    requestContext.response = HTTPResult.withHeaders(
-      extractError(error),
-      requestContext.response.getHeaders(),
-      500,
-    );
+    replaceResponse(requestContext, extractError(error), 500);
   }
   requestContext.error = error;
   const monitorExecution = executeMonitors(method, path, requestContext);
@@ -837,7 +851,7 @@ function processRequest(
     rawResponse: res,
     url,
     routeParameters: {},
-    response: new HTTPResult(404, "Not Found"),
+    response: new HTTPResult(),
   };
   const path = url.pathname.split("/").filter((part) => part);
   const method = req.method?.toLowerCase() || "get";
@@ -927,11 +941,7 @@ export async function upgradeListener(
       );
       const prefixResult = prefixExecution ? await prefixExecution : undefined;
       if (prefixResult) {
-        requestContext.response = HTTPResult.withHeaders(
-          prefixResult,
-          requestContext.response.getHeaders(),
-          200,
-        );
+        setMiddlewareResponse(requestContext, prefixResult);
         mustSendResponse = true;
         mustDestroySocket = true;
         // Fall through to finally block to execute monitors.
@@ -945,11 +955,7 @@ export async function upgradeListener(
     requestError = error;
     mustDestroySocket = true;
     if (!hasUpgradedConnection) {
-      requestContext.response = HTTPResult.withHeaders(
-        extractError(error),
-        requestContext.response.getHeaders(),
-        500,
-      );
+      replaceResponse(requestContext, extractError(error), 500);
       mustSendResponse = true;
     }
   } finally {
