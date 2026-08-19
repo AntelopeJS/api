@@ -126,6 +126,10 @@ function hasParameter(parameters: Record<string, string>, name: string) {
   return Object.getOwnPropertyDescriptor(parameters, name) !== undefined;
 }
 
+interface HeaderPeekable {
+  peekHeaders(): Readonly<Record<string, string>> | undefined;
+}
+
 function findHandlers(
   path: string[],
   depth: number,
@@ -547,23 +551,51 @@ function extractError(error: unknown) {
   return error;
 }
 
+function getExistingHeaders(response: HTTPResult) {
+  const peekHeaders = (response as Partial<HeaderPeekable>).peekHeaders;
+  if (typeof peekHeaders === "function") {
+    return peekHeaders.call(response);
+  }
+  return response.getHeaders();
+}
+
+function copyHeaders(source: HTTPResult, target: HTTPResult) {
+  if (source === target) {
+    return;
+  }
+  for (const [name, value] of Object.entries(
+    getExistingHeaders(source) ?? {},
+  )) {
+    target.addHeader(name, value);
+  }
+}
+
+function setResponse(
+  requestContext: RequestContext,
+  result: unknown,
+  status: number,
+  mustReplace = false,
+) {
+  const previousResponse = requestContext.response;
+  if (result instanceof HTTPResult) {
+    copyHeaders(previousResponse, result);
+    requestContext.response = result;
+    return;
+  }
+  if (!mustReplace && !previousResponse.isStream()) {
+    previousResponse.setBody(result);
+    previousResponse.setStatus(status);
+    return;
+  }
+  const response = new HTTPResult(status, result);
+  copyHeaders(previousResponse, response);
+  requestContext.response = response;
+}
+
 function setHandlerResponse(requestContext: RequestContext, result: unknown) {
-  if (requestContext.response.isStream()) {
-    return;
+  if (!requestContext.response.isStream()) {
+    setResponse(requestContext, result || "", 200);
   }
-  if (result) {
-    requestContext.response = HTTPResult.withHeaders(
-      result,
-      requestContext.response.getHeaders(),
-      200,
-    );
-    return;
-  }
-  requestContext.response = HTTPResult.withHeaders(
-    "",
-    requestContext.response.getHeaders(),
-    200,
-  );
 }
 
 function cloneResponse(response: HTTPResult) {
@@ -572,9 +604,7 @@ function cloneResponse(response: HTTPResult) {
     response.getBody(),
     response.getContentType(),
   );
-  for (const [name, value] of Object.entries(response.getHeaders())) {
-    snapshot.addHeader(name, value);
-  }
+  copyHeaders(response, snapshot);
   return snapshot;
 }
 
@@ -732,11 +762,7 @@ function setMiddlewareResponse(
   result: unknown,
 ): void {
   if (result) {
-    requestContext.response = HTTPResult.withHeaders(
-      result,
-      requestContext.response.getHeaders(),
-      200,
-    );
+    setResponse(requestContext, result, 200);
   }
 }
 
@@ -775,6 +801,10 @@ function executeRequest(
     handler = getHandler("get", path, roots.handler, false, exactPath);
   }
   const selectedHandler = Array.isArray(handler) ? undefined : handler;
+  if (!selectedHandler) {
+    requestContext.response.setBody("Not Found");
+    requestContext.response.setStatus(404);
+  }
   if (!selectedHandler && method !== "options") {
     return;
   }
@@ -806,11 +836,7 @@ function completeRequest(
   requestContext: RequestContext,
 ): Awaitable<void> {
   if (didFail) {
-    requestContext.response = HTTPResult.withHeaders(
-      extractError(error),
-      requestContext.response.getHeaders(),
-      500,
-    );
+    setResponse(requestContext, extractError(error), 500, true);
   }
   requestContext.error = error;
   const monitorExecution = executeMonitors(method, path, requestContext);
@@ -837,7 +863,7 @@ function processRequest(
     rawResponse: res,
     url,
     routeParameters: {},
-    response: new HTTPResult(404, "Not Found"),
+    response: new HTTPResult(),
   };
   const path = url.pathname.split("/").filter((part) => part);
   const method = req.method?.toLowerCase() || "get";
@@ -927,11 +953,7 @@ export async function upgradeListener(
       );
       const prefixResult = prefixExecution ? await prefixExecution : undefined;
       if (prefixResult) {
-        requestContext.response = HTTPResult.withHeaders(
-          prefixResult,
-          requestContext.response.getHeaders(),
-          200,
-        );
+        setResponse(requestContext, prefixResult, 200);
         mustSendResponse = true;
         mustDestroySocket = true;
         // Fall through to finally block to execute monitors.
@@ -945,11 +967,7 @@ export async function upgradeListener(
     requestError = error;
     mustDestroySocket = true;
     if (!hasUpgradedConnection) {
-      requestContext.response = HTTPResult.withHeaders(
-        extractError(error),
-        requestContext.response.getHeaders(),
-        500,
-      );
+      setResponse(requestContext, extractError(error), 500, true);
       mustSendResponse = true;
     }
   } finally {
