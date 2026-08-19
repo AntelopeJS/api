@@ -130,7 +130,7 @@ type RequestProtocol = "http" | "https" | "ws" | "wss";
 
 const commonPathname = /^\/[A-Za-z0-9/_-]*$/;
 const commonHost = /^[A-Za-z0-9.-]+(?::[0-9]+)?$/;
-const numericHost = /^[0-9.]+$/;
+const commonDomainHost = /^[A-Za-z]/;
 const commonIpv4 = /^(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}$/;
 const safePathname = /^\/[A-Za-z0-9\-._~!$&'()*+,;=:@/%]*$/;
 const dotPathSegment = /(?:^|\/)(?:(?:\.|%2e){1,2})(?:\/|$)/i;
@@ -170,6 +170,24 @@ const requestUrlDescriptors: Record<RequestProtocol, PropertyDescriptor> = {
   wss: createRequestUrlDescriptor("wss"),
 };
 
+function isCommonIpv4(hostname: string): boolean {
+  if (!commonIpv4.test(hostname)) {
+    return false;
+  }
+  let octet = 0;
+  for (const character of hostname) {
+    if (character === ".") {
+      octet = 0;
+    } else {
+      octet = octet * 10 + character.charCodeAt(0) - 48;
+      if (octet > 255) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 function isCommonHost(host: string): boolean {
   if (!commonHost.test(host)) {
     return false;
@@ -179,13 +197,10 @@ function isCommonHost(host: string): boolean {
     return false;
   }
   const hostname = host.slice(0, portDelimiter < 0 ? undefined : portDelimiter);
-  if (!numericHost.test(hostname)) {
+  if (commonDomainHost.test(hostname)) {
     return true;
   }
-  return (
-    commonIpv4.test(hostname) &&
-    hostname.split(".").every((part) => Number(part) <= 255)
-  );
+  return isCommonIpv4(hostname);
 }
 
 function createRequestContext(
