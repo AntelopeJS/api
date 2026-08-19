@@ -29,8 +29,9 @@ export interface RequestContext {
 
 interface DynamicRoute {
   match: RegExp;
+  parameterName?: string;
+  parameterNames: string[];
   sub: RouteLevel;
-  mapping: string[];
 }
 
 interface CatchAllRoute {
@@ -43,6 +44,7 @@ class RouteLevel {
   handlers: IndexedRouteCallback[] = [];
   staticRoutes: Record<string, RouteLevel> = {};
   dynamicRoutes: Record<string, DynamicRoute> = {};
+  dynamicRouteList: DynamicRoute[] = [];
   catchAllRoutes: CatchAllRoute[] = [];
 }
 
@@ -111,6 +113,10 @@ function updateExactHandler(
   index[method].set(exactPath, handler.callback);
 }
 
+function hasParameter(parameters: Record<string, string>, name: string) {
+  return Object.getOwnPropertyDescriptor(parameters, name) !== undefined;
+}
+
 function findHandlers(
   path: string[],
   depth: number,
@@ -118,15 +124,16 @@ function findHandlers(
   result: Array<HandlerResult>,
   parameters: Record<string, string>,
   multi = false,
+  parameterCount = 0,
 ) {
   if (multi) {
-    result.push(
-      ...level.handlers.map((handler) => ({
+    for (const handler of level.handlers) {
+      result.push({
         handler: handler.callback,
-        parameters,
+        parameters: { ...parameters },
         priority: handler.priority,
-      })),
-    );
+      });
+    }
   }
   if (depth >= path.length) {
     if (!multi && level.handlers.length > 0) {
@@ -149,26 +156,68 @@ function findHandlers(
       result,
       parameters,
       multi,
+      parameterCount,
     );
     if (result.length > 0 && !multi) {
       return;
     }
   }
 
-  for (const { match, sub, mapping } of Object.values(level.dynamicRoutes)) {
-    const res = match.exec(part);
-    if (res) {
-      const newParameters = { ...parameters };
-      for (let i = 0; i < mapping.length; ++i) {
-        const parameterName = mapping[i];
-        const parameterValue = res[i + 1];
-        if (parameterName !== undefined && parameterValue !== undefined) {
-          newParameters[parameterName] = parameterValue;
-        }
-      }
-      findHandlers(path, depth + 1, sub, result, newParameters, multi);
+  for (const route of level.dynamicRouteList) {
+    const match = route.match.exec(part);
+    if (!match) {
+      continue;
+    }
+    if (route.parameterName !== undefined) {
+      const parameterName = route.parameterName;
+      const previousValue = parameters[parameterName];
+      const existingParameter =
+        parameterCount > 0 && hasParameter(parameters, parameterName);
+      parameters[parameterName] = match[1];
+      findHandlers(
+        path,
+        depth + 1,
+        route.sub,
+        result,
+        parameters,
+        multi,
+        parameterCount + 1,
+      );
       if (result.length > 0 && !multi) {
         return;
+      }
+      if (existingParameter) {
+        parameters[parameterName] = previousValue;
+      } else {
+        delete parameters[parameterName];
+      }
+      continue;
+    }
+    const previousValues = route.parameterNames.map((name) => parameters[name]);
+    const existingParameters = route.parameterNames.map((name) =>
+      hasParameter(parameters, name),
+    );
+    for (let index = 0; index < route.parameterNames.length; ++index) {
+      parameters[route.parameterNames[index]] = match[index + 1];
+    }
+    findHandlers(
+      path,
+      depth + 1,
+      route.sub,
+      result,
+      parameters,
+      multi,
+      parameterCount + route.parameterNames.length,
+    );
+    if (result.length > 0 && !multi) {
+      return;
+    }
+    for (let index = 0; index < route.parameterNames.length; ++index) {
+      const name = route.parameterNames[index];
+      if (existingParameters[index]) {
+        parameters[name] = previousValues[index];
+      } else {
+        delete parameters[name];
       }
     }
   }
@@ -202,20 +251,25 @@ function findHandlers(
       continue;
     }
 
-    const newParameters = {
-      ...parameters,
-      [catchAll.paramName]: captured.join("/"),
-    };
+    const existingParameter = hasParameter(parameters, catchAll.paramName);
+    const previousValue = parameters[catchAll.paramName];
+    parameters[catchAll.paramName] = captured.join("/");
     findHandlers(
       path,
       path.length,
       catchAll.level,
       result,
-      newParameters,
+      parameters,
       multi,
+      parameterCount + 1,
     );
     if (result.length > 0 && !multi) {
       return;
+    }
+    if (existingParameter) {
+      parameters[catchAll.paramName] = previousValue;
+    } else {
+      delete parameters[catchAll.paramName];
     }
   }
 }
@@ -289,7 +343,7 @@ function removeHandlerFromLevel(
     }
   }
 
-  for (const route of Object.values(level.dynamicRoutes)) {
+  for (const route of level.dynamicRouteList) {
     const dynamicRemovedCount = removeHandlerFromLevel(
       id,
       route.sub,
@@ -340,6 +394,47 @@ const special = {
   ")": true,
   ",": true,
 };
+
+function compileDynamicRoute(part: string): DynamicRoute {
+  const mapping = [];
+  const pattern = ["^"];
+  let word: string[] | undefined;
+  for (const char of part) {
+    if (char in special) {
+      if (word) {
+        mapping.push(word.join(""));
+        pattern.push(`([^\\${char}]*)`);
+        word = undefined;
+      }
+      pattern.push(`\\${char}`);
+    } else if (char === ":") {
+      if (word) {
+        throw new Error("Invalid URL parameter");
+      }
+      word = [];
+    } else if (char.match(/[a-zA-Z0-9]/)) {
+      if (word) {
+        word.push(char);
+      } else {
+        pattern.push(char);
+      }
+    } else {
+      throw new Error("Invalid character in URL");
+    }
+  }
+  if (word) {
+    mapping.push(word.join(""));
+    pattern.push(`(.*)`);
+  }
+  pattern.push("$");
+  return {
+    match: new RegExp(pattern.join("")),
+    parameterName: mapping.length === 1 ? mapping[0] : undefined,
+    parameterNames: mapping,
+    sub: new RouteLevel(),
+  };
+}
+
 export function registerHandler(
   id: string,
   mode: HandlerMode,
@@ -389,42 +484,9 @@ export function registerHandler(
 
     if (part.indexOf(":") >= 0) {
       if (!(part in level.dynamicRoutes)) {
-        const mapping = [];
-        const match = ["^"];
-        let word: string[] | undefined;
-        for (const char of part) {
-          if (char in special) {
-            if (word) {
-              mapping.push(word.join(""));
-              match.push(`([^\\${char}]*)`);
-              word = undefined;
-            }
-            match.push(`\\${char}`);
-          } else if (char === ":") {
-            if (word) {
-              throw new Error("Invalid URL parameter");
-            }
-            word = [];
-          } else if (char.match(/[a-zA-Z0-9]/)) {
-            if (word) {
-              word.push(char);
-            } else {
-              match.push(char);
-            }
-          } else {
-            throw new Error("Invalid character in URL");
-          }
-        }
-        if (word) {
-          mapping.push(word.join(""));
-          match.push(`(.*)`);
-        }
-        match.push("$");
-        level.dynamicRoutes[part] = {
-          match: new RegExp(match.join("")),
-          sub: new RouteLevel(),
-          mapping,
-        };
+        const route = compileDynamicRoute(part);
+        level.dynamicRoutes[part] = route;
+        level.dynamicRouteList.push(route);
       }
       level = level.dynamicRoutes[part].sub;
     } else {
