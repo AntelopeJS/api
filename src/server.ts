@@ -75,7 +75,16 @@ type HandlerLookupResult =
   | RouteCallback
   | HandlerResult[]
   | undefined;
+type Awaitable<T> = T | PromiseLike<T>;
+type ThenCallback = (
+  onfulfilled: (value: unknown) => unknown,
+  onrejected: (reason: unknown) => unknown,
+) => unknown;
 type ExactHandlerIndex = Record<string, Map<string, RouteCallback>>;
+
+interface PromiseLikeValue {
+  then?: unknown;
+}
 
 const exactHandlerIndexes = new WeakMap<
   Record<string, RouteLevel>,
@@ -589,16 +598,63 @@ function executeHandler(
   return handler.handler(requestContext);
 }
 
-async function executePriorityHandlers(
+function getThen(value: unknown): ThenCallback | undefined {
+  if (
+    value === null ||
+    (typeof value !== "object" && typeof value !== "function")
+  ) {
+    return;
+  }
+  const then = (value as PromiseLikeValue).then;
+  return typeof then === "function" ? (then as ThenCallback) : undefined;
+}
+
+function resolveThenable(value: unknown, then: ThenCallback): Promise<unknown> {
+  if (value instanceof Promise) {
+    return value;
+  }
+  return new Promise((resolve, reject) => {
+    queueMicrotask(() => {
+      try {
+        then.call(value, resolve, reject);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
+}
+
+function continueExecution<T, U>(
+  value: Awaitable<T>,
+  next: (result: T) => Awaitable<U>,
+): Awaitable<U> {
+  const then = getThen(value);
+  if (then) {
+    return resolveThenable(value, then).then((result) => next(result as T));
+  }
+  return next(value as T);
+}
+
+function executePriorityHandlers(
   handlers: HandlerResult[],
   requestContext: RequestContext,
-) {
-  if (handlers.length > 1) {
+  startIndex = 0,
+): Awaitable<unknown> {
+  if (startIndex === 0 && handlers.length > 1) {
     handlers.sort((a, b) => a.priority - b.priority);
   }
-  for (const { handler, parameters } of handlers) {
+  for (let index = startIndex; index < handlers.length; index += 1) {
+    const { handler, parameters } = handlers[index];
     requestContext.routeParameters = parameters;
-    const result = await handler(requestContext);
+    const result = handler(requestContext);
+    const then = getThen(result);
+    if (then) {
+      return resolveThenable(result, then).then((resolved) =>
+        resolved
+          ? resolved
+          : executePriorityHandlers(handlers, requestContext, index + 1),
+      );
+    }
     if (result) {
       return result;
     }
@@ -611,7 +667,7 @@ function executeMiddleware(
   method: string,
   path: string[],
   requestContext: RequestContext,
-) {
+): Awaitable<unknown> {
   if (handlerCounts[mode] === 0) {
     return undefined;
   }
@@ -622,17 +678,29 @@ function executeMiddleware(
   return executePriorityHandlers(handlers, requestContext);
 }
 
-async function runMonitors(
+function runMonitors(
   monitors: HandlerResult[],
   monitorContext: RequestContext,
-) {
-  if (monitors.length > 1) {
+  startIndex = 0,
+): Awaitable<void> {
+  if (startIndex === 0 && monitors.length > 1) {
     monitors.sort((a, b) => a.priority - b.priority);
   }
-  for (const { handler, parameters } of monitors) {
+  for (let index = startIndex; index < monitors.length; index += 1) {
+    const { handler, parameters } = monitors[index];
     monitorContext.routeParameters = parameters;
     try {
-      await handler(monitorContext);
+      const result = handler(monitorContext);
+      const then = getThen(result);
+      if (then) {
+        return resolveThenable(result, then).then(
+          () => runMonitors(monitors, monitorContext, index + 1),
+          (error) => {
+            console.error(error);
+            return runMonitors(monitors, monitorContext, index + 1);
+          },
+        );
+      }
     } catch (error) {
       console.error(error);
     }
@@ -643,7 +711,7 @@ function executeMonitors(
   method: string,
   path: string[],
   requestContext: RequestContext,
-) {
+): Awaitable<void> {
   if (handlerCounts.monitor === 0) {
     return;
   }
@@ -659,11 +727,107 @@ function executeMonitors(
   return runMonitors(monitors, monitorContext);
 }
 
-export async function requestListener(
+function setMiddlewareResponse(
+  requestContext: RequestContext,
+  result: unknown,
+): void {
+  if (result) {
+    requestContext.response = HTTPResult.withHeaders(
+      result,
+      requestContext.response.getHeaders(),
+      200,
+    );
+  }
+}
+
+function executePostfix(
+  method: string,
+  path: string[],
+  requestContext: RequestContext,
+): Awaitable<void> {
+  const execution = executeMiddleware("postfix", method, path, requestContext);
+  return continueExecution(execution, (result) => {
+    setMiddlewareResponse(requestContext, result);
+  });
+}
+
+function executeHandlerAndPostfix(
+  handler: HandlerResult | RouteCallback,
+  method: string,
+  path: string[],
+  requestContext: RequestContext,
+): Awaitable<void> {
+  const execution = executeHandler(handler, requestContext);
+  return continueExecution(execution, (result) => {
+    setHandlerResponse(requestContext, result);
+    return executePostfix(method, path, requestContext);
+  });
+}
+
+function executeRequest(
+  method: string,
+  path: string[],
+  exactPath: string,
+  requestContext: RequestContext,
+): Awaitable<void> {
+  let handler = getHandler(method, path, roots.handler, false, exactPath);
+  if (!handler && method === "head") {
+    handler = getHandler("get", path, roots.handler, false, exactPath);
+  }
+  const selectedHandler = Array.isArray(handler) ? undefined : handler;
+  if (!selectedHandler && method !== "options") {
+    return;
+  }
+  const prefixExecution = executeMiddleware(
+    "prefix",
+    method,
+    path,
+    requestContext,
+  );
+  return continueExecution(prefixExecution, (prefixResult) => {
+    setMiddlewareResponse(requestContext, prefixResult);
+    if (prefixResult || !selectedHandler) {
+      return;
+    }
+    return executeHandlerAndPostfix(
+      selectedHandler,
+      method,
+      path,
+      requestContext,
+    );
+  });
+}
+
+function completeRequest(
+  didFail: boolean,
+  error: unknown,
+  method: string,
+  path: string[],
+  requestContext: RequestContext,
+): Awaitable<void> {
+  if (didFail) {
+    requestContext.response = HTTPResult.withHeaders(
+      extractError(error),
+      requestContext.response.getHeaders(),
+      500,
+    );
+  }
+  requestContext.error = error;
+  const monitorExecution = executeMonitors(method, path, requestContext);
+  return continueExecution(monitorExecution, () =>
+    handleResult(
+      method === "head",
+      requestContext.response,
+      requestContext.rawResponse,
+    ),
+  );
+}
+
+function processRequest(
   req: IncomingMessage,
   res: ServerResponse,
   protocol: "http" | "https",
-) {
+): Awaitable<void> {
   const url = new URL(
     req.url || "",
     `${protocol}://${req.headers.host || "localhost"}`,
@@ -675,73 +839,38 @@ export async function requestListener(
     routeParameters: {},
     response: new HTTPResult(404, "Not Found"),
   };
-
   const path = url.pathname.split("/").filter((part) => part);
   const method = req.method?.toLowerCase() || "get";
-  const isHeadRequest = method === "head";
-  let requestError: unknown;
 
   try {
-    let handler = getHandler(method, path, roots.handler, false, url.pathname);
-    if (!handler && method === "head") {
-      handler = getHandler("get", path, roots.handler, false, url.pathname);
-    }
-    if (!handler && method !== "options") {
-      // Fall through to finally block to execute monitors.
-    } else {
-      const prefixExecution = executeMiddleware(
-        "prefix",
-        method,
-        path,
-        requestContext,
-      );
-      const prefixResult = prefixExecution ? await prefixExecution : undefined;
-      if (prefixResult) {
-        requestContext.response = HTTPResult.withHeaders(
-          prefixResult,
-          requestContext.response.getHeaders(),
-          200,
-        );
-      } else if (!handler && method === "options") {
-        // Fall through to finally block to execute monitors.
-      } else {
-        if (handler && !Array.isArray(handler)) {
-          const result = await executeHandler(handler, requestContext);
-          setHandlerResponse(requestContext, result);
-        }
-
-        const postfixExecution = executeMiddleware(
-          "postfix",
-          method,
-          path,
-          requestContext,
-        );
-        const postfixResult = postfixExecution
-          ? await postfixExecution
-          : undefined;
-        if (postfixResult) {
-          requestContext.response = HTTPResult.withHeaders(
-            postfixResult,
-            requestContext.response.getHeaders(),
-            200,
-          );
-        }
-      }
-    }
-  } catch (error: unknown) {
-    requestError = error;
-    requestContext.response = HTTPResult.withHeaders(
-      extractError(error),
-      requestContext.response.getHeaders(),
-      500,
+    const execution = executeRequest(
+      method,
+      path,
+      url.pathname,
+      requestContext,
     );
-  } finally {
-    requestContext.error = requestError;
-    const monitorExecution = executeMonitors(method, path, requestContext);
-    if (monitorExecution) {
-      await monitorExecution;
+    const then = getThen(execution);
+    if (then) {
+      return resolveThenable(execution, then).then(
+        () => completeRequest(false, undefined, method, path, requestContext),
+        (error) => completeRequest(true, error, method, path, requestContext),
+      );
     }
-    handleResult(isHeadRequest, requestContext.response, res);
+  } catch (error) {
+    return completeRequest(true, error, method, path, requestContext);
+  }
+  return completeRequest(false, undefined, method, path, requestContext);
+}
+
+export function requestListener(
+  req: IncomingMessage,
+  res: ServerResponse,
+  protocol: "http" | "https",
+): Awaitable<void> {
+  try {
+    return processRequest(req, res, protocol);
+  } catch (error) {
+    return Promise.reject(error);
   }
 }
 
