@@ -13,6 +13,10 @@ export interface IdentifiableRouteCallback {
 type HandlerMode = "prefix" | "postfix" | "handler" | "monitor" | "websocket";
 type MiddlewareMode = "prefix" | "postfix";
 
+interface IndexedRouteCallback extends IdentifiableRouteCallback {
+  exactPath?: string;
+}
+
 export interface RequestContext {
   rawRequest: IncomingMessage;
   rawResponse: ServerResponse;
@@ -36,7 +40,7 @@ interface CatchAllRoute {
 }
 
 class RouteLevel {
-  handlers: IdentifiableRouteCallback[] = [];
+  handlers: IndexedRouteCallback[] = [];
   staticRoutes: Record<string, RouteLevel> = {};
   dynamicRoutes: Record<string, DynamicRoute> = {};
   catchAllRoutes: CatchAllRoute[] = [];
@@ -64,7 +68,48 @@ interface HandlerResult {
   priority: HandlerPriority;
 }
 
-type HandlerLookupResult = HandlerResult | HandlerResult[] | undefined;
+type HandlerLookupResult =
+  | HandlerResult
+  | RouteCallback
+  | HandlerResult[]
+  | undefined;
+type ExactHandlerIndex = Record<string, Map<string, RouteCallback>>;
+
+const exactHandlerIndexes = new WeakMap<
+  Record<string, RouteLevel>,
+  ExactHandlerIndex
+>([
+  [roots.handler, {}],
+  [roots.websocket, {}],
+]);
+
+function updateExactHandler(
+  source: Record<string, RouteLevel>,
+  method: string,
+  level: RouteLevel,
+  removedExactPath?: string,
+) {
+  const index = exactHandlerIndexes.get(source);
+  const exactPath = level.handlers[0]?.exactPath ?? removedExactPath;
+  if (!index || !exactPath) {
+    return;
+  }
+
+  const methodIndex = index[method];
+  if (level.handlers.length !== 1) {
+    methodIndex?.delete(exactPath);
+    if (methodIndex?.size === 0) {
+      delete index[method];
+    }
+    return;
+  }
+
+  const handler = level.handlers[0];
+  if (!methodIndex) {
+    index[method] = new Map();
+  }
+  index[method].set(exactPath, handler.callback);
+}
 
 function findHandlers(
   path: string[],
@@ -180,59 +225,104 @@ function getHandler(
   path: string[],
   source: Record<string, RouteLevel>,
   multi = false,
+  exactPath?: string,
 ): HandlerLookupResult {
-  const result: Array<HandlerResult> = [];
+  let result: Array<HandlerResult> | undefined;
   if (method in source) {
+    if (!multi && exactPath) {
+      const exactHandler = exactHandlerIndexes
+        .get(source)
+        ?.[method]?.get(exactPath);
+      if (exactHandler) {
+        return exactHandler;
+      }
+    }
+    result = [];
     findHandlers(path, 0, source[method], result, {}, multi);
     if (result.length > 0 && !multi) {
       return result[0];
     }
   }
   if ("any" in source) {
+    if (!multi && exactPath) {
+      const exactHandler = exactHandlerIndexes.get(source)?.any?.get(exactPath);
+      if (exactHandler) {
+        return exactHandler;
+      }
+    }
+    result ??= [];
     findHandlers(path, 0, source.any, result, {}, multi);
     if (result.length > 0 && !multi) {
       return result[0];
     }
   }
-  return multi ? result : undefined;
+  return multi ? (result ?? []) : undefined;
 }
 
-function removeHandler(id: string, source: Record<string, RouteLevel>): number {
-  for (const level of Object.values(source)) {
-    const handlerLength = level.handlers.length;
-    level.handlers = level.handlers.filter((handler) => handler.id !== id);
-    const removedCount = handlerLength - level.handlers.length;
+function removeHandlerFromLevel(
+  id: string,
+  level: RouteLevel,
+  source: Record<string, RouteLevel>,
+  method: string,
+): number {
+  const handlerLength = level.handlers.length;
+  const removedExactPath = level.handlers.find(
+    (handler) => handler.id === id,
+  )?.exactPath;
+  level.handlers = level.handlers.filter((handler) => handler.id !== id);
+  const removedCount = handlerLength - level.handlers.length;
 
-    if (removedCount > 0) {
-      return removedCount;
-    }
+  if (removedCount > 0) {
+    updateExactHandler(source, method, level, removedExactPath);
+    return removedCount;
+  }
 
-    const staticRemovedCount = removeHandler(id, level.staticRoutes);
+  for (const child of Object.values(level.staticRoutes)) {
+    const staticRemovedCount = removeHandlerFromLevel(
+      id,
+      child,
+      source,
+      method,
+    );
     if (staticRemovedCount > 0) {
       return staticRemovedCount;
     }
+  }
 
-    const dynamicRemovedCount = removeHandler(
+  for (const route of Object.values(level.dynamicRoutes)) {
+    const dynamicRemovedCount = removeHandlerFromLevel(
       id,
-      Object.fromEntries(
-        Object.entries(level.dynamicRoutes).map(([key, route]) => [
-          key,
-          route.sub,
-        ]),
-      ),
+      route.sub,
+      source,
+      method,
     );
     if (dynamicRemovedCount > 0) {
       return dynamicRemovedCount;
     }
+  }
 
-    for (const catchAll of level.catchAllRoutes) {
-      const catchAllRemovedCount = removeHandler(id, { _: catchAll.level });
-      if (catchAllRemovedCount > 0) {
-        return catchAllRemovedCount;
-      }
+  for (const catchAll of level.catchAllRoutes) {
+    const catchAllRemovedCount = removeHandlerFromLevel(
+      id,
+      catchAll.level,
+      source,
+      method,
+    );
+    if (catchAllRemovedCount > 0) {
+      return catchAllRemovedCount;
     }
   }
 
+  return 0;
+}
+
+function removeHandler(id: string, source: Record<string, RouteLevel>): number {
+  for (const [method, level] of Object.entries(source)) {
+    const removedCount = removeHandlerFromLevel(id, level, source, method);
+    if (removedCount > 0) {
+      return removedCount;
+    }
+  }
   return 0;
 }
 
@@ -260,10 +350,11 @@ export function registerHandler(
 ) {
   const parts = location.split("/").filter((part) => part);
   const source = roots[mode];
-  let level = source[method?.toLowerCase() || "any"];
+  const routeMethod = method?.toLowerCase() || "any";
+  let level = source[routeMethod];
   if (!level) {
     level = new RouteLevel();
-    source[method?.toLowerCase() || "any"] = level;
+    source[routeMethod] = level;
   }
   for (let i = 0; i < parts.length; ++i) {
     const part = parts[i];
@@ -343,7 +434,16 @@ export function registerHandler(
       level = level.staticRoutes[part];
     }
   }
-  level.handlers.push({ id, callback: handler, priority });
+  const identifiableHandler: IndexedRouteCallback = {
+    id,
+    callback: handler,
+    priority,
+  };
+  if (parts.every((part) => !part.includes(":"))) {
+    identifiableHandler.exactPath = `/${parts.join("/")}`;
+  }
+  level.handlers.push(identifiableHandler);
+  updateExactHandler(source, routeMethod, level);
   handlerCounts[mode] += 1;
 }
 
@@ -414,6 +514,17 @@ function getMultiHandlers(
 ) {
   const handlers = getHandler(method, path, source, true);
   return Array.isArray(handlers) ? handlers : [];
+}
+
+function executeHandler(
+  handler: HandlerResult | RouteCallback,
+  requestContext: RequestContext,
+) {
+  if (typeof handler === "function") {
+    return handler(requestContext);
+  }
+  requestContext.routeParameters = handler.parameters;
+  return handler.handler(requestContext);
 }
 
 async function executePriorityHandlers(
@@ -509,9 +620,9 @@ export async function requestListener(
   let requestError: unknown;
 
   try {
-    let handler = getHandler(method, path, roots.handler, false);
+    let handler = getHandler(method, path, roots.handler, false, url.pathname);
     if (!handler && method === "head") {
-      handler = getHandler("get", path, roots.handler, false);
+      handler = getHandler("get", path, roots.handler, false, url.pathname);
     }
     if (!handler && method !== "options") {
       // Fall through to finally block to execute monitors.
@@ -533,8 +644,7 @@ export async function requestListener(
         // Fall through to finally block to execute monitors.
       } else {
         if (handler && !Array.isArray(handler)) {
-          requestContext.routeParameters = handler.parameters;
-          const result = await handler.handler(requestContext);
+          const result = await executeHandler(handler, requestContext);
           setHandlerResponse(requestContext, result);
         }
 
@@ -606,7 +716,13 @@ export async function upgradeListener(
   let mustDestroySocket = false;
 
   try {
-    const handler = getHandler(method, path, roots.websocket, false);
+    const handler = getHandler(
+      method,
+      path,
+      roots.websocket,
+      false,
+      url.pathname,
+    );
     if (!handler || Array.isArray(handler)) {
       mustSendResponse = true;
       mustDestroySocket = true;
@@ -631,8 +747,7 @@ export async function upgradeListener(
       } else {
         requestContext.connection = await upgrader(req, socket, head);
         hasUpgradedConnection = true;
-        requestContext.routeParameters = handler.parameters;
-        await handler.handler(requestContext);
+        await executeHandler(handler, requestContext);
       }
     }
   } catch (error: unknown) {
