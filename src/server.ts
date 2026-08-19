@@ -10,6 +10,9 @@ export interface IdentifiableRouteCallback {
   priority: HandlerPriority;
 }
 
+type HandlerMode = "prefix" | "postfix" | "handler" | "monitor" | "websocket";
+type MiddlewareMode = "prefix" | "postfix";
+
 export interface RequestContext {
   rawRequest: IncomingMessage;
   rawResponse: ServerResponse;
@@ -39,12 +42,20 @@ class RouteLevel {
   catchAllRoutes: CatchAllRoute[] = [];
 }
 
-const roots: Record<string, Record<string, RouteLevel>> = {
+const roots: Record<HandlerMode, Record<string, RouteLevel>> = {
   handler: {},
   prefix: {},
   postfix: {},
   monitor: {},
   websocket: {},
+};
+
+const handlerCounts: Record<HandlerMode, number> = {
+  handler: 0,
+  prefix: 0,
+  postfix: 0,
+  monitor: 0,
+  websocket: 0,
 };
 
 interface HandlerResult {
@@ -186,42 +197,43 @@ function getHandler(
   return multi ? result : undefined;
 }
 
-function removeHandler(
-  id: string,
-  source: Record<string, RouteLevel>,
-): boolean {
+function removeHandler(id: string, source: Record<string, RouteLevel>): number {
   for (const level of Object.values(source)) {
     const handlerLength = level.handlers.length;
     level.handlers = level.handlers.filter((handler) => handler.id !== id);
+    const removedCount = handlerLength - level.handlers.length;
 
-    if (handlerLength !== level.handlers.length) {
-      return true;
+    if (removedCount > 0) {
+      return removedCount;
     }
 
-    if (removeHandler(id, level.staticRoutes)) {
-      return true;
+    const staticRemovedCount = removeHandler(id, level.staticRoutes);
+    if (staticRemovedCount > 0) {
+      return staticRemovedCount;
     }
 
-    if (
-      removeHandler(
-        id,
-        Object.keys(level.dynamicRoutes).reduce(
-          (acc, key) => ({ ...acc, [key]: level.dynamicRoutes[key].sub }),
-          {} as Record<string, RouteLevel>,
-        ),
-      )
-    ) {
-      return true;
+    const dynamicRemovedCount = removeHandler(
+      id,
+      Object.fromEntries(
+        Object.entries(level.dynamicRoutes).map(([key, route]) => [
+          key,
+          route.sub,
+        ]),
+      ),
+    );
+    if (dynamicRemovedCount > 0) {
+      return dynamicRemovedCount;
     }
 
     for (const catchAll of level.catchAllRoutes) {
-      if (removeHandler(id, { _: catchAll.level })) {
-        return true;
+      const catchAllRemovedCount = removeHandler(id, { _: catchAll.level });
+      if (catchAllRemovedCount > 0) {
+        return catchAllRemovedCount;
       }
     }
   }
 
-  return false;
+  return 0;
 }
 
 const special = {
@@ -240,7 +252,7 @@ const special = {
 };
 export function registerHandler(
   id: string,
-  mode: "prefix" | "postfix" | "handler" | "monitor" | "websocket",
+  mode: HandlerMode,
   method: string | undefined,
   location: string,
   handler: RouteCallback,
@@ -332,11 +344,14 @@ export function registerHandler(
     }
   }
   level.handlers.push({ id, callback: handler, priority });
+  handlerCounts[mode] += 1;
 }
 
 export function unregisterHandler(id: string) {
-  for (const source of Object.values(roots)) {
-    if (removeHandler(id, source)) {
+  for (const [mode, source] of Object.entries(roots)) {
+    const removedCount = removeHandler(id, source);
+    if (removedCount > 0) {
+      handlerCounts[mode as HandlerMode] -= removedCount;
       return;
     }
   }
@@ -405,7 +420,9 @@ async function executePriorityHandlers(
   handlers: HandlerResult[],
   requestContext: RequestContext,
 ) {
-  handlers.sort((a, b) => a.priority - b.priority);
+  if (handlers.length > 1) {
+    handlers.sort((a, b) => a.priority - b.priority);
+  }
   for (const { handler, parameters } of handlers) {
     requestContext.routeParameters = parameters;
     const result = await handler(requestContext);
@@ -416,19 +433,29 @@ async function executePriorityHandlers(
   return undefined;
 }
 
-async function executeMonitors(
+function executeMiddleware(
+  mode: MiddlewareMode,
   method: string,
   path: string[],
   requestContext: RequestContext,
 ) {
-  const monitors = getMultiHandlers(method, path, roots.monitor);
-  const monitorContext: RequestContext = {
-    ...requestContext,
-    routeParameters: {},
-    response: cloneResponse(requestContext.response),
-  };
+  if (handlerCounts[mode] === 0) {
+    return undefined;
+  }
+  const handlers = getMultiHandlers(method, path, roots[mode]);
+  if (handlers.length === 0) {
+    return undefined;
+  }
+  return executePriorityHandlers(handlers, requestContext);
+}
 
-  monitors.sort((a, b) => a.priority - b.priority);
+async function runMonitors(
+  monitors: HandlerResult[],
+  monitorContext: RequestContext,
+) {
+  if (monitors.length > 1) {
+    monitors.sort((a, b) => a.priority - b.priority);
+  }
   for (const { handler, parameters } of monitors) {
     monitorContext.routeParameters = parameters;
     try {
@@ -437,6 +464,26 @@ async function executeMonitors(
       console.error(error);
     }
   }
+}
+
+function executeMonitors(
+  method: string,
+  path: string[],
+  requestContext: RequestContext,
+) {
+  if (handlerCounts.monitor === 0) {
+    return;
+  }
+  const monitors = getMultiHandlers(method, path, roots.monitor);
+  if (monitors.length === 0) {
+    return;
+  }
+  const monitorContext: RequestContext = {
+    ...requestContext,
+    routeParameters: {},
+    response: cloneResponse(requestContext.response),
+  };
+  return runMonitors(monitors, monitorContext);
 }
 
 export async function requestListener(
@@ -469,10 +516,13 @@ export async function requestListener(
     if (!handler && method !== "options") {
       // Fall through to finally block to execute monitors.
     } else {
-      const prefixResult = await executePriorityHandlers(
-        getMultiHandlers(method, path, roots.prefix),
+      const prefixExecution = executeMiddleware(
+        "prefix",
+        method,
+        path,
         requestContext,
       );
+      const prefixResult = prefixExecution ? await prefixExecution : undefined;
       if (prefixResult) {
         requestContext.response = HTTPResult.withHeaders(
           prefixResult,
@@ -488,10 +538,15 @@ export async function requestListener(
           setHandlerResponse(requestContext, result);
         }
 
-        const postfixResult = await executePriorityHandlers(
-          getMultiHandlers(method, path, roots.postfix),
+        const postfixExecution = executeMiddleware(
+          "postfix",
+          method,
+          path,
           requestContext,
         );
+        const postfixResult = postfixExecution
+          ? await postfixExecution
+          : undefined;
         if (postfixResult) {
           requestContext.response = HTTPResult.withHeaders(
             postfixResult,
@@ -510,7 +565,10 @@ export async function requestListener(
     );
   } finally {
     requestContext.error = requestError;
-    await executeMonitors(method, path, requestContext);
+    const monitorExecution = executeMonitors(method, path, requestContext);
+    if (monitorExecution) {
+      await monitorExecution;
+    }
     handleResult(isHeadRequest, requestContext.response, res);
   }
 }
@@ -554,10 +612,13 @@ export async function upgradeListener(
       mustDestroySocket = true;
       // Fall through to finally block to execute monitors.
     } else {
-      const prefixResult = await executePriorityHandlers(
-        getMultiHandlers(method, path, roots.prefix),
+      const prefixExecution = executeMiddleware(
+        "prefix",
+        method,
+        path,
         requestContext,
       );
+      const prefixResult = prefixExecution ? await prefixExecution : undefined;
       if (prefixResult) {
         requestContext.response = HTTPResult.withHeaders(
           prefixResult,
@@ -587,7 +648,10 @@ export async function upgradeListener(
     }
   } finally {
     requestContext.error = requestError;
-    await executeMonitors(method, path, requestContext);
+    const monitorExecution = executeMonitors(method, path, requestContext);
+    if (monitorExecution) {
+      await monitorExecution;
+    }
     if (mustSendResponse) {
       handleResult(false, requestContext.response, res);
     }
