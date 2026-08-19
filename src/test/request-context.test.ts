@@ -1,5 +1,10 @@
 import assert from "node:assert";
-import { createServer, type Server } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 import type { AddressInfo } from "node:net";
 import { connect } from "node:net";
 import WebSocket from "ws";
@@ -159,6 +164,24 @@ describe("Request context URL", () => {
 
     const body = await sendRawRequest("/lazy/hostless");
     assert.equal(body, "http://localhost");
+  });
+
+  it("rejects invalid numeric hosts before routing", async () => {
+    let handlerWasCalled = false;
+    register("lazy-url-invalid-host", "handler", "/lazy/invalid-host", () => {
+      handlerWasCalled = true;
+    });
+    const request = {
+      headers: { host: "999.999.999.999" },
+      method: "GET",
+      url: "/lazy/invalid-host",
+    } as IncomingMessage;
+
+    await assert.rejects(
+      requestListener(request, {} as ServerResponse, "http"),
+      TypeError,
+    );
+    assert.equal(handlerWasCalled, false);
   });
 
   it("keeps url assignable", async () => {

@@ -130,6 +130,8 @@ type RequestProtocol = "http" | "https" | "ws" | "wss";
 
 const commonPathname = /^\/[A-Za-z0-9/_-]*$/;
 const commonHost = /^[A-Za-z0-9.-]+(?::[0-9]+)?$/;
+const numericHost = /^[0-9.]+$/;
+const commonIpv4 = /^(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}$/;
 const safePathname = /^\/[A-Za-z0-9\-._~!$&'()*+,;=:@/%]*$/;
 const dotPathSegment = /(?:^|\/)(?:(?:\.|%2e){1,2})(?:\/|$)/i;
 const requestHost = Symbol();
@@ -173,7 +175,17 @@ function isCommonHost(host: string): boolean {
     return false;
   }
   const portDelimiter = host.lastIndexOf(":");
-  return portDelimiter < 0 || Number(host.slice(portDelimiter + 1)) <= 65_535;
+  if (portDelimiter >= 0 && Number(host.slice(portDelimiter + 1)) > 65_535) {
+    return false;
+  }
+  const hostname = host.slice(0, portDelimiter < 0 ? undefined : portDelimiter);
+  if (!numericHost.test(hostname)) {
+    return true;
+  }
+  return (
+    commonIpv4.test(hostname) &&
+    hostname.split(".").every((part) => Number(part) <= 255)
+  );
 }
 
 function createRequestContext(
