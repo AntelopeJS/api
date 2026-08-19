@@ -556,32 +556,28 @@ function copyHeaders(source: HTTPResult, target: HTTPResult) {
   }
 }
 
-function setResponse(
+function replaceResponse(
   requestContext: RequestContext,
   result: unknown,
   status: number,
-  mustReplace = false,
 ) {
   const previousResponse = requestContext.response;
-  if (result instanceof HTTPResult) {
-    copyHeaders(previousResponse, result);
-    requestContext.response = result;
-    return;
-  }
-  if (!mustReplace && !previousResponse.isStream()) {
-    previousResponse.setBody(result);
-    previousResponse.setStatus(status);
-    return;
-  }
-  const response = new HTTPResult(status, result);
+  const response =
+    result instanceof HTTPResult ? result : new HTTPResult(status, result);
   copyHeaders(previousResponse, response);
   requestContext.response = response;
 }
 
 function setHandlerResponse(requestContext: RequestContext, result: unknown) {
-  if (!requestContext.response.isStream()) {
-    setResponse(requestContext, result || "", 200);
+  if (requestContext.response.isStream()) {
+    return;
   }
+  if (result instanceof HTTPResult) {
+    replaceResponse(requestContext, result, 200);
+    return;
+  }
+  requestContext.response.setBody(result || "");
+  requestContext.response.setStatus(200);
 }
 
 function cloneResponse(response: HTTPResult) {
@@ -747,9 +743,15 @@ function setMiddlewareResponse(
   requestContext: RequestContext,
   result: unknown,
 ): void {
-  if (result) {
-    setResponse(requestContext, result, 200);
+  if (!result) {
+    return;
   }
+  if (result instanceof HTTPResult || requestContext.response.isStream()) {
+    replaceResponse(requestContext, result, 200);
+    return;
+  }
+  requestContext.response.setBody(result);
+  requestContext.response.setStatus(200);
 }
 
 function executePostfix(
@@ -822,7 +824,7 @@ function completeRequest(
   requestContext: RequestContext,
 ): Awaitable<void> {
   if (didFail) {
-    setResponse(requestContext, extractError(error), 500, true);
+    replaceResponse(requestContext, extractError(error), 500);
   }
   requestContext.error = error;
   const monitorExecution = executeMonitors(method, path, requestContext);
@@ -939,7 +941,7 @@ export async function upgradeListener(
       );
       const prefixResult = prefixExecution ? await prefixExecution : undefined;
       if (prefixResult) {
-        setResponse(requestContext, prefixResult, 200);
+        setMiddlewareResponse(requestContext, prefixResult);
         mustSendResponse = true;
         mustDestroySocket = true;
         // Fall through to finally block to execute monitors.
@@ -953,7 +955,7 @@ export async function upgradeListener(
     requestError = error;
     mustDestroySocket = true;
     if (!hasUpgradedConnection) {
-      setResponse(requestContext, extractError(error), 500, true);
+      replaceResponse(requestContext, extractError(error), 500);
       mustSendResponse = true;
     }
   } finally {
