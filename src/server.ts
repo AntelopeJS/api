@@ -126,6 +126,95 @@ function hasParameter(parameters: Record<string, string>, name: string) {
   return Object.getOwnPropertyDescriptor(parameters, name) !== undefined;
 }
 
+type RequestProtocol = "http" | "https" | "ws" | "wss";
+
+const commonPathname = /^\/[A-Za-z0-9/_-]*$/;
+const commonHost = /^[A-Za-z0-9.-]+(?::[0-9]+)?$/;
+const safePathname = /^\/[A-Za-z0-9\-._~!$&'()*+,;=:@/%]*$/;
+const dotPathSegment = /(?:^|\/)(?:(?:\.|%2e){1,2})(?:\/|$)/i;
+const requestHost = Symbol();
+const requestTarget = Symbol();
+const requestUrl = Symbol();
+
+interface LazyRequestContext extends RequestContext {
+  [requestHost]: string;
+  [requestTarget]: string;
+  [requestUrl]?: URL;
+}
+
+function createRequestUrlDescriptor(
+  protocol: RequestProtocol,
+): PropertyDescriptor {
+  return {
+    configurable: true,
+    enumerable: true,
+    get(this: LazyRequestContext) {
+      this[requestUrl] ??= new URL(
+        this[requestTarget],
+        `${protocol}://${this[requestHost]}`,
+      );
+      return this[requestUrl];
+    },
+    set(this: LazyRequestContext, url: URL) {
+      this[requestUrl] = url;
+    },
+  };
+}
+
+const requestUrlDescriptors: Record<RequestProtocol, PropertyDescriptor> = {
+  http: createRequestUrlDescriptor("http"),
+  https: createRequestUrlDescriptor("https"),
+  ws: createRequestUrlDescriptor("ws"),
+  wss: createRequestUrlDescriptor("wss"),
+};
+
+function isCommonHost(host: string): boolean {
+  if (!commonHost.test(host)) {
+    return false;
+  }
+  const portDelimiter = host.lastIndexOf(":");
+  return portDelimiter < 0 || Number(host.slice(portDelimiter + 1)) <= 65_535;
+}
+
+function createRequestContext(
+  req: IncomingMessage,
+  res: ServerResponse,
+  protocol: RequestProtocol,
+): RequestContext {
+  const context = {
+    rawRequest: req,
+    rawResponse: res,
+    [requestHost]: req.headers.host || "localhost",
+    [requestTarget]: req.url || "",
+    routeParameters: {},
+    response: new HTTPResult(404, "Not Found"),
+  } as unknown as LazyRequestContext;
+  Object.defineProperty(context, "url", requestUrlDescriptors[protocol]);
+  if (!isCommonHost(context[requestHost])) {
+    void context.url;
+  }
+  return context;
+}
+
+function getPathname(requestContext: RequestContext): string {
+  const requestTarget = requestContext.rawRequest.url;
+  if (!requestTarget || requestTarget.startsWith("//")) {
+    return requestContext.url.pathname;
+  }
+
+  const delimiterIndex = requestTarget.search(/[?#]/);
+  const pathname = requestTarget.slice(
+    0,
+    delimiterIndex < 0 ? undefined : delimiterIndex,
+  );
+  if (commonPathname.test(pathname)) {
+    return pathname;
+  }
+  return safePathname.test(pathname) && !dotPathSegment.test(pathname)
+    ? pathname
+    : requestContext.url.pathname;
+}
+
 function findHandlers(
   path: string[],
   depth: number,
@@ -828,25 +917,16 @@ function processRequest(
   res: ServerResponse,
   protocol: "http" | "https",
 ): Awaitable<void> {
-  const url = new URL(
-    req.url || "",
-    `${protocol}://${req.headers.host || "localhost"}`,
-  );
-  const requestContext: RequestContext = {
-    rawRequest: req,
-    rawResponse: res,
-    url,
-    routeParameters: {},
-    response: new HTTPResult(404, "Not Found"),
-  };
-  const path = url.pathname.split("/").filter((part) => part);
+  const requestContext = createRequestContext(req, res, protocol);
+  const pathname = getPathname(requestContext);
+  const path = pathname.split("/").filter(Boolean);
   const method = req.method?.toLowerCase() || "get";
 
   try {
     const execution = executeRequest(
       method,
       path,
-      url.pathname,
+      pathname,
       requestContext,
     );
     const then = getThen(execution);
@@ -887,19 +967,9 @@ export async function upgradeListener(
   protocol: "ws" | "wss",
 ) {
   const res = new ServerResponse(req);
-  const url = new URL(
-    req.url || "",
-    `${protocol}://${req.headers.host || "localhost"}`,
-  );
-  const requestContext: RequestContext = {
-    rawRequest: req,
-    rawResponse: res,
-    url,
-    routeParameters: {},
-    response: new HTTPResult(404, "Not Found"),
-  };
-
-  const path = url.pathname.split("/").filter((part) => part);
+  const requestContext = createRequestContext(req, res, protocol);
+  const pathname = getPathname(requestContext);
+  const path = pathname.split("/").filter(Boolean);
   const method = req.method?.toLowerCase() || "get";
   let requestError: unknown;
   let hasUpgradedConnection = false;
@@ -912,7 +982,7 @@ export async function upgradeListener(
       path,
       roots.websocket,
       false,
-      url.pathname,
+      pathname,
     );
     if (!handler || Array.isArray(handler)) {
       mustSendResponse = true;
