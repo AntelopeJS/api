@@ -30,6 +30,11 @@ interface RequestOptions {
   path?: string;
 }
 
+interface StatefulThenable {
+  getReadCount: () => number;
+  value: PromiseLike<string>;
+}
+
 function immediateThenable<T>(value: T): PromiseLike<T> {
   const thenable = Object.create(null);
   Object.defineProperty(thenable, THEN_PROPERTY, {
@@ -45,6 +50,24 @@ function rejectedThenable(error: unknown): PromiseLike<never> {
       reject(error),
   });
   return thenable as PromiseLike<never>;
+}
+
+function statefulThenable(value: string): StatefulThenable {
+  let readCount = 0;
+  const thenable = Object.create(null);
+  Object.defineProperty(thenable, THEN_PROPERTY, {
+    get: () => {
+      readCount += 1;
+      if (readCount > 1) {
+        throw new Error("then getter read more than once");
+      }
+      return (resolve: (resolved: string) => unknown) => resolve(value);
+    },
+  });
+  return {
+    getReadCount: () => readCount,
+    value: thenable as PromiseLike<string>,
+  };
 }
 
 function listen(server: http.Server): Promise<number> {
@@ -183,6 +206,7 @@ describe("Synchronous HTTP request path", () => {
 
   it("continues in order when each phase returns a promise or thenable", async () => {
     const order: string[] = [];
+    const handlerResult = statefulThenable("async-ok");
     register("async-prefix", "prefix", "GET", "/async", () =>
       Promise.resolve().then(() => {
         order.push("prefix");
@@ -190,7 +214,7 @@ describe("Synchronous HTTP request path", () => {
     );
     register("thenable-handler", "handler", "GET", "/async", () => {
       order.push("handler");
-      return immediateThenable("async-ok");
+      return handlerResult.value;
     });
     register("thenable-postfix", "postfix", "GET", "/async", () => {
       order.push("postfix");
@@ -204,6 +228,7 @@ describe("Synchronous HTTP request path", () => {
 
     assert.equal(response.body, "async-ok");
     assert.ok(listenerResult instanceof Promise);
+    assert.equal(handlerResult.getReadCount(), 1);
     assert.deepEqual(order, ["prefix", "handler", "postfix", "monitor"]);
   });
 
