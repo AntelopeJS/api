@@ -178,10 +178,41 @@ describe("Request context URL", () => {
     } as IncomingMessage;
 
     await assert.rejects(
-      requestListener(request, {} as ServerResponse, "http"),
+      async () => requestListener(request, {} as ServerResponse, "http"),
       TypeError,
     );
     assert.equal(handlerWasCalled, false);
+  });
+
+  it("returns the same URL instance across repeated synchronous accesses", async () => {
+    register("lazy-url-identity", "handler", "/lazy/identity", (context) => {
+      const first = context.url;
+      return {
+        pathname: context.url.pathname,
+        query: context.url.searchParams.get("value"),
+        sameInstance: first === context.url,
+      };
+    });
+
+    const body = await sendRawRequest(
+      "/lazy/identity?value=repeated",
+      "example.test",
+    );
+    assert.deepEqual(JSON.parse(body), {
+      pathname: "/lazy/identity",
+      query: "repeated",
+      sameInstance: true,
+    });
+  });
+
+  it("keeps lazy URL semantics in asynchronous handlers", async () => {
+    register("lazy-url-async", "handler", "/lazy/async", async (context) => {
+      await Promise.resolve();
+      return context.url.href;
+    });
+
+    const body = await sendRawRequest("/lazy/async?value=ok", "example.test");
+    assert.equal(body, "http://example.test/lazy/async?value=ok");
   });
 
   it("keeps url assignable", async () => {

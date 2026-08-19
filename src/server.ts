@@ -950,12 +950,7 @@ function processRequest(
   const method = req.method?.toLowerCase() || "get";
 
   try {
-    const execution = executeRequest(
-      method,
-      path,
-      pathname,
-      requestContext,
-    );
+    const execution = executeRequest(method, path, pathname, requestContext);
     const then = getThen(execution);
     if (then) {
       return resolveThenable(execution, then).then(
@@ -1004,13 +999,7 @@ export async function upgradeListener(
   let mustDestroySocket = false;
 
   try {
-    const handler = getHandler(
-      method,
-      path,
-      roots.websocket,
-      false,
-      pathname,
-    );
+    const handler = getHandler(method, path, roots.websocket, false, pathname);
     if (!handler || Array.isArray(handler)) {
       mustSendResponse = true;
       mustDestroySocket = true;
