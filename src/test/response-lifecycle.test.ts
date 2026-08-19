@@ -113,11 +113,10 @@ describe("HTTP response lifecycle", () => {
     }
   });
 
-  it("uses peekHeaders when the installed interface exposes it", async () => {
+  it("uses the published non-allocating header lookup", async () => {
     const path = `${ROUTE_ROOT}/peek-headers`;
     let headerReads = 0;
     const originalGetHeaders = HTTPResult.prototype.getHeaders;
-    const hasPeekHeaders = "peekHeaders" in HTTPResult.prototype;
     register("handler", path, () => new HTTPResult(203, "result"));
     HTTPResult.prototype.getHeaders = function getHeaders() {
       headerReads += 1;
@@ -128,7 +127,7 @@ describe("HTTP response lifecycle", () => {
       const response = await request(port, path);
       assert.equal(response.status, 203);
       assert.equal(response.body, "result");
-      assert.equal(headerReads, hasPeekHeaders ? 0 : 1);
+      assert.equal(headerReads, 0);
     } finally {
       HTTPResult.prototype.getHeaders = originalGetHeaders;
     }

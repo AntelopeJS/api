@@ -126,10 +126,6 @@ function hasParameter(parameters: Record<string, string>, name: string) {
   return Object.getOwnPropertyDescriptor(parameters, name) !== undefined;
 }
 
-interface HeaderPeekable {
-  peekHeaders(): Readonly<Record<string, string>> | undefined;
-}
-
 function findHandlers(
   path: string[],
   depth: number,
@@ -551,21 +547,11 @@ function extractError(error: unknown) {
   return error;
 }
 
-function getExistingHeaders(response: HTTPResult) {
-  const peekHeaders = (response as Partial<HeaderPeekable>).peekHeaders;
-  if (typeof peekHeaders === "function") {
-    return peekHeaders.call(response);
-  }
-  return response.getHeaders();
-}
-
 function copyHeaders(source: HTTPResult, target: HTTPResult) {
   if (source === target) {
     return;
   }
-  for (const [name, value] of Object.entries(
-    getExistingHeaders(source) ?? {},
-  )) {
+  for (const [name, value] of Object.entries(source.peekHeaders() ?? {})) {
     target.addHeader(name, value);
   }
 }
