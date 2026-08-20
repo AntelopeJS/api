@@ -298,3 +298,5 @@ export const routesProxy = {
     return routes;
   },
 };
+
+export const internal = { routesProxy };

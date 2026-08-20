@@ -1,5 +1,7 @@
 import assert from "node:assert";
+import { spawnSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
+import { resolve } from "node:path";
 import {
   type ComputedParameter,
   ControllerMeta,
@@ -112,6 +114,23 @@ describe("Controller resolution", () => {
       routesProxy.unregister(id);
     });
     await close(server);
+  });
+
+  it("attaches the full implementation through the nested interface contract", () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `const { ImplementInterface } = require("@antelopejs/interface-core");
+        ImplementInterface(
+          require("@antelopejs/interface-api"),
+          require("./dist/implementations/api"),
+        );`,
+      ],
+      { cwd: resolve(__dirname, "../.."), encoding: "utf8" },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
   });
 
   it("isolates computed properties across concurrent requests", async () => {
