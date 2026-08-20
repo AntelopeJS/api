@@ -6,7 +6,7 @@ import {
   type RouteHandler,
 } from "@antelopejs/interface-api";
 import { GetMetadata } from "@antelopejs/interface-core";
-import { routesProxy } from "../implementations/api";
+import { internal, routesProxy } from "../implementations/api";
 import { requestListener } from "../server";
 
 const TEST_HOST = "127.0.0.1";
@@ -112,6 +112,10 @@ describe("Controller resolution", () => {
       routesProxy.unregister(id);
     });
     await close(server);
+  });
+
+  it("exposes the route proxy through the nested interface contract", () => {
+    assert.equal(internal.routesProxy, routesProxy);
   });
 
   it("isolates computed properties across concurrent requests", async () => {
