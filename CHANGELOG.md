@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.3
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.2.2...v1.2.3)
+
+### 🩹 Fixes
+
+- Support interface-core 0.0.11 ([#36](https://github.com/AntelopeJS/api/pull/36))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <upd4ting@gmail.com>
+
 ## v1.2.2
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.2.1...v1.2.2)
