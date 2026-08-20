@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.2.2
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.2.1...v1.2.2)
+
+### 🔥 Performance
+
+- **api:** Compile controller resolution plans ([#29](https://github.com/AntelopeJS/api/pull/29))
+- **server:** Skip empty middleware work ([#30](https://github.com/AntelopeJS/api/pull/30))
+- **router:** Index exact static handlers ([#31](https://github.com/AntelopeJS/api/pull/31))
+- **router:** Compile dynamic parameter extraction ([#32](https://github.com/AntelopeJS/api/pull/32))
+- **server:** Add synchronous HTTP request path ([#33](https://github.com/AntelopeJS/api/pull/33))
+- **http:** Reuse response results through request lifecycle ([#35](https://github.com/AntelopeJS/api/pull/35))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <upd4ting@gmail.com>
+
 ## v1.2.1
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.2.0...v1.2.1)
