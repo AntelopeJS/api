@@ -1,12 +1,14 @@
 import assert from "node:assert";
+import { spawnSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
+import { resolve } from "node:path";
 import {
   type ComputedParameter,
   ControllerMeta,
   type RouteHandler,
 } from "@antelopejs/interface-api";
 import { GetMetadata } from "@antelopejs/interface-core";
-import { internal, routesProxy } from "../implementations/api";
+import { routesProxy } from "../implementations/api";
 import { requestListener } from "../server";
 
 const TEST_HOST = "127.0.0.1";
@@ -114,8 +116,21 @@ describe("Controller resolution", () => {
     await close(server);
   });
 
-  it("exposes the route proxy through the nested interface contract", () => {
-    assert.equal(internal.routesProxy, routesProxy);
+  it("attaches the full implementation through the nested interface contract", () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `const { ImplementInterface } = require("@antelopejs/interface-core");
+        ImplementInterface(
+          require("@antelopejs/interface-api"),
+          require("./dist/implementations/api"),
+        );`,
+      ],
+      { cwd: resolve(__dirname, "../.."), encoding: "utf8" },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
   });
 
   it("isolates computed properties across concurrent requests", async () => {
