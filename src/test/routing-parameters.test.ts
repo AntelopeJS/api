@@ -155,6 +155,34 @@ describe("Compiled route parameter extraction", () => {
     });
   });
 
+  it("preserves prefixed and suffixed dynamic segment matching", async () => {
+    register(
+      "compiled-filter-prefix",
+      "handler",
+      "get",
+      "/compiled/filter/pre:id.json",
+      ({ routeParameters }) => `prefix:${routeParameters.id}`,
+    );
+    register(
+      "compiled-filter-suffix",
+      "handler",
+      "get",
+      "/compiled/filter/:first-:second.tail",
+      ({ routeParameters }) =>
+        `suffix:${routeParameters.first}:${routeParameters.second}`,
+    );
+
+    assert.equal(
+      (await request("/compiled/filter/prevalue.json")).body,
+      "prefix:value",
+    );
+    assert.equal(
+      (await request("/compiled/filter/left-right.tail")).body,
+      "suffix:left:right",
+    );
+    assert.equal((await request("/compiled/filter/value.json")).status, 404);
+  });
+
   it("isolates parameter objects for multiple handlers", async () => {
     const observed: string[] = [];
     register(

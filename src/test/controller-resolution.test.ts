@@ -13,6 +13,7 @@ import { requestListener } from "../server";
 
 const TEST_HOST = "127.0.0.1";
 const TEST_ORIGIN = `http://${TEST_HOST}`;
+const THEN_PROPERTY = ["th", "en"].join("");
 
 interface TestController {
   requestId?: string;
@@ -22,6 +23,11 @@ interface TestController {
 interface TestResponse {
   status: number;
   body: string;
+}
+
+interface StatefulThenable {
+  readCount: () => number;
+  value: PromiseLike<string>;
 }
 
 type ControllerConstructor = (new () => TestController) & {
@@ -40,6 +46,21 @@ function createController(): ControllerConstructor {
     static location = "";
     sequence = 0;
   };
+}
+
+function statefulThenable(value: string): StatefulThenable {
+  let reads = 0;
+  const thenable = Object.create(null);
+  Object.defineProperty(thenable, THEN_PROPERTY, {
+    get: () => {
+      reads += 1;
+      if (reads > 1) {
+        throw new Error("then getter read more than once");
+      }
+      return (resolve: (resolved: string) => unknown) => resolve(value);
+    },
+  });
+  return { readCount: () => reads, value: thenable };
 }
 
 function createHandler(
@@ -95,6 +116,7 @@ describe("Controller resolution", () => {
   let server: Server;
   let port: number;
   let nextRouteId = 0;
+  let listenerResult: unknown;
 
   function register(handler: RouteHandler): void {
     const id = `controller-resolution-${nextRouteId++}`;
@@ -104,7 +126,7 @@ describe("Controller resolution", () => {
 
   before(async () => {
     server = createServer((request, response) => {
-      void requestListener(request, response, "http");
+      listenerResult = requestListener(request, response, "http");
     });
     port = await listen(server);
   });
@@ -276,6 +298,75 @@ describe("Controller resolution", () => {
       status: 200,
       body: "value:computed:4:undefined:4",
     });
+  });
+
+  it("keeps synchronous modifier chains on the synchronous request path", async () => {
+    const Controller = createController();
+    const location = "/controller-resolution/synchronous-modifiers";
+    register(
+      createHandler(
+        Controller,
+        function (this: TestController, value) {
+          return `${value}:${this.sequence}`;
+        },
+        location,
+        [
+          computedParameter(
+            function (this: TestController) {
+              this.sequence += 1;
+              return "provider";
+            },
+            [
+              function (this: TestController, _context, value) {
+                this.sequence += 1;
+                return `${value}:first`;
+              },
+              function (this: TestController, _context, value) {
+                this.sequence += 1;
+                return `${value}:second`;
+              },
+            ],
+          ),
+        ],
+      ),
+    );
+
+    assert.deepEqual(await get(port, location), {
+      status: 200,
+      body: "provider:first:second:3",
+    });
+    assert.equal(listenerResult, undefined);
+  });
+
+  it("continues remaining modifiers after the first asynchronous value", async () => {
+    const Controller = createController();
+    const events: string[] = [];
+    const thenable = statefulThenable("value:thenable");
+    const location = "/controller-resolution/mixed-modifiers";
+    register(
+      createHandler(Controller, (value) => value, location, [
+        computedParameter(() => {
+          events.push("provider");
+          return thenable.value;
+        }, [
+          (_context, value) => {
+            events.push("async");
+            return Promise.resolve(`${value}:async`);
+          },
+          (_context, value) => {
+            events.push("remaining");
+            return `${value}:remaining`;
+          },
+        ]),
+      ]),
+    );
+
+    assert.deepEqual(await get(port, location), {
+      status: 200,
+      body: "value:thenable:async:remaining",
+    });
+    assert.deepEqual(events, ["provider", "async", "remaining"]);
+    assert.equal(thenable.readCount(), 1);
   });
 
   it("turns provider and modifier failures into request errors", async () => {
