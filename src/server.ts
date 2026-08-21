@@ -29,6 +29,8 @@ export interface RequestContext {
 
 interface DynamicRoute {
   match: RegExp;
+  requiredPrefix: string;
+  requiredSuffix: string;
   parameterName?: string;
   parameterNames: string[];
   sub: RouteLevel;
@@ -173,6 +175,12 @@ function findHandlers(
   }
 
   for (const route of level.dynamicRouteList) {
+    if (
+      (route.requiredPrefix && !part.startsWith(route.requiredPrefix)) ||
+      (route.requiredSuffix && !part.endsWith(route.requiredSuffix))
+    ) {
+      continue;
+    }
     const match = route.match.exec(part);
     if (!match) {
       continue;
@@ -436,8 +444,16 @@ function compileDynamicRoute(part: string): DynamicRoute {
     pattern.push(`(.*)`);
   }
   pattern.push("$");
+  const firstParameter = part.indexOf(":");
+  const lastParameter = part.lastIndexOf(":");
+  let suffixStart = lastParameter + 1;
+  while (suffixStart < part.length && /[a-zA-Z0-9]/.test(part[suffixStart])) {
+    suffixStart += 1;
+  }
   return {
     match: new RegExp(pattern.join("")),
+    requiredPrefix: part.slice(0, firstParameter),
+    requiredSuffix: part.slice(suffixStart),
     parameterName: mapping.length === 1 ? mapping[0] : undefined,
     parameterNames: mapping,
     sub: new RouteLevel(),
