@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.4
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.2.3...v1.2.4)
+
+### 🔥 Performance
+
+- Optimize HTTP routing hot paths ([#37](https://github.com/AntelopeJS/api/pull/37))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <upd4ting@gmail.com>
+
 ## v1.2.3
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.2.2...v1.2.3)
