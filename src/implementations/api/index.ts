@@ -28,6 +28,15 @@ type ParameterResolver = (
   controllerInstance: UnknownRecord,
 ) => unknown;
 
+type ThenCallback = (
+  onfulfilled: (value: unknown) => unknown,
+  onrejected: (reason: unknown) => unknown,
+) => unknown;
+
+interface PromiseLikeValue {
+  then?: unknown;
+}
+
 interface ComputedPropertyResolver {
   key: string;
   resolve: ParameterResolver;
@@ -74,13 +83,60 @@ function compileParameter(
     return (context, controller) => provider.call(controller, context);
   }
 
-  return async (context, controller) => {
-    let value = await provider.call(controller, context);
-    for (const modifier of modifiers) {
-      value = await modifier.call(controller, context, value);
+  return (context, controller) =>
+    applyModifiers(
+      provider.call(controller, context),
+      modifiers,
+      context,
+      controller,
+    );
+}
+
+function applyModifiers(
+  initialValue: unknown,
+  modifiers: ComputedParameter["modifiers"],
+  context: RequestContextDev,
+  controller: UnknownRecord,
+  startIndex = 0,
+): unknown {
+  let value = initialValue;
+  for (let index = startIndex; index < modifiers.length; index += 1) {
+    const then = getThen(value);
+    if (then) {
+      return resolveThenable(value, then).then((resolved) =>
+        applyModifiers(resolved, modifiers, context, controller, index),
+      );
     }
+    value = modifiers[index].call(controller, context, value);
+  }
+  const then = getThen(value);
+  return then ? resolveThenable(value, then) : value;
+}
+
+function getThen(value: unknown): ThenCallback | undefined {
+  if (
+    value === null ||
+    (typeof value !== "object" && typeof value !== "function")
+  ) {
+    return;
+  }
+  const then = (value as PromiseLikeValue).then;
+  return typeof then === "function" ? (then as ThenCallback) : undefined;
+}
+
+function resolveThenable(value: unknown, then: ThenCallback): Promise<unknown> {
+  if (value instanceof Promise) {
     return value;
-  };
+  }
+  return new Promise((resolve, reject) => {
+    queueMicrotask(() => {
+      try {
+        then.call(value, resolve, reject);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
 }
 
 function compileController(
