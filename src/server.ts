@@ -1,10 +1,10 @@
-import { type IncomingMessage, ServerResponse } from "node:http";
 import type stream from "node:stream";
-import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 import { type WebSocket, WebSocketServer } from "ws";
+import { type IncomingMessage, ServerResponse } from "node:http";
+import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 
 export type RouteCallback = (context: RequestContext) => unknown;
-export interface IdentifiableRouteCallback {
+interface IdentifiableRouteCallback {
   id: string;
   callback: RouteCallback;
   priority: HandlerPriority;
@@ -658,6 +658,7 @@ function continueExecution<T, U>(
 ): Awaitable<U> {
   const then = getThen(value);
   if (then) {
+    // oxlint-disable-next-line promise/no-callback-in-promise -- continuation-passing keeps the synchronous fast path allocation-free
     return resolveThenable(value, then).then((result) => next(result as T));
   }
   return next(value as T);

@@ -1,7 +1,8 @@
-import assert from "node:assert";
-import * as net from "node:net";
-import * as coreRuntime from "@antelopejs/interface-core/runtime";
 import sinon from "sinon";
+import * as net from "node:net";
+import assert from "node:assert";
+import * as coreRuntime from "@antelopejs/interface-core/runtime";
+
 import {
   configure,
   getConfig,

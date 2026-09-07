@@ -1,40 +1,24 @@
 import type * as net from "node:net";
-import type { CorsConfig } from "@antelopejs/interface-api";
-import { ImplementInterface } from "@antelopejs/interface-core";
 import { Logging } from "@antelopejs/interface-core/logging";
+import { ImplementInterface } from "@antelopejs/interface-core";
 import type { DevServerEndpoint } from "@antelopejs/interface-core/runtime";
+
 import { resolveDevMode } from "./dev-mode";
+import { listenServer } from "./port-binding";
+import type { Config } from "./server-config";
+import { createConfiguredServer } from "./server-factory";
+import { configure, getConfig, setCorsConfig } from "./module-config";
+
+export { configure, getConfig, setCorsConfig };
 import {
   collectListeningEndpoints,
   registerDevServerEndpoints,
   shouldAllowPortFallback,
 } from "./dev-registry";
-import { listenServer } from "./port-binding";
-import { type Config, resolveServers } from "./server-config";
-import { createConfiguredServer } from "./server-factory";
 import "./middlewares/cors";
-
-let conf: Config = {
-  servers: [],
-};
 
 let servers: net.Server[] = [];
 let listening = false;
-
-export function getConfig(): Config {
-  return conf;
-}
-
-export function configure(config: Config): void {
-  conf = {
-    ...config,
-    servers: resolveServers(config),
-  };
-}
-
-export function setCorsConfig(cors: CorsConfig): void {
-  conf = { ...conf, cors };
-}
 
 export async function construct(config: Config): Promise<void> {
   configure(config);
@@ -42,7 +26,7 @@ export async function construct(config: Config): Promise<void> {
 
   void ImplementInterface(
     await import("@antelopejs/interface-api"),
-    await import("./implementations/api"),
+    await import("./implementations/api/index.js"),
   );
 }
 
@@ -62,11 +46,11 @@ function closeServers(): Promise<void> {
 
 export function start(): void {
   const serversClosed = closeServers();
-  servers = (conf.servers ?? []).map((serverConfig) =>
+  servers = (getConfig().servers ?? []).map((serverConfig) =>
     createConfiguredServer(serverConfig),
   );
 
-  if (conf.autoListen !== false) {
+  if (getConfig().autoListen !== false) {
     void serversClosed
       .then(() => listenServers())
       .catch((error: unknown) => {
@@ -77,7 +61,7 @@ export function start(): void {
 }
 
 export function getListeningEndpoints(): DevServerEndpoint[] {
-  return collectListeningEndpoints(servers, conf.servers);
+  return collectListeningEndpoints(servers, getConfig().servers);
 }
 
 export async function listenServers(): Promise<void> {
@@ -88,9 +72,9 @@ export async function listenServers(): Promise<void> {
   listening = true;
 
   try {
-    const allowPortFallback = await shouldAllowPortFallback(conf);
+    const allowPortFallback = await shouldAllowPortFallback(getConfig());
     await Promise.all(
-      (conf.servers ?? []).map((serverConfig, index) =>
+      (getConfig().servers ?? []).map((serverConfig, index) =>
         listenServer(servers[index], serverConfig, allowPortFallback),
       ),
     );
