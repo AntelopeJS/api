@@ -26,7 +26,7 @@ export async function construct(config: Config): Promise<void> {
 
   void ImplementInterface(
     await import("@antelopejs/interface-api"),
-    await import("./implementations/api/index.js"),
+    await import("./implementations/api"),
   );
 }
 

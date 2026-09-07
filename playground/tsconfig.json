@@ -1,8 +1,7 @@
 {
   "compilerOptions": {
-    "moduleResolution": "node16",
     "target": "esnext",
-    "module": "node16",
+    "module": "commonjs",
     "lib": ["ES2020"],
     "allowJs": true,
     "outDir": "dist",
