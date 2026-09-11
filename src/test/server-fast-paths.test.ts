@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import { createServer, type Server } from "node:http";
 import { HandlerPriority } from "@antelopejs/interface-api";
+
 import { registerHandler, requestListener, unregisterHandler } from "../server";
 
 const TEST_HOST = "127.0.0.1";

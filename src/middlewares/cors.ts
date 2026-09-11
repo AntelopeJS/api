@@ -8,8 +8,9 @@ import {
   Prefix,
   type RequestContext,
 } from "@antelopejs/interface-api";
-import { getConfig } from "..";
+
 import { isDevMode } from "../dev-mode";
+import { getConfig } from "../module-config";
 
 type RequestHeaderValue = string | string[] | undefined;
 

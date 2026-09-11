@@ -1,11 +1,11 @@
 {
   "compilerOptions": {
-    "moduleResolution": "node",
     "target": "esnext",
     "module": "commonjs",
     "lib": ["ES2020"],
     "allowJs": true,
     "outDir": "dist",
+    "rootDir": "src",
     "strict": true,
     "noImplicitAny": true,
     "esModuleInterop": true,
@@ -16,8 +16,7 @@
     "emitDecoratorMetadata": true,
     "declaration": true,
     "sourceMap": true,
-    "useDefineForClassFields": true,
-    "baseUrl": "src"
+    "useDefineForClassFields": true
   },
   "include": ["src/**/*.ts"]
 }

@@ -1,10 +1,11 @@
-import assert from "node:assert";
-import { execFile } from "node:child_process";
-import * as http from "node:http";
 import path from "node:path";
-import { promisify } from "node:util";
-import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 import { WebSocket } from "ws";
+import assert from "node:assert";
+import * as http from "node:http";
+import { promisify } from "node:util";
+import { execFile } from "node:child_process";
+import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
+
 import {
   type RequestContext,
   registerHandler,

@@ -1,11 +1,12 @@
+import { GetMetadata } from "@antelopejs/interface-core";
+import type { Class } from "@antelopejs/interface-core/decorators";
 import {
   type ComputedParameter,
   ControllerMeta,
   type CorsConfig,
   type RouteHandler,
 } from "@antelopejs/interface-api";
-import { GetMetadata } from "@antelopejs/interface-core";
-import type { Class } from "@antelopejs/interface-core/decorators";
+
 import { getConfig, listenServers, setCorsConfig } from "../../index";
 import {
   type RequestContext,
