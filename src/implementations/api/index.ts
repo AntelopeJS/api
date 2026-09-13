@@ -1,15 +1,20 @@
 import { GetMetadata } from "@antelopejs/interface-core";
 import type { Class } from "@antelopejs/interface-core/decorators";
+import type { RegisteredReadTarget } from "@antelopejs/interface-api/registered-read";
 import {
   type ComputedParameter,
   ControllerMeta,
   type CorsConfig,
+  HTTPResult,
   type RouteHandler,
 } from "@antelopejs/interface-api";
 
+import { assertReadActive } from "../../registered-read-context";
 import { getConfig, listenServers, setCorsConfig } from "../../index";
 import {
   type RequestContext,
+  type RouteCallback,
+  executeRegisteredRead,
   registerHandler,
   unregisterHandler,
 } from "../../server";
@@ -57,6 +62,7 @@ interface HandlerPlan {
 
 const classCacheSymbol = Symbol();
 const registeredRoutes = new Map<string, RouteHandler>();
+const compiledRoutes = new Map<string, RouteCallback>();
 const controllerPlans = new WeakMap<ControllerClass, ControllerPlan>();
 
 interface RequestContextDev extends RequestContext {
@@ -81,16 +87,21 @@ function compileParameter(
   const { provider } = parameter;
   const modifiers = [...parameter.modifiers];
   if (modifiers.length === 0) {
-    return (context, controller) => provider.call(controller, context);
+    return (context, controller) => {
+      assertReadActive(context);
+      return provider.call(controller, context);
+    };
   }
 
-  return (context, controller) =>
-    applyModifiers(
+  return (context, controller) => {
+    assertReadActive(context);
+    return applyModifiers(
       provider.call(controller, context),
       modifiers,
       context,
       controller,
     );
+  };
 }
 
 function applyModifiers(
@@ -102,6 +113,7 @@ function applyModifiers(
 ): unknown {
   let value = initialValue;
   for (let index = startIndex; index < modifiers.length; index += 1) {
+    assertReadActive(context);
     const then = getThen(value);
     if (then) {
       return resolveThenable(value, then).then((resolved) =>
@@ -198,10 +210,12 @@ function applyComputedProperties(
     if (isPromiseLike(value)) {
       pending.push(
         Promise.resolve(value).then((resolved) => {
+          assertReadActive(context);
           controllerInstance[property.key] = resolved;
         }),
       );
     } else {
+      assertReadActive(context);
       controllerInstance[property.key] = value;
     }
   }
@@ -275,16 +289,19 @@ function invokeCallback(
   controllerInstance: UnknownRecord,
   context: RequestContextDev,
 ): unknown {
+  assertReadActive(context);
   if (plan.parameters.length === 0) {
     return plan.callback.call(controllerInstance);
   }
   if (plan.parameters.length === 1) {
     const parameter = plan.parameters[0](context, controllerInstance);
     if (isPromiseLike(parameter)) {
-      return Promise.resolve(parameter).then((resolved) =>
-        plan.callback.call(controllerInstance, resolved),
-      );
+      return Promise.resolve(parameter).then((resolved) => {
+        assertReadActive(context);
+        return plan.callback.call(controllerInstance, resolved);
+      });
     }
+    assertReadActive(context);
     return plan.callback.call(controllerInstance, parameter);
   }
 
@@ -292,10 +309,12 @@ function invokeCallback(
     resolve(context, controllerInstance),
   );
   if (parameters.some(isPromiseLike)) {
-    return Promise.all(parameters).then((resolved) =>
-      plan.callback.apply(controllerInstance, resolved),
-    );
+    return Promise.all(parameters).then((resolved) => {
+      assertReadActive(context);
+      return plan.callback.apply(controllerInstance, resolved);
+    });
   }
+  assertReadActive(context);
   return plan.callback.apply(controllerInstance, parameters);
 }
 
@@ -321,21 +340,44 @@ function compileHandler(handler: RouteHandler): HandlerPlan {
   };
 }
 
+const READ_FORBIDDEN = 403;
+
+export async function ExecuteRegisteredRead(
+  target: RegisteredReadTarget,
+  context: RequestContext,
+): Promise<HTTPResult> {
+  const route = registeredRoutes.get(target.routeId);
+  const callback = compiledRoutes.get(target.routeId);
+  if (
+    !route ||
+    !callback ||
+    route.method !== "get" ||
+    route.mode !== "handler"
+  ) {
+    throw new HTTPResult(READ_FORBIDDEN, "Invalid registered read target");
+  }
+  return executeRegisteredRead(callback, context, target.pathname);
+}
+
 export const routesProxy = {
   register: (id: string, handler: RouteHandler): void => {
     registeredRoutes.set(id, handler);
     const plan = compileHandler(handler);
+    const callback = (context: RequestContextDev) =>
+      invokeHandler(plan, context);
+    compiledRoutes.set(id, callback);
     registerHandler(
       `dev/${id}`,
       handler.mode,
       handler.method,
       handler.location,
-      (context: RequestContextDev) => invokeHandler(plan, context),
+      callback,
       handler.priority,
     );
   },
   unregister: (id: string): void => {
     registeredRoutes.delete(id);
+    compiledRoutes.delete(id);
     unregisterHandler(`dev/${id}`);
   },
   getRoutes: (): RouteInfo[] => {

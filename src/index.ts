@@ -28,6 +28,10 @@ export async function construct(config: Config): Promise<void> {
     await import("@antelopejs/interface-api"),
     await import("./implementations/api"),
   );
+  void ImplementInterface(
+    await import("@antelopejs/interface-api/registered-read"),
+    await import("./implementations/api"),
+  );
 }
 
 export function destroy(): void {}

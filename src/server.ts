@@ -3,6 +3,13 @@ import { type WebSocket, WebSocketServer } from "ws";
 import { type IncomingMessage, ServerResponse } from "node:http";
 import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 
+import {
+  assertReadActive,
+  completeRead,
+  createReadContext,
+  type RegisteredReadContext,
+} from "./registered-read-context";
+
 export type RouteCallback = (context: RequestContext) => unknown;
 interface IdentifiableRouteCallback {
   id: string;
@@ -673,6 +680,7 @@ function executePriorityHandlers(
     handlers.sort((a, b) => a.priority - b.priority);
   }
   for (let index = startIndex; index < handlers.length; index += 1) {
+    assertReadActive(requestContext);
     const { handler, parameters } = handlers[index];
     requestContext.routeParameters = parameters;
     const result = handler(requestContext);
@@ -790,9 +798,72 @@ function executeHandlerAndPostfix(
 ): Awaitable<void> {
   const execution = executeHandler(handler, requestContext);
   return continueExecution(execution, (result) => {
+    assertReadActive(requestContext);
     setHandlerResponse(requestContext, result);
     return executePostfix(method, path, requestContext);
   });
+}
+
+const READ_FORBIDDEN = 403;
+const SUCCESS_MIN = 200;
+const SUCCESS_MAX = 300;
+
+function assertCompletedRead(context: RegisteredReadContext): void {
+  const status = context.response.getStatus();
+  if (
+    context.signal.aborted ||
+    !Number.isInteger(status) ||
+    status < SUCCESS_MIN ||
+    status >= SUCCESS_MAX ||
+    context.response.isStream() ||
+    context.rawResponse.headersSent ||
+    context.rawResponse.writableEnded ||
+    context.rawResponse.destroyed
+  ) {
+    throw new HTTPResult(READ_FORBIDDEN, "Registered read did not complete");
+  }
+}
+
+export async function executeRegisteredRead(
+  expected: RouteCallback,
+  parent: RequestContext,
+  pathname: string,
+): Promise<HTTPResult> {
+  const context = createReadContext(parent, pathname);
+  return completeRead(context, () =>
+    runRegisteredRead(expected, pathname, context),
+  );
+}
+
+async function runRegisteredRead(
+  expected: RouteCallback,
+  pathname: string,
+  context: RegisteredReadContext,
+): Promise<HTTPResult> {
+  const path = pathname.split("/").filter(Boolean);
+  const selected = getHandler("get", path, roots.handler, false, pathname);
+  const callback =
+    typeof selected === "function"
+      ? selected
+      : selected && !Array.isArray(selected)
+        ? selected.handler
+        : undefined;
+  if (callback !== expected) {
+    throw new HTTPResult(READ_FORBIDDEN, "Registered read target mismatch");
+  }
+  const prefix = await executeMiddleware("prefix", "get", path, context);
+  assertCompletedRead(context);
+  if (prefix) {
+    throw new HTTPResult(READ_FORBIDDEN, "Registered read intercepted");
+  }
+  await executeHandlerAndPostfix(
+    selected as HandlerResult | RouteCallback,
+    "get",
+    path,
+    context,
+  );
+  assertCompletedRead(context);
+  return context.response;
 }
 
 function executeRequest(
