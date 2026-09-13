@@ -2,11 +2,13 @@ import type stream from "node:stream";
 import { type WebSocket, WebSocketServer } from "ws";
 import { type IncomingMessage, ServerResponse } from "node:http";
 import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
+import type { RegisteredReadTarget } from "@antelopejs/interface-api/registered-read";
 
 import {
   assertReadActive,
   completeRead,
   createReadContext,
+  isRegisteredRead,
   type RegisteredReadContext,
 } from "./registered-read-context";
 
@@ -800,6 +802,7 @@ function executeHandlerAndPostfix(
   return continueExecution(execution, (result) => {
     assertReadActive(requestContext);
     setHandlerResponse(requestContext, result);
+    if (isRegisteredRead(requestContext)) assertCompletedRead(requestContext);
     return executePostfix(method, path, requestContext);
   });
 }
@@ -827,11 +830,11 @@ function assertCompletedRead(context: RegisteredReadContext): void {
 export async function executeRegisteredRead(
   expected: RouteCallback,
   parent: RequestContext,
-  pathname: string,
+  target: RegisteredReadTarget,
 ): Promise<HTTPResult> {
-  const context = createReadContext(parent, pathname);
+  const context = createReadContext(parent, target);
   return completeRead(context, () =>
-    runRegisteredRead(expected, pathname, context),
+    runRegisteredRead(expected, target.pathname, context),
   );
 }
 

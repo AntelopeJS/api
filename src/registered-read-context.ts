@@ -1,7 +1,9 @@
 import { HTTPResult } from "@antelopejs/interface-api";
 import { IncomingMessage, ServerResponse } from "node:http";
+import type { RegisteredReadTarget } from "@antelopejs/interface-api/registered-read";
 
 import type { RequestContext } from "./server";
+import { RegisteredReadSocket } from "./registered-read-socket";
 
 const FORBIDDEN = 403;
 
@@ -17,12 +19,18 @@ export function assertReadActive(context: RequestContext): void {
   readSignals.get(context)?.throwIfAborted();
 }
 
+export function isRegisteredRead(
+  context: RequestContext,
+): context is RegisteredReadContext {
+  return readSignals.has(context);
+}
+
 class ReadRequest extends IncomingMessage {
   constructor(
     parent: IncomingMessage,
     private readonly abort: () => void,
   ) {
-    super(parent.socket);
+    super(new RegisteredReadSocket(parent.socket, abort));
   }
 
   override _destroy(
@@ -70,6 +78,10 @@ class ReadResponse extends ServerResponse {
   override writeEarlyHints(): void {
     this.abort();
   }
+  override setTimeout(): this {
+    this.abort();
+    return this;
+  }
 }
 
 function readUrl(origin: string, pathname: string): URL {
@@ -116,15 +128,18 @@ function copyHeaders(parent: IncomingMessage, request: IncomingMessage): void {
 
 export function createReadContext(
   parent: RequestContext,
-  pathname: string,
+  target: RegisteredReadTarget,
 ): RegisteredReadContext {
-  const url = readUrl(parent.url.origin, pathname);
+  const url = readUrl(parent.url.origin, target.pathname);
+  for (const [key, value] of Object.entries(target.query ?? {})) {
+    url.searchParams.set(key, value);
+  }
   const controller = new AbortController();
   const abort = () =>
     controller.abort(new HTTPResult(FORBIDDEN, "Registered read interrupted"));
   const request = new ReadRequest(parent.rawRequest, abort);
   request.method = "GET";
-  request.url = pathname;
+  request.url = `${url.pathname}${url.search}`;
   request.httpVersion = parent.rawRequest.httpVersion;
   request.httpVersionMajor = parent.rawRequest.httpVersionMajor;
   request.httpVersionMinor = parent.rawRequest.httpVersionMinor;

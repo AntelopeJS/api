@@ -12,6 +12,19 @@ const RECORD_PATH = `${ROOT}/records/record-a`;
 const FORBIDDEN = 403;
 const registrations: string[] = [];
 const events: string[] = [];
+type TransportOperation = (ctx: RequestContext) => unknown;
+const transportOperations: Record<string, TransportOperation> = {
+  requestTimeout: (ctx) => ctx.rawRequest.setTimeout(1),
+  socketDestroy: (ctx) => ctx.rawRequest.socket.destroy(),
+  socketEnd: (ctx) => ctx.rawRequest.socket.end(),
+  socketConnect: (ctx) => ctx.rawRequest.socket.connect(1, "127.0.0.1"),
+  corkedWrite: (ctx) => {
+    ctx.rawRequest.socket.cork();
+    ctx.rawRequest.socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+  },
+  responseTimeout: (ctx) =>
+    new Promise<void>((resolve) => ctx.rawResponse.setTimeout(1, resolve)),
+};
 type InformationalWrite = (
   response: ServerResponse,
   callback?: () => void,
@@ -354,9 +367,13 @@ describe("Registered reads", () => {
       authorization: ["Bearer fixture"],
       "content-length": ["999"],
     };
+    Object.defineProperty(parent.rawRequest.socket, "remoteAddress", {
+      value: "192.0.2.41",
+    });
     registerContextPrefix((ctx) => {
-      assert.equal(ctx.rawRequest.socket, parent.rawRequest.socket);
-      assert.equal(ctx.rawRequest.connection, parent.rawRequest.connection);
+      assert.notEqual(ctx.rawRequest.socket, parent.rawRequest.socket);
+      assert.notEqual(ctx.rawRequest.connection, parent.rawRequest.connection);
+      assert.equal(ctx.rawRequest.socket.remoteAddress, "192.0.2.41");
       assert.equal(ctx.rawRequest.headers.authorization, "Bearer fixture");
       assert.deepEqual(ctx.rawRequest.rawHeaders, [
         "Authorization",
@@ -392,6 +409,114 @@ describe("Registered reads", () => {
       HTTPResult,
     );
   });
+
+  for (const status of [403, 302, 200]) {
+    it(`rejects a denied or streaming handler before a successful postfix (${status})`, async () => {
+      const response = new HTTPResult(status, "denied");
+      if (status === 200) response.getWriteStream().end("secret");
+      const target = register({ callback: () => response });
+      register({
+        mode: "postfix",
+        location: ROOT,
+        callback: () => {
+          events.push("postfix");
+          return { success: true };
+        },
+      });
+      await assert.rejects(read(target), HTTPResult);
+      assert.deepEqual(events, []);
+    });
+  }
+
+  it("observes pending properties when a later property interrupts collection", async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      const target = register({
+        properties: {
+          first: { provider: () => Promise.resolve("actor"), modifiers: [] },
+          second: {
+            provider: (ctx) => ctx.rawResponse.destroy(),
+            modifiers: [],
+          },
+        },
+        callback: () => events.push("handler"),
+      });
+      await assert.rejects(read(target), HTTPResult);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      assert.deepEqual(unhandled, []);
+      assert.deepEqual(events, []);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
+  for (const [name, operation] of Object.entries(transportOperations)) {
+    it(`interrupts ${name} without mutating the live connection`, async () => {
+      const parent = parentContext();
+      const timeout = parent.rawRequest.socket.timeout;
+      registerContextPrefix(operation);
+      const target = register({ callback: () => events.push("handler") });
+      await assert.rejects(read(target, parent), HTTPResult);
+      assert.equal(parent.rawRequest.socket.timeout, timeout);
+      assert.equal(parent.rawRequest.socket.destroyed, false);
+      assert.deepEqual(events, []);
+    });
+  }
+
+  it("uses only server-selected query values in both child URL views", async () => {
+    const parent = parentContext();
+    const id = "record&bypass=true/#";
+    const routeId = register({
+      location: `${ROOT}/get`,
+      parameters: [{ provider: (ctx) => ctx, modifiers: [] }],
+      callback: (ctx: RequestContext) => {
+        assert.equal(ctx.url.searchParams.get("id"), id);
+        assert.equal(ctx.url.searchParams.has("bypass"), false);
+        assert.equal(
+          ctx.rawRequest.url,
+          `${ROOT}/get?id=record%26bypass%3Dtrue%2F%23`,
+        );
+        return { id };
+      },
+    });
+    const result = await ExecuteRegisteredRead(
+      { routeId, pathname: `${ROOT}/get`, query: { id } },
+      parent,
+    );
+    assert.deepEqual(JSON.parse(result.getBody()), { id });
+    assert.equal(parent.url.search, "?bypass=true");
+  });
+
+  for (const withModifier of [false, true]) {
+    it(`observes rejecting parameters during interrupted dispatch (modifier=${withModifier})`, async () => {
+      const unhandled: unknown[] = [];
+      const onUnhandled = (reason: unknown) => unhandled.push(reason);
+      process.on("unhandledRejection", onUnhandled);
+      try {
+        const target = register({
+          parameters: [
+            {
+              provider: (ctx) => {
+                ctx.rawResponse.destroy();
+                return Promise.reject(new Error("parameter denied"));
+              },
+              modifiers: withModifier ? [() => events.push("modifier")] : [],
+            },
+            { provider: () => events.push("later parameter"), modifiers: [] },
+          ],
+          callback: () => events.push("handler"),
+        });
+        await assert.rejects(read(target), HTTPResult);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.deepEqual(unhandled, []);
+        assert.deepEqual(events, []);
+      } finally {
+        process.off("unhandledRejection", onUnhandled);
+      }
+    });
+  }
 
   it("rejects handler and postfix denials", async () => {
     const denied = register({

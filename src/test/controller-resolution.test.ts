@@ -370,6 +370,29 @@ describe("Controller resolution", () => {
     assert.equal(thenable.readCount(), 1);
   });
 
+  it("preserves positional holes in programmatically registered parameters", async () => {
+    const Controller = createController();
+    const location = "/controller-resolution/sparse-parameters";
+    const parameters: RouteHandler["parameters"] = [];
+    parameters[1] = computedParameter(() => "record-a");
+    register(
+      createHandler(
+        Controller,
+        (first, second) => {
+          assert.equal(first, undefined);
+          assert.equal(second, "record-a");
+          return second;
+        },
+        location,
+        parameters,
+      ),
+    );
+    assert.deepEqual(await get(port, location), {
+      status: 200,
+      body: "record-a",
+    });
+  });
+
   it("turns provider and modifier failures into request errors", async () => {
     const ProviderController = createController();
     const ModifierController = createController();

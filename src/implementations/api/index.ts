@@ -113,13 +113,13 @@ function applyModifiers(
 ): unknown {
   let value = initialValue;
   for (let index = startIndex; index < modifiers.length; index += 1) {
-    assertReadActive(context);
     const then = getThen(value);
     if (then) {
       return resolveThenable(value, then).then((resolved) =>
         applyModifiers(resolved, modifiers, context, controller, index),
       );
     }
+    assertReadActive(context);
     value = modifiers[index].call(controller, context, value);
   }
   const then = getThen(value);
@@ -205,19 +205,24 @@ function applyComputedProperties(
   }
 
   const pending: Promise<void>[] = [];
-  for (const property of computedProperties) {
-    const value = property.resolve(context, controllerInstance);
-    if (isPromiseLike(value)) {
-      pending.push(
-        Promise.resolve(value).then((resolved) => {
-          assertReadActive(context);
-          controllerInstance[property.key] = resolved;
-        }),
-      );
-    } else {
-      assertReadActive(context);
-      controllerInstance[property.key] = value;
+  try {
+    for (const property of computedProperties) {
+      const value = property.resolve(context, controllerInstance);
+      if (isPromiseLike(value)) {
+        pending.push(
+          Promise.resolve(value).then((resolved) => {
+            assertReadActive(context);
+            controllerInstance[property.key] = resolved;
+          }),
+        );
+      } else {
+        assertReadActive(context);
+        controllerInstance[property.key] = value;
+      }
     }
+  } catch (error) {
+    void Promise.allSettled(pending);
+    throw error;
   }
 
   if (pending.length > 0) {
@@ -284,6 +289,23 @@ interface RouteInfo {
   callbackName: string;
 }
 
+function resolveParameters(
+  plan: HandlerPlan,
+  controllerInstance: UnknownRecord,
+  context: RequestContextDev,
+): unknown[] {
+  const parameters: unknown[] = [];
+  try {
+    for (const resolve of plan.parameters) {
+      parameters.push(resolve(context, controllerInstance));
+    }
+  } catch (error) {
+    void Promise.allSettled(parameters);
+    throw error;
+  }
+  return parameters;
+}
+
 function invokeCallback(
   plan: HandlerPlan,
   controllerInstance: UnknownRecord,
@@ -305,9 +327,7 @@ function invokeCallback(
     return plan.callback.call(controllerInstance, parameter);
   }
 
-  const parameters = plan.parameters.map((resolve) =>
-    resolve(context, controllerInstance),
-  );
+  const parameters = resolveParameters(plan, controllerInstance, context);
   if (parameters.some(isPromiseLike)) {
     return Promise.all(parameters).then((resolved) => {
       assertReadActive(context);
@@ -336,7 +356,7 @@ function compileHandler(handler: RouteHandler): HandlerPlan {
   return {
     callback: handler.callback,
     controller: compileController(controllerClass, handler.properties),
-    parameters: handler.parameters.map(compileParameter),
+    parameters: Array.from(handler.parameters, compileParameter),
   };
 }
 
@@ -356,7 +376,7 @@ export async function ExecuteRegisteredRead(
   ) {
     throw new HTTPResult(READ_FORBIDDEN, "Invalid registered read target");
   }
-  return executeRegisteredRead(callback, context, target.pathname);
+  return executeRegisteredRead(callback, context, target);
 }
 
 export const routesProxy = {
