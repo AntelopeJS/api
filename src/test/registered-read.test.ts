@@ -97,6 +97,37 @@ function registerContextPrefix(
   });
 }
 
+function registerDocumentRead(): string {
+  return register({
+    properties: {
+      actor: {
+        provider: (ctx) => {
+          events.push("property");
+          return ctx.rawRequest.headers.authorization;
+        },
+        modifiers: [],
+      },
+    },
+    parameters: [
+      {
+        provider: (ctx) => {
+          events.push("parameter");
+          assert.equal(ctx.url.search, "");
+          assert.equal(ctx.rawRequest.method, "GET");
+          assert.equal(ctx.rawRequest.url, RECORD_PATH);
+          assert.equal(ctx.rawRequest.headers["content-length"], undefined);
+          return ctx.routeParameters.id;
+        },
+        modifiers: [],
+      },
+    ],
+    callback: function (this: ReadController, id: string) {
+      events.push("handler");
+      return { id, actor: this.actor };
+    },
+  });
+}
+
 describe("Registered reads", () => {
   afterEach(() => {
     for (const id of registrations.splice(0)) routesProxy.unregister(id);
@@ -119,34 +150,7 @@ describe("Registered reads", () => {
         events.push("prefix");
       },
     });
-    const routeId = register({
-      properties: {
-        actor: {
-          provider: (ctx) => {
-            events.push("property");
-            return ctx.rawRequest.headers.authorization;
-          },
-          modifiers: [],
-        },
-      },
-      parameters: [
-        {
-          provider: (ctx) => {
-            events.push("parameter");
-            assert.equal(ctx.url.search, "");
-            assert.equal(ctx.rawRequest.method, "GET");
-            assert.equal(ctx.rawRequest.url, RECORD_PATH);
-            assert.equal(ctx.rawRequest.headers["content-length"], undefined);
-            return ctx.routeParameters.id;
-          },
-          modifiers: [],
-        },
-      ],
-      callback: function (this: ReadController, id: string) {
-        events.push("handler");
-        return { id, actor: this.actor };
-      },
-    });
+    const routeId = registerDocumentRead();
     register({
       mode: "postfix",
       location: ROOT,
