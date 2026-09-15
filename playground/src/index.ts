@@ -1,3 +1,4 @@
+import { assert } from "@antelopejs/interface-api-util";
 import {
   Controller,
   Delete,
@@ -7,7 +8,6 @@ import {
   Post,
   Put,
 } from "@antelopejs/interface-api";
-import { assert } from "@antelopejs/interface-api-util";
 
 export class PlaygroundController extends Controller("/playground") {
   @Get("/hello")

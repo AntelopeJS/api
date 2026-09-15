@@ -1,15 +1,16 @@
 import assert from "node:assert";
+import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
-import { resolve } from "node:path";
+import { GetMetadata } from "@antelopejs/interface-core";
 import {
   type ComputedParameter,
   ControllerMeta,
   type RouteHandler,
 } from "@antelopejs/interface-api";
-import { GetMetadata } from "@antelopejs/interface-core";
-import { routesProxy } from "../implementations/api";
+
 import { requestListener } from "../server";
+import { routesProxy } from "../implementations/api";
 
 const TEST_HOST = "127.0.0.1";
 const TEST_ORIGIN = `http://${TEST_HOST}`;

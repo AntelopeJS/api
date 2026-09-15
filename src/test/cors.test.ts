@@ -1,9 +1,10 @@
 import assert from "node:assert";
 import { HTTPResult, type RequestContext } from "@antelopejs/interface-api";
-import { isDevMode, setDevMode } from "../dev-mode";
-import { GetCorsConfig, SetCorsConfig } from "../implementations/api";
-import { configure, getConfig, setCorsConfig } from "../index";
+
 import { Cors } from "../middlewares/cors";
+import { isDevMode, setDevMode } from "../dev-mode";
+import { configure, getConfig, setCorsConfig } from "../index";
+import { GetCorsConfig, SetCorsConfig } from "../implementations/api";
 
 const ALLOWED_ORIGIN = "https://example.com";
 const DISALLOWED_ORIGIN = "https://evil.com";
