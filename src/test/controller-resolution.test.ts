@@ -15,8 +15,10 @@ import { routesProxy } from "../implementations/api";
 const TEST_HOST = "127.0.0.1";
 const TEST_ORIGIN = `http://${TEST_HOST}`;
 const THEN_PROPERTY = ["th", "en"].join("");
+const SYMBOL_PROPERTY = Symbol("computed-property");
 
 interface TestController {
+  [SYMBOL_PROPERTY]?: string;
   requestId?: string;
   sequence: number;
 }
@@ -252,6 +254,53 @@ describe("Controller resolution", () => {
     assert.deepEqual(await get(port, location, "inherited"), {
       status: 200,
       body: "inherited",
+    });
+  });
+
+  it("compiles handler metadata when the first request arrives", async () => {
+    const Controller = createController();
+    const properties: Record<PropertyKey, ComputedParameter> = {};
+    const location = "/controller-resolution/late-metadata";
+    register(
+      createHandler(
+        Controller,
+        function (this: TestController) {
+          return this.requestId;
+        },
+        location,
+        [],
+        properties,
+      ),
+    );
+    properties.requestId = computedParameter(() => "late metadata");
+
+    assert.deepEqual(await get(port, location), {
+      status: 200,
+      body: "late metadata",
+    });
+  });
+
+  it("applies symbol-keyed computed metadata", async () => {
+    const Controller = createController();
+    const properties = {
+      [SYMBOL_PROPERTY]: computedParameter(() => "symbol value"),
+    };
+    const location = "/controller-resolution/symbol-metadata";
+    register(
+      createHandler(
+        Controller,
+        function (this: TestController) {
+          return this[SYMBOL_PROPERTY];
+        },
+        location,
+        [],
+        properties,
+      ),
+    );
+
+    assert.deepEqual(await get(port, location), {
+      status: 200,
+      body: "symbol value",
     });
   });
 
