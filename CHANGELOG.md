@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.2.5
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.2.4...v1.2.5)
+
+### 🩹 Fixes
+
+- **api:** Enforce late controller guards ([#41](https://github.com/AntelopeJS/api/pull/41))
+
+### 🏡 Chore
+
+- Replace Biome with oxlint, oxfmt and Knip ([#39](https://github.com/AntelopeJS/api/pull/39))
+
+### 🤖 CI
+
+- Standardize npm releases ([#38](https://github.com/AntelopeJS/api/pull/38))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+- Thomas ([@Thomasims](http://github.com/Thomasims))
+
 ## v1.2.4
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.2.3...v1.2.4)
