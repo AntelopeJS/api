@@ -38,7 +38,7 @@ interface PromiseLikeValue {
 }
 
 interface ComputedPropertyResolver {
-  key: string;
+  key: PropertyKey;
   resolve: ParameterResolver;
 }
 
@@ -143,12 +143,10 @@ function compileController(
   controllerClass: ControllerClass,
   properties: Record<PropertyKey, ComputedParameter>,
 ): ControllerPlan {
-  const computedProperties = Object.entries(properties).map(
-    ([key, parameter]) => ({
-      key,
-      resolve: compileParameter(parameter),
-    }),
-  );
+  const computedProperties = Reflect.ownKeys(properties).map((key) => ({
+    key,
+    resolve: compileParameter(properties[key]),
+  }));
   const existingPlan = controllerPlans.get(controllerClass);
   const plan = existingPlan ?? {
     controllerClass,
@@ -323,13 +321,16 @@ function compileHandler(handler: RouteHandler): HandlerPlan {
 export const routesProxy = {
   register: (id: string, handler: RouteHandler): void => {
     registeredRoutes.set(id, handler);
-    const plan = compileHandler(handler);
+    let plan: HandlerPlan | undefined;
     registerHandler(
       `dev/${id}`,
       handler.mode,
       handler.method,
       handler.location,
-      (context: RequestContextDev) => invokeHandler(plan, context),
+      (context: RequestContextDev) => {
+        plan ??= compileHandler(handler);
+        return invokeHandler(plan, context);
+      },
       handler.priority,
     );
   },
