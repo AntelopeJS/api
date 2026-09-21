@@ -25,6 +25,7 @@ export interface Config {
   cors?: CorsConfig;
   autoListen?: boolean;
   strictPort?: boolean;
+  publicBaseUrl?: string;
 }
 
 export const DEFAULT_HTTP_PORT = 80;

@@ -37,7 +37,7 @@ function listenOnce(
   });
 }
 
-function isPortInUseError(error: unknown): boolean {
+export function isPortInUseError(error: unknown): boolean {
   return (error as NodeJS.ErrnoException)?.code === "EADDRINUSE";
 }
 
@@ -55,7 +55,7 @@ export function resolveBoundPort(
 
 const MAX_PORT = 65535;
 
-function resolveRequestedPort(config: ServerConfig): number {
+export function resolveRequestedPort(config: ServerConfig): number {
   const rawPort = config.port ?? DEFAULT_HTTP_PORT;
   const port = Number(rawPort);
   if (!Number.isInteger(port) || port < RANDOM_PORT || port > MAX_PORT) {
@@ -66,7 +66,7 @@ function resolveRequestedPort(config: ServerConfig): number {
   return port;
 }
 
-function buildCandidatePorts(
+export function buildCandidatePorts(
   requestedPort: number,
   allowPortFallback: boolean,
 ): number[] {
