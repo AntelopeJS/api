@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.3.0-next.2
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.3.0-next.1...v1.3.0-next.2)
+
+### 🩹 Fixes
+
+- Advertise the server under a single loopback spelling ([#46](https://github.com/AntelopeJS/api/pull/46))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.3.0-next.1
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.0-next.0...v1.3.0-next.1)
