@@ -7,6 +7,7 @@ export default defineConfig({
     local: {
       source: { type: "local", path: "." },
       config: {
+        publicBaseUrl: "https://api.test.example.com",
         servers: [
           {
             protocol: "http",

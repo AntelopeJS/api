@@ -41,7 +41,15 @@ export class PlaygroundController extends Controller("/playground") {
   }
 }
 
-export function construct(): void {}
+interface PlaygroundConfig {
+  apiPort?: number;
+  apiLocalBaseUrl?: string;
+  apiPublicBaseUrl?: string;
+}
+
+export function construct(config: PlaygroundConfig): void {
+  console.log("playground received api config variables", config);
+}
 
 export function destroy(): void {}
 

@@ -37,7 +37,7 @@
   "dependencies": {
     "@antelopejs/interface-api": ">=0.0.12 <1.0.0",
     "@antelopejs/interface-api-util": "^0.1.1",
-    "@antelopejs/interface-core": ">=0.0.6 <1.0.0",
+    "@antelopejs/interface-core": ">=0.0.14 <1.0.0",
     "reflect-metadata": "^0.2.2",
     "ws": "^8.20.0"
   },
@@ -63,6 +63,11 @@
     "implements": [
       "@antelopejs/interface-api",
       "@antelopejs/interface-api-util"
+    ],
+    "configVars": [
+      "API_PORT",
+      "API_LOCAL_BASE_URL",
+      "API_PUBLIC_BASE_URL"
     ],
     "test": "src/test/antelope.test.ts",
     "defaultConfig": {

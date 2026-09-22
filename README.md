@@ -42,6 +42,7 @@ The API module can be configured with the following options:
 
 ```json
 {
+  "publicBaseUrl": "https://api.example.com",
   "servers": [
     {
       "protocol": "http",
@@ -63,6 +64,12 @@ The API module can be configured with the following options:
 }
 ```
 
+### Public Base URL
+
+`publicBaseUrl` is the origin external clients — browsers — must use to reach this API. It is published as the `API_PUBLIC_BASE_URL` config variable and is meant for presigned asset URLs, CORS origins, redirect allowlists and e-mail links.
+
+It is **required outside development**: when the runtime does not report `dev` and the key is missing, the module fails the boot with an explicit error instead of silently handing out `http://127.0.0.1:<port>` links. In development it defaults to `API_LOCAL_BASE_URL`, so local work needs no configuration at all.
+
 ### Server Configuration
 
 The module supports both HTTP and HTTPS servers. If no servers are configured, it defaults to HTTP on port 80.
@@ -82,6 +89,48 @@ The API module automatically adds a middleware for CORS support, which can be co
 - `allowedMethods`: An array of allowed HTTP methods
 
 In development (when the runtime reports `dev`), loopback origins — `localhost`, `127.0.0.1` and `[::1]`, on any port — are accepted automatically, with or without a `cors` block, so local frontends need no configuration. The request origin is reflected as-is, never `*`. In production, and for non-loopback development frontends (e.g. a LAN address), origins must be listed explicitly in `allowedOrigins`.
+
+## Published Config Variables
+
+The module publishes three [config variables](https://antelopejs.com/docs/concepts/configuration#module-config-variables) other modules reference from their own configuration with `${@api.<VAR_NAME>}`:
+
+| Variable              | Type   | Description                                                                   |
+| --------------------- | ------ | ----------------------------------------------------------------------------- |
+| `API_PORT`            | number | The port the server reserved during `construct`, and the port it later binds. |
+| `API_LOCAL_BASE_URL`  | string | The same-host origin, always on loopback: `http://127.0.0.1:<API_PORT>`.      |
+| `API_PUBLIC_BASE_URL` | string | The origin external clients must use, from the `publicBaseUrl` key.           |
+
+All three derive from the **first entry of `servers[]`**, the same entry the dev registry and the frontend discovery already treat as the project's canonical api endpoint. Additional servers are still started, but they are not advertised through config variables.
+
+```typescript [antelope.config.ts]
+export default defineConfig({
+  name: "my-project",
+  modules: {
+    api: { config: { servers: [{ protocol: "http", port: 8080 }] } },
+    "file-storage-local": {
+      config: { baseUrl: "${@api.API_PUBLIC_BASE_URL}/assets" },
+    },
+  },
+});
+```
+
+### Port reservation
+
+To publish a port it can guarantee, the module reserves it during `construct`: it binds a throwaway socket on the configured port, holds it while every other module constructs, and releases it immediately before the real `listen()`. The value other modules receive is therefore the port the server actually binds — never a stale one.
+
+The reservation honours the existing port rules:
+
+- `strictPort: true`, or any non-development runtime, reserves exactly the requested port or fails the boot with a `PortReservationError` naming the port.
+- In development, the reservation falls back to the next free port (up to 20 above the requested one, then an OS-assigned port), exactly as `listen()` did before.
+- `port: 0` reserves an OS-assigned port and publishes it.
+
+`API_LOCAL_BASE_URL` turns the bind host into a connectable URL host, following the same convention the dev registry endpoints already use:
+
+- an absent or wildcard host (`0.0.0.0`, `::`, `[::]`) becomes `127.0.0.1`, because a wildcard is not a connectable address;
+- any explicit host — `localhost`, a LAN address, a name — is preserved verbatim, because a server bound to it does not listen on loopback at all;
+- a bare IPv6 literal is bracketed, as a URL requires.
+
+The scheme follows the first server's `protocol`, so an HTTPS-first setup is never advertised as `http://`.
 
 ## License
 
