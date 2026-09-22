@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.3.0-next.0
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.2.5...v1.3.0-next.0)
+
+### 🚀 Enhancements
+
+- Publish api port and base urls as config variables ([#44](https://github.com/AntelopeJS/api/pull/44))
+
+### 🏡 Chore
+
+- Align community files with the organization defaults ([#43](https://github.com/AntelopeJS/api/pull/43))
+
+### 🤖 CI
+
+- Use shared npm release workflow ([#42](https://github.com/AntelopeJS/api/pull/42))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.2.5
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.2.4...v1.2.5)
