@@ -45,12 +45,27 @@ async function reserveConfiguredPorts(): Promise<void> {
 }
 
 /**
- * Reserves the configured ports and returns the config variables the
- * module publishes. Exposed for tests: `construct` is the only production
- * caller, but it also registers the api interface implementation, which
- * must happen exactly once per process.
+ * Copies the reserved ports onto the current configuration. Exposed for
+ * tests, which reproduce the rebuilt configuration the core may hand to
+ * `construct`.
+ *
+ * `provide` and `construct` receive the configuration through separate
+ * substitution passes, so the object `construct` sees may be a rebuilt
+ * copy carrying the originally requested ports again. Re-applying the
+ * reservation is what keeps the published `API_PORT` and the port
+ * `start` binds identical, whatever the core hands over.
  */
-export async function publishConfigVars(): Promise<ConfigVars> {
+export function applyReservedPorts(): void {
+  const servers = getConfig().servers ?? [];
+  reservations.forEach((reservation, index) => {
+    const serverConfig = servers[index];
+    if (serverConfig) {
+      serverConfig.port = reservation.port;
+    }
+  });
+}
+
+async function publishConfigVars(): Promise<ConfigVars> {
   await reserveConfiguredPorts();
 
   try {
@@ -61,16 +76,30 @@ export async function publishConfigVars(): Promise<ConfigVars> {
   }
 }
 
-export async function construct(config: Config): Promise<ConfigVars> {
+/**
+ * Publishes the module config variables, before any module constructs.
+ *
+ * Nothing has constructed at this point, so this path awaits no other
+ * module's interface: it only reads the runtime information the core
+ * registers before the module lifecycle starts, and holds a socket on
+ * the port the server will bind.
+ */
+export async function provide(config: Config): Promise<ConfigVars> {
   configure(config);
+  await resolveDevMode();
+
+  return publishConfigVars();
+}
+
+export async function construct(config: Config): Promise<void> {
+  configure(config);
+  applyReservedPorts();
   await resolveDevMode();
 
   void ImplementInterface(
     await import("@antelopejs/interface-api"),
     await import("./implementations/api"),
   );
-
-  return publishConfigVars();
 }
 
 export function destroy(): void {}

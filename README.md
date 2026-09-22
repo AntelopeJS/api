@@ -94,11 +94,11 @@ In development (when the runtime reports `dev`), loopback origins — `localhost
 
 The module publishes three [config variables](https://antelopejs.com/docs/concepts/configuration#module-config-variables) other modules reference from their own configuration with `${@api.<VAR_NAME>}`:
 
-| Variable              | Type   | Description                                                                   |
-| --------------------- | ------ | ----------------------------------------------------------------------------- |
-| `API_PORT`            | number | The port the server reserved during `construct`, and the port it later binds. |
-| `API_LOCAL_BASE_URL`  | string | The same-host origin, always on loopback: `http://127.0.0.1:<API_PORT>`.      |
-| `API_PUBLIC_BASE_URL` | string | The origin external clients must use, from the `publicBaseUrl` key.           |
+| Variable              | Type   | Description                                                                 |
+| --------------------- | ------ | --------------------------------------------------------------------------- |
+| `API_PORT`            | number | The port the server reserved during `provide`, and the port it later binds. |
+| `API_LOCAL_BASE_URL`  | string | The same-host origin, always on loopback: `http://127.0.0.1:<API_PORT>`.    |
+| `API_PUBLIC_BASE_URL` | string | The origin external clients must use, from the `publicBaseUrl` key.         |
 
 All three derive from the **first entry of `servers[]`**, the same entry the dev registry and the frontend discovery already treat as the project's canonical api endpoint. Additional servers are still started, but they are not advertised through config variables.
 
@@ -116,7 +116,9 @@ export default defineConfig({
 
 ### Port reservation
 
-To publish a port it can guarantee, the module reserves it during `construct`: it binds a throwaway socket on the configured port, holds it while every other module constructs, and releases it immediately before the real `listen()`. The value other modules receive is therefore the port the server actually binds — never a stale one.
+The variables are published from the `provide` callback, which the core runs before any module constructs.
+
+To publish a port it can guarantee, the module reserves it right there: it binds a throwaway socket on the configured port, holds it while every other module constructs, and releases it immediately before the real `listen()` in `start`. The value other modules receive is therefore the port the server actually binds — never a stale one.
 
 The reservation honours the existing port rules:
 
