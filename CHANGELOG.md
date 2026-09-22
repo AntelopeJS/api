@@ -4,10 +4,26 @@
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.0-next.2...v1.3.0)
 
+This release promotes the `1.3.0-next` line to stable. It carries everything published from `v1.3.0-next.0` to `v1.3.0-next.2`, summarised here and listed version by version in the sections below.
+
+### 🚀 Enhancements
+
+- Publish api port and base urls as config variables: `API_PORT`, `API_LOCAL_BASE_URL` and `API_PUBLIC_BASE_URL` are published for other modules to reference, the port is reserved before it is published so the advertised value is the one actually bound, and `publicBaseUrl` becomes required outside development instead of silently minting loopback links ([#44](https://github.com/AntelopeJS/api/pull/44))
+
+### 🩹 Fixes
+
+- Publish config variables from the provide callback, the phase the core runs before any module constructs, carrying the port reservation with them ([#45](https://github.com/AntelopeJS/api/pull/45))
+- Advertise the server under a single loopback spelling: the dev registry named it `localhost` while the published variables derived `127.0.0.1`, two origins as far as a browser is concerned ([#46](https://github.com/AntelopeJS/api/pull/46))
+
 ### 🏡 Chore
 
+- Align community files with the organization defaults ([#43](https://github.com/AntelopeJS/api/pull/43))
 - **release:** Allow a release with no commits since the last tag ([#47](https://github.com/AntelopeJS/api/pull/47))
 - Install stable @antelopejs/core in CI ([#48](https://github.com/AntelopeJS/api/pull/48))
+
+### 🤖 CI
+
+- Use shared npm release workflow ([#42](https://github.com/AntelopeJS/api/pull/42))
 
 ### ❤️ Contributors
 
