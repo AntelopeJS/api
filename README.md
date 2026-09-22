@@ -126,13 +126,17 @@ The reservation honours the existing port rules:
 - In development, the reservation falls back to the next free port (up to 20 above the requested one, then an OS-assigned port), exactly as `listen()` did before.
 - `port: 0` reserves an OS-assigned port and publishes it.
 
-`API_LOCAL_BASE_URL` turns the bind host into a connectable URL host, following the same convention the dev registry endpoints already use:
+### One advertised origin
 
-- an absent or wildcard host (`0.0.0.0`, `::`, `[::]`) becomes `127.0.0.1`, because a wildcard is not a connectable address;
+The module names itself in exactly one way. The host recorded in `.antelope/dev.json` and the host in `API_LOCAL_BASE_URL` go through the same derivation, so a browser is never handed the same server under two spellings — `localhost` and `127.0.0.1` are distinct origins to it, worth a second preflight and a second cookie jar.
+
+The bind host becomes a connectable URL host as follows:
+
+- an absent or wildcard host (`0.0.0.0`, `::`, `[::]`) becomes `127.0.0.1`, because a wildcard is not a connectable address. `127.0.0.1` is used rather than `localhost`, which goes through the resolver and may answer `::1` — an address an IPv4-bound server does not listen on;
 - any explicit host — `localhost`, a LAN address, a name — is preserved verbatim, because a server bound to it does not listen on loopback at all;
 - a bare IPv6 literal is bracketed, as a URL requires.
 
-The scheme follows the first server's `protocol`, so an HTTPS-first setup is never advertised as `http://`.
+The scheme follows the first server's `protocol`, so an HTTPS-first setup is never advertised as `http://`. The same origin is what the startup log prints.
 
 ## License
 

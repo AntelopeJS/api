@@ -5,7 +5,9 @@ import * as coreRuntime from "@antelopejs/interface-core/runtime";
 import type { ConfigVars } from "@antelopejs/interface-core/config";
 
 import { setDevMode } from "../dev-mode";
-import type { Config } from "../server-config";
+import { LOOPBACK_HOST } from "../server-origin";
+import { collectListeningEndpoints } from "../dev-registry";
+import type { Config, ServerConfig } from "../server-config";
 import {
   PortReservationError,
   releaseReservedPorts,
@@ -39,6 +41,7 @@ const CONSTRUCT_TAKEN_PORT = 25240;
 const CONSTRUCT_STRICT_PORT = 25250;
 const SECONDARY_PORT = 25260;
 const REBUILT_CONFIG_PORT = 25270;
+const AGREEMENT_PORT = 25290;
 const HELD_RESERVATION_PORT = 25280;
 const RESERVATION_HOLD_MS = 250;
 const RANDOM_PORT = 0;
@@ -384,6 +387,24 @@ describe("Config variables publication", () => {
     await assert.rejects(publish(config), MissingPublicBaseUrlError);
   });
 
+  it("advertises one origin in the dev registry and in the variables", async () => {
+    stubRuntime(true);
+
+    const vars = await publish({
+      servers: [{ protocol: "http", port: AGREEMENT_PORT }],
+    });
+
+    start();
+    await listenServers();
+
+    const [endpoint] = getListeningEndpoints();
+    assert.equal(
+      `${endpoint.protocol}://${endpoint.host}:${endpoint.port}`,
+      vars[API_LOCAL_BASE_URL],
+    );
+    assert.equal(vars[API_PUBLIC_BASE_URL], vars[API_LOCAL_BASE_URL]);
+  });
+
   it("defaults publicBaseUrl to the local base url in development", async () => {
     stubRuntime(true);
 
@@ -396,5 +417,76 @@ describe("Config variables publication", () => {
       vars[API_PUBLIC_BASE_URL],
       `http://${TEST_HOST}:${CONSTRUCT_FREE_PORT}`,
     );
+  });
+});
+
+describe("Advertised host agreement", () => {
+  const BIND_HOSTS = [
+    undefined,
+    "0.0.0.0",
+    "::",
+    "[::]",
+    "localhost",
+    "192.168.1.5",
+    "api.internal",
+    "::1",
+    "[::1]",
+  ];
+
+  function listenOnFreePort(): Promise<net.Server> {
+    return new Promise((resolve, reject) => {
+      const server = net.createServer();
+      server.once("error", reject);
+      server.listen(0, TEST_HOST, () => resolve(server));
+    });
+  }
+
+  function boundPort(server: net.Server): number {
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    return address.port;
+  }
+
+  it("advertises loopback as 127.0.0.1 for an absent or wildcard host", () => {
+    const loopbackHosts = [undefined, "0.0.0.0", "::", "[::]"];
+
+    for (const host of loopbackHosts) {
+      const vars = buildConfigVars({
+        publicBaseUrl: PUBLIC_BASE_URL,
+        servers: [{ protocol: "http", host, port: RESERVED_FREE_PORT }],
+      });
+
+      assert.equal(
+        vars[API_LOCAL_BASE_URL],
+        `http://${LOOPBACK_HOST}:${RESERVED_FREE_PORT}`,
+        `bind host ${String(host)}`,
+      );
+    }
+  });
+
+  it("names the server identically in the dev registry and in API_LOCAL_BASE_URL", async () => {
+    const server = await listenOnFreePort();
+
+    try {
+      for (const host of BIND_HOSTS) {
+        const servers: ServerConfig[] = [
+          { protocol: "http", host, port: boundPort(server) },
+        ];
+
+        const [endpoint] = collectListeningEndpoints([server], servers);
+        const vars = buildConfigVars({
+          publicBaseUrl: PUBLIC_BASE_URL,
+          servers,
+        });
+
+        assert.equal(
+          `${endpoint.protocol}://${endpoint.host}:${endpoint.port}`,
+          vars[API_LOCAL_BASE_URL],
+          `bind host ${String(host)}`,
+        );
+      }
+    } finally {
+      await closeServer(server);
+    }
   });
 });

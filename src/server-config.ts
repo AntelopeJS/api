@@ -29,7 +29,6 @@ export interface Config {
 }
 
 export const DEFAULT_HTTP_PORT = 80;
-export const DEFAULT_HOST = "localhost";
 export const RANDOM_PORT = 0;
 
 const DEFAULT_SERVER_CONFIG: HTTPConfig = {
