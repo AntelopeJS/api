@@ -13,21 +13,22 @@ import {
   reserveServerPorts,
 } from "../port-reservation";
 import {
-  configure,
-  getConfig,
-  getListeningEndpoints,
-  listenServers,
-  publishConfigVars,
-  start,
-  stop,
-} from "../index";
-import {
   API_LOCAL_BASE_URL,
   API_PORT,
   API_PUBLIC_BASE_URL,
   buildConfigVars,
   MissingPublicBaseUrlError,
 } from "../config-vars";
+import {
+  applyReservedPorts,
+  configure,
+  getConfig,
+  getListeningEndpoints,
+  listenServers,
+  provide,
+  start,
+  stop,
+} from "../index";
 
 const TEST_HOST = "127.0.0.1";
 const RESERVED_FREE_PORT = 25200;
@@ -37,12 +38,27 @@ const CONSTRUCT_FREE_PORT = 25230;
 const CONSTRUCT_TAKEN_PORT = 25240;
 const CONSTRUCT_STRICT_PORT = 25250;
 const SECONDARY_PORT = 25260;
+const REBUILT_CONFIG_PORT = 25270;
+const HELD_RESERVATION_PORT = 25280;
+const RESERVATION_HOLD_MS = 250;
 const RANDOM_PORT = 0;
 const PUBLIC_BASE_URL = "https://api.example.com";
 
 interface LocalHostCase {
   bindHost?: string;
   urlHost: string;
+}
+
+interface PortInUseError {
+  code?: string;
+}
+
+function isPortInUseError(error: unknown): boolean {
+  return (error as PortInUseError).code === "EADDRINUSE";
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function occupyPort(port: number): Promise<net.Server> {
@@ -68,8 +84,7 @@ function stubRuntime(dev: boolean): void {
 }
 
 function publish(config: Config): Promise<ConfigVars> {
-  configure(config);
-  return publishConfigVars();
+  return provide(config);
 }
 
 function singleServerConfig(port: number, host = TEST_HOST): Config {
@@ -313,6 +328,41 @@ describe("Config variables publication", () => {
     const endpoints = getListeningEndpoints();
     assert.equal(endpoints.length, 1);
     assert.equal(endpoints[0].port, vars[API_PORT]);
+  });
+
+  it("re-applies the reservation to the configuration construct receives", async () => {
+    stubRuntime(true);
+    await blockPort(REBUILT_CONFIG_PORT);
+
+    const vars = await publish(singleServerConfig(REBUILT_CONFIG_PORT));
+    assert.equal(vars[API_PORT], REBUILT_CONFIG_PORT + 1);
+
+    configure(singleServerConfig(REBUILT_CONFIG_PORT));
+    assert.equal(getConfig().servers?.[0].port, REBUILT_CONFIG_PORT);
+
+    applyReservedPorts();
+    assert.equal(getConfig().servers?.[0].port, vars[API_PORT]);
+
+    start();
+    await listenServers();
+
+    assert.equal(getListeningEndpoints()[0].port, vars[API_PORT]);
+  });
+
+  it("holds the reservation across a long provide to start window", async () => {
+    stubRuntime(false);
+
+    const vars = await publish(singleServerConfig(HELD_RESERVATION_PORT));
+    assert.equal(vars[API_PORT], HELD_RESERVATION_PORT);
+
+    await assert.rejects(occupyPort(HELD_RESERVATION_PORT), isPortInUseError);
+    await delay(RESERVATION_HOLD_MS);
+    await assert.rejects(occupyPort(HELD_RESERVATION_PORT), isPortInUseError);
+
+    start();
+    await listenServers();
+
+    assert.equal(getListeningEndpoints()[0].port, HELD_RESERVATION_PORT);
   });
 
   it("fails the boot when strictPort cannot reserve the requested port", async () => {

@@ -81,8 +81,8 @@ function resolvePublicBaseUrl(config: Config, localBaseUrl: string): string {
  * the dev registry and the frontend discovery already privilege as the
  * project's canonical api endpoint.
  *
- * - `API_PORT`: the port reserved during `construct`, which is the port
- *   the server later binds.
+ * - `API_PORT`: the port reserved during `provide`, which is the port the
+ *   server later binds.
  * - `API_LOCAL_BASE_URL`: the same-host origin. Its host follows the
  *   `buildUrlHost` convention: an absent or wildcard bind host becomes
  *   loopback, an explicit host is preserved. For sidecars, health probes

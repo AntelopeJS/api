@@ -10,13 +10,13 @@ importers:
     dependencies:
       '@antelopejs/interface-api':
         specifier: '>=0.0.12 <1.0.0'
-        version: 0.0.12(@antelopejs/interface-core@0.0.14)
+        version: 0.0.12(@antelopejs/interface-core@0.1.0)
       '@antelopejs/interface-api-util':
         specifier: ^0.1.1
-        version: 0.1.1(@antelopejs/interface-api@0.0.12(@antelopejs/interface-core@0.0.14))(@antelopejs/interface-core@0.0.14)
+        version: 0.1.1(@antelopejs/interface-api@0.0.12(@antelopejs/interface-core@0.1.0))(@antelopejs/interface-core@0.1.0)
       '@antelopejs/interface-core':
-        specifier: '>=0.0.14 <1.0.0'
-        version: 0.0.14
+        specifier: '>=0.1.0 <1.0.0'
+        version: 0.1.0
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -74,13 +74,13 @@ importers:
     dependencies:
       '@antelopejs/interface-api':
         specifier: '>=0.0.12 <1.0.0'
-        version: 0.0.12(@antelopejs/interface-core@0.0.14)
+        version: 0.0.12(@antelopejs/interface-core@0.1.0)
       '@antelopejs/interface-api-util':
         specifier: ^0.1.1
-        version: 0.1.1(@antelopejs/interface-api@0.0.12(@antelopejs/interface-core@0.0.14))(@antelopejs/interface-core@0.0.14)
+        version: 0.1.1(@antelopejs/interface-api@0.0.12(@antelopejs/interface-core@0.1.0))(@antelopejs/interface-core@0.1.0)
       '@antelopejs/interface-core':
-        specifier: '>=0.0.14 <1.0.0'
-        version: 0.0.14
+        specifier: '>=0.1.0 <1.0.0'
+        version: 0.1.0
     devDependencies:
       '@types/node':
         specifier: ^20.5.7
@@ -105,8 +105,8 @@ packages:
     peerDependencies:
       '@antelopejs/interface-core': '>=0.0.3 <1.0.0'
 
-  '@antelopejs/interface-core@0.0.14':
-    resolution: {integrity: sha512-d5oB68J4T3/nK7npc/+caoCD81ZaTB2tVBsupQ4kh6HIKpKBrrKzqlzdYUD97pbMK42VaWhTSv6O8Iy1Wet1vw==}
+  '@antelopejs/interface-core@0.1.0':
+    resolution: {integrity: sha512-49mmTXREMNNEigWpmubwQD7fSrIIvmcTb9L8L79zQcDWTToud/GIap40vaKWmkbN1oGbjOB4ael/agqZ/ejYSg==}
 
   '@antelopejs/tooling-configs@0.0.4':
     resolution: {integrity: sha512-Nfv71Z9DF78mFu817SwTZnzfF/oWhjXWhAY/zhBV9ArevV3ZwJ/JhZD+3QiLf9fXIS2pXCrmCCYGclpc598psA==}
@@ -2090,16 +2090,16 @@ packages:
 
 snapshots:
 
-  '@antelopejs/interface-api-util@0.1.1(@antelopejs/interface-api@0.0.12(@antelopejs/interface-core@0.0.14))(@antelopejs/interface-core@0.0.14)':
+  '@antelopejs/interface-api-util@0.1.1(@antelopejs/interface-api@0.0.12(@antelopejs/interface-core@0.1.0))(@antelopejs/interface-core@0.1.0)':
     dependencies:
-      '@antelopejs/interface-api': 0.0.12(@antelopejs/interface-core@0.0.14)
-      '@antelopejs/interface-core': 0.0.14
+      '@antelopejs/interface-api': 0.0.12(@antelopejs/interface-core@0.1.0)
+      '@antelopejs/interface-core': 0.1.0
 
-  '@antelopejs/interface-api@0.0.12(@antelopejs/interface-core@0.0.14)':
+  '@antelopejs/interface-api@0.0.12(@antelopejs/interface-core@0.1.0)':
     dependencies:
-      '@antelopejs/interface-core': 0.0.14
+      '@antelopejs/interface-core': 0.1.0
 
-  '@antelopejs/interface-core@0.0.14':
+  '@antelopejs/interface-core@0.1.0':
     dependencies:
       reflect-metadata: 0.2.2
 
