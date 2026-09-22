@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.3.0-next.1
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.3.0-next.0...v1.3.0-next.1)
+
+### 🩹 Fixes
+
+- Publish config variables from the provide callback ([#45](https://github.com/AntelopeJS/api/pull/45))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.3.0-next.0
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.2.5...v1.3.0-next.0)
