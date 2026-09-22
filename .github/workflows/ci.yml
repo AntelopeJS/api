@@ -25,10 +25,7 @@ jobs:
         run: |
           echo "$PR_TITLE" | grep -Eq '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([^)]+\))?!?: .+'
       - run: pnpm install --frozen-lockfile
-      # TEMPORARY: pinned to the prerelease that ships the `provide` phase
-      # of the module config variables engine. Revert to
-      # `@antelopejs/core` once 1.9.0 is on the `latest` dist-tag.
-      - run: pnpm add --global @antelopejs/core@1.9.0-next.2
+      - run: pnpm add --global @antelopejs/core
       - run: pnpm prepack
       - run: pnpm lint
       - run: pnpm format:check
