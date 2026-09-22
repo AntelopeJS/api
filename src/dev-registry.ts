@@ -6,10 +6,10 @@ import {
   RegisterDevServer,
 } from "@antelopejs/interface-core/runtime";
 
+import { buildUrlHost } from "./server-origin";
 import { resolveBoundPort } from "./port-binding";
 import {
   type Config,
-  DEFAULT_HOST,
   DEFAULT_HTTP_PORT,
   type ServerConfig,
 } from "./server-config";
@@ -27,6 +27,13 @@ export async function shouldAllowPortFallback(
   return runtimeInfo.dev;
 }
 
+/**
+ * Builds the endpoint recorded in `.antelope/dev.json`.
+ *
+ * The host is the connectable one `buildUrlHost` derives, not the raw
+ * bind host: the registry is read to build a base URL, and it has to
+ * name the server exactly as the published config variables do.
+ */
 function buildEndpoint(
   server: net.Server,
   config?: ServerConfig,
@@ -38,7 +45,7 @@ function buildEndpoint(
   const port = resolveBoundPort(server, config.port ?? DEFAULT_HTTP_PORT);
   return {
     protocol: config.protocol,
-    host: config.host ?? DEFAULT_HOST,
+    host: buildUrlHost(config.host),
     port,
   };
 }

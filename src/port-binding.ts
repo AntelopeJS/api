@@ -1,8 +1,8 @@
 import type * as net from "node:net";
 import { Logging } from "@antelopejs/interface-core/logging";
 
+import { buildServerOrigin } from "./server-origin";
 import {
-  DEFAULT_HOST,
   DEFAULT_HTTP_PORT,
   RANDOM_PORT,
   type ServerConfig,
@@ -112,7 +112,7 @@ function logServerStarted(
   requestedPort: number,
   boundPort: number,
 ): void {
-  const serverUrl = `${config.protocol}://${config.host ?? DEFAULT_HOST}:${boundPort}`;
+  const serverUrl = buildServerOrigin(config, boundPort);
   if (boundPort === requestedPort || requestedPort === RANDOM_PORT) {
     Logging.Info(`Server started, listening on ${serverUrl}`);
     return;
