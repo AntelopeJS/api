@@ -124,7 +124,13 @@ The reservation honours the existing port rules:
 - In development, the reservation falls back to the next free port (up to 20 above the requested one, then an OS-assigned port), exactly as `listen()` did before.
 - `port: 0` reserves an OS-assigned port and publishes it.
 
-`API_LOCAL_BASE_URL` is always built on `127.0.0.1`, never on the configured `host`: a wildcard bind (`0.0.0.0`, `::`, `[::]`) is not a connectable URL host, and same-host consumers — sidecar proxies, health probes, gateway upstreams — always reach the server through loopback.
+`API_LOCAL_BASE_URL` turns the bind host into a connectable URL host, following the same convention the dev registry endpoints already use:
+
+- an absent or wildcard host (`0.0.0.0`, `::`, `[::]`) becomes `127.0.0.1`, because a wildcard is not a connectable address;
+- any explicit host — `localhost`, a LAN address, a name — is preserved verbatim, because a server bound to it does not listen on loopback at all;
+- a bare IPv6 literal is bracketed, as a URL requires.
+
+The scheme follows the first server's `protocol`, so an HTTPS-first setup is never advertised as `http://`.
 
 ## License
 

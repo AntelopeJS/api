@@ -40,6 +40,11 @@ const SECONDARY_PORT = 25260;
 const RANDOM_PORT = 0;
 const PUBLIC_BASE_URL = "https://api.example.com";
 
+interface LocalHostCase {
+  bindHost?: string;
+  urlHost: string;
+}
+
 function occupyPort(port: number): Promise<net.Server> {
   return new Promise((resolve, reject) => {
     const blocker = net.createServer();
@@ -98,20 +103,44 @@ describe("Published config variables", () => {
     assert.equal(vars[API_PUBLIC_BASE_URL], PUBLIC_BASE_URL);
   });
 
-  it("keeps the local base url on loopback for a wildcard host", () => {
-    const wildcardHosts = ["0.0.0.0", "::", "[::]"];
+  it("maps every bind host to a connectable url host", () => {
+    const hostCases: LocalHostCase[] = [
+      { bindHost: undefined, urlHost: TEST_HOST },
+      { bindHost: "0.0.0.0", urlHost: TEST_HOST },
+      { bindHost: "::", urlHost: TEST_HOST },
+      { bindHost: "[::]", urlHost: TEST_HOST },
+      { bindHost: "localhost", urlHost: "localhost" },
+      { bindHost: "192.168.1.5", urlHost: "192.168.1.5" },
+      { bindHost: "::1", urlHost: "[::1]" },
+      { bindHost: "[::1]", urlHost: "[::1]" },
+    ];
 
-    for (const host of wildcardHosts) {
+    for (const { bindHost, urlHost } of hostCases) {
       const vars = buildConfigVars({
         publicBaseUrl: PUBLIC_BASE_URL,
-        servers: [{ protocol: "http", host, port: RESERVED_FREE_PORT }],
+        servers: [
+          { protocol: "http", host: bindHost, port: RESERVED_FREE_PORT },
+        ],
       });
 
       assert.equal(
         vars[API_LOCAL_BASE_URL],
-        `http://${TEST_HOST}:${RESERVED_FREE_PORT}`,
+        `http://${urlHost}:${RESERVED_FREE_PORT}`,
+        `bind host ${String(bindHost)}`,
       );
     }
+  });
+
+  it("follows the protocol of the first configured server", () => {
+    const vars = buildConfigVars({
+      publicBaseUrl: PUBLIC_BASE_URL,
+      servers: [{ protocol: "https", host: TEST_HOST, port: SECONDARY_PORT }],
+    });
+
+    assert.equal(
+      vars[API_LOCAL_BASE_URL],
+      `https://${TEST_HOST}:${SECONDARY_PORT}`,
+    );
   });
 
   it("defaults the public base url to the local one in development", () => {
