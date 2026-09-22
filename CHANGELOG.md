@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.3.0
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.3.0-next.2...v1.3.0)
+
+### 🏡 Chore
+
+- **release:** Allow a release with no commits since the last tag ([#47](https://github.com/AntelopeJS/api/pull/47))
+- Install stable @antelopejs/core in CI ([#48](https://github.com/AntelopeJS/api/pull/48))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.3.0-next.2
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.0-next.1...v1.3.0-next.2)
