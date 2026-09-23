@@ -40,3 +40,11 @@ Pull requests should:
 Maintainers may ask for changes before merging. AntelopeJS repositories
 normally squash pull requests, so the pull request title becomes the commit on
 the default branch.
+
+## Releases
+
+Releases are published from GitHub Actions: the `latest` channel from the
+default branch and the `next` channel from a branch named `next`. See the
+organization-wide
+[release channels guide](https://github.com/AntelopeJS/.github/blob/main/CONTRIBUTING.md#release-channels)
+for how prereleases and stable fixes are handled.
