@@ -1,5 +1,3 @@
-![API](.github/social-card.png)
-
 # @antelopejs/api
 
 <div align="center">
