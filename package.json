@@ -35,14 +35,15 @@
     "knip": "knip"
   },
   "dependencies": {
-    "@antelopejs/interface-api": ">=0.0.12 <1.0.0",
-    "@antelopejs/interface-api-util": "^0.1.1",
-    "@antelopejs/interface-core": ">=0.1.0 <1.0.0",
+    "@antelopejs/interface-api": ">=0.0.14 <1.0.0",
+    "@antelopejs/interface-api-util": "^0.1.2",
+    "@antelopejs/interface-core": ">=0.1.1 <1.0.0",
     "reflect-metadata": "^0.2.2",
     "ws": "^8.20.0"
   },
   "devDependencies": {
-    "@antelopejs/tooling-configs": "^0.0.4",
+    "@antelopejs/core": "^1.9.1",
+    "@antelopejs/tooling-configs": "^0.0.6",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.19.15",
     "@types/sinon": "^21.0.0",
