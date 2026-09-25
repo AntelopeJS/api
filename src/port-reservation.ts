@@ -14,7 +14,9 @@ import {
  * Holding the socket is what keeps the published `API_PORT` and the port
  * the server eventually binds in sync: the probe-then-use race shrinks to
  * the instant between `release()` and the real `listen()`, instead of
- * spanning the construction of every other module.
+ * spanning the construction of every other module. Any client reaching
+ * the port meanwhile gets an immediate `503` and a closed connection, so
+ * an early probe never keeps the holding socket from closing.
  */
 export interface ReservedPort {
   port: number;
@@ -30,26 +32,58 @@ export class PortReservationError extends Error {
   readonly code = "EADDRINUSE";
 }
 
+interface PortHolder {
+  server: net.Server;
+  sockets: Set<net.Socket>;
+}
+
 interface PortHold {
-  holder?: net.Server;
+  holder?: PortHolder;
   error?: unknown;
 }
 
 const STRICT_PORT_HINT =
   " Port fallback is disabled; set strictPort to false in development to accept the next free port.";
 
+const RESERVATION_RETRY_AFTER_SECONDS = 1;
+
+const RESERVATION_RESPONSE = [
+  "HTTP/1.1 503 Service Unavailable",
+  "Connection: close",
+  "Content-Length: 0",
+  `Retry-After: ${RESERVATION_RETRY_AFTER_SECONDS}`,
+  "",
+  "",
+].join("\r\n");
+
+function rejectHeldConnection(
+  sockets: Set<net.Socket>,
+  socket: net.Socket,
+): void {
+  sockets.add(socket);
+  socket.once("close", () => sockets.delete(socket));
+  socket.on("error", () => socket.destroy());
+  socket.end(RESERVATION_RESPONSE);
+}
+
 function holdPort(port: number, host?: string): Promise<PortHold> {
   return new Promise((resolve) => {
-    const holder = net.createServer();
-    holder.unref();
-    holder.once("error", (error: Error) => resolve({ error }));
-    holder.listen({ port, host }, () => resolve({ holder }));
+    const sockets = new Set<net.Socket>();
+    const server = net.createServer((socket) =>
+      rejectHeldConnection(sockets, socket),
+    );
+    server.unref();
+    server.once("error", (error: Error) => resolve({ error }));
+    server.listen({ port, host }, () =>
+      resolve({ holder: { server, sockets } }),
+    );
   });
 }
 
-function closeHolder(holder: net.Server): Promise<void> {
+function closeHolder(holder: PortHolder): Promise<void> {
   return new Promise((resolve) => {
-    holder.close(() => resolve());
+    holder.server.close(() => resolve());
+    holder.sockets.forEach((socket) => socket.destroy());
   });
 }
 
@@ -81,7 +115,7 @@ async function reservePort(
     const { holder, error } = await holdPort(candidatePort, config.host);
     if (holder) {
       return {
-        port: resolveBoundPort(holder, candidatePort),
+        port: resolveBoundPort(holder.server, candidatePort),
         release: () => closeHolder(holder),
       };
     }

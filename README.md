@@ -124,6 +124,8 @@ The reservation honours the existing port rules:
 - In development, the reservation falls back to the next free port (up to 20 above the requested one, then an OS-assigned port), exactly as `listen()` did before.
 - `port: 0` reserves an OS-assigned port and publishes it.
 
+A client that connects while the port is only reserved — a health probe, an eager consumer — receives an immediate `503 Service Unavailable` with `Retry-After: 1` and a closed connection, so it retries once the real server listens. Releasing the reservation never waits on such a connection. If the servers are still not listening five seconds after `start`, the module logs an error.
+
 ### One advertised origin
 
 The module names itself in exactly one way. The host recorded in `.antelope/dev.json` and the host in `API_LOCAL_BASE_URL` go through the same derivation, so a browser is never handed the same server under two spellings — `localhost` and `127.0.0.1` are distinct origins to it, worth a second preflight and a second cookie jar.

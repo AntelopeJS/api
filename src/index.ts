@@ -9,6 +9,11 @@ import { listenServer } from "./port-binding";
 import type { Config } from "./server-config";
 import { buildConfigVars } from "./config-vars";
 import { createConfiguredServer } from "./server-factory";
+import {
+  armListenDeadline,
+  disarmListenDeadline,
+  settlesWithin,
+} from "./startup-deadline";
 import { configure, getConfig, setCorsConfig } from "./module-config";
 
 export { configure, getConfig, setCorsConfig };
@@ -24,14 +29,31 @@ import {
 } from "./dev-registry";
 import "./middlewares/cors";
 
+const RESERVATION_RELEASE_TIMEOUT_MS = 1000;
+const LISTEN_DEADLINE_MS = 5000;
+
 let servers: net.Server[] = [];
 let listening = false;
 let reservations: ReservedPort[] = [];
 
-function releaseReservations(): Promise<void> {
+async function releaseReservations(): Promise<void> {
   const pending = reservations;
   reservations = [];
-  return releaseReservedPorts(pending);
+  const isReleased = await settlesWithin(
+    releaseReservedPorts(pending),
+    RESERVATION_RELEASE_TIMEOUT_MS,
+  );
+  if (!isReleased) {
+    Logging.Warn(
+      `Port reservations still closing after ${RESERVATION_RELEASE_TIMEOUT_MS} ms, binding the servers anyway`,
+    );
+  }
+}
+
+function reportMissedListenDeadline(): void {
+  Logging.Error(
+    `Servers are still not listening ${LISTEN_DEADLINE_MS} ms after start`,
+  );
 }
 
 async function reserveConfiguredPorts(): Promise<void> {
@@ -113,6 +135,7 @@ function closeServers(): Promise<void> {
   );
   servers = [];
   listening = false;
+  disarmListenDeadline();
   return Promise.all(closing).then(() => undefined);
 }
 
@@ -122,7 +145,8 @@ export function start(): void {
     createConfiguredServer(serverConfig),
   );
 
-  if (getConfig().autoListen !== false) {
+  if (getConfig().autoListen !== false && servers.length > 0) {
+    armListenDeadline(LISTEN_DEADLINE_MS, reportMissedListenDeadline);
     void serversClosed
       .then(() => listenServers())
       .catch((error: unknown) => {
@@ -154,6 +178,8 @@ export async function listenServers(): Promise<void> {
   } catch (error) {
     listening = false;
     throw error;
+  } finally {
+    disarmListenDeadline();
   }
 
   await registerDevServerEndpoints(getListeningEndpoints());
