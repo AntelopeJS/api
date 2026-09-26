@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.3.1
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.3.0...v1.3.1)
+
+### 🩹 Fixes
+
+- **port-reservation:** Serve the port bound during provide instead of re-listening ([#55](https://github.com/AntelopeJS/api/pull/55))
+
+### 📖 Documentation
+
+- Summarise the 1.3.0 prerelease line in the stable entry ([#49](https://github.com/AntelopeJS/api/pull/49))
+- **readme:** Remove social card image ([#50](https://github.com/AntelopeJS/api/pull/50))
+
+### 🏡 Chore
+
+- Remove .git-blame-ignore-revs ([#51](https://github.com/AntelopeJS/api/pull/51))
+- **playground:** Update antelope dependencies to latest ([#54](https://github.com/AntelopeJS/api/pull/54))
+
+### 🤖 CI
+
+- **release:** Release next from a dedicated branch and restore requireCommits ([#52](https://github.com/AntelopeJS/api/pull/52))
+- **release:** Reference the shared release workflows through v1 ([#53](https://github.com/AntelopeJS/api/pull/53))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.3.0
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.0-next.2...v1.3.0)
