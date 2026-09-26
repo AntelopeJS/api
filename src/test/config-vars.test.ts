@@ -9,11 +9,11 @@ import { LOOPBACK_HOST } from "../server-origin";
 import { collectListeningEndpoints } from "../dev-registry";
 import type { Config, ServerConfig } from "../server-config";
 import {
+  type BoundListener,
+  bindServerPorts,
+  closeListeners,
   PortReservationError,
-  releaseReservedPorts,
-  type ReservedPort,
-  reserveServerPorts,
-} from "../port-reservation";
+} from "../port-listener";
 import {
   API_LOCAL_BASE_URL,
   API_PORT,
@@ -33,17 +33,17 @@ import {
 } from "../index";
 
 const TEST_HOST = "127.0.0.1";
-const RESERVED_FREE_PORT = 25200;
-const RESERVED_TAKEN_PORT = 25210;
-const RESERVED_STRICT_PORT = 25220;
+const BOUND_FREE_PORT = 25200;
+const BOUND_TAKEN_PORT = 25210;
+const BOUND_STRICT_PORT = 25220;
 const CONSTRUCT_FREE_PORT = 25230;
 const CONSTRUCT_TAKEN_PORT = 25240;
 const CONSTRUCT_STRICT_PORT = 25250;
 const SECONDARY_PORT = 25260;
 const REBUILT_CONFIG_PORT = 25270;
 const AGREEMENT_PORT = 25290;
-const HELD_RESERVATION_PORT = 25280;
-const RESERVATION_HOLD_MS = 250;
+const HELD_LISTENER_PORT = 25280;
+const LISTENER_HOLD_MS = 250;
 const RANDOM_PORT = 0;
 const PUBLIC_BASE_URL = "https://api.example.com";
 
@@ -108,15 +108,15 @@ describe("Published config variables", () => {
     const vars = buildConfigVars({
       publicBaseUrl: PUBLIC_BASE_URL,
       servers: [
-        { protocol: "http", host: TEST_HOST, port: RESERVED_FREE_PORT },
+        { protocol: "http", host: TEST_HOST, port: BOUND_FREE_PORT },
         { protocol: "http", host: TEST_HOST, port: SECONDARY_PORT },
       ],
     });
 
-    assert.equal(vars[API_PORT], RESERVED_FREE_PORT);
+    assert.equal(vars[API_PORT], BOUND_FREE_PORT);
     assert.equal(
       vars[API_LOCAL_BASE_URL],
-      `http://${TEST_HOST}:${RESERVED_FREE_PORT}`,
+      `http://${TEST_HOST}:${BOUND_FREE_PORT}`,
     );
     assert.equal(vars[API_PUBLIC_BASE_URL], PUBLIC_BASE_URL);
   });
@@ -136,14 +136,12 @@ describe("Published config variables", () => {
     for (const { bindHost, urlHost } of hostCases) {
       const vars = buildConfigVars({
         publicBaseUrl: PUBLIC_BASE_URL,
-        servers: [
-          { protocol: "http", host: bindHost, port: RESERVED_FREE_PORT },
-        ],
+        servers: [{ protocol: "http", host: bindHost, port: BOUND_FREE_PORT }],
       });
 
       assert.equal(
         vars[API_LOCAL_BASE_URL],
-        `http://${urlHost}:${RESERVED_FREE_PORT}`,
+        `http://${urlHost}:${BOUND_FREE_PORT}`,
         `bind host ${String(bindHost)}`,
       );
     }
@@ -165,9 +163,7 @@ describe("Published config variables", () => {
     setDevMode(true);
 
     const vars = buildConfigVars({
-      servers: [
-        { protocol: "http", host: TEST_HOST, port: RESERVED_FREE_PORT },
-      ],
+      servers: [{ protocol: "http", host: TEST_HOST, port: BOUND_FREE_PORT }],
     });
 
     assert.equal(vars[API_PUBLIC_BASE_URL], vars[API_LOCAL_BASE_URL]);
@@ -180,7 +176,7 @@ describe("Published config variables", () => {
       () =>
         buildConfigVars({
           servers: [
-            { protocol: "http", host: TEST_HOST, port: RESERVED_FREE_PORT },
+            { protocol: "http", host: TEST_HOST, port: BOUND_FREE_PORT },
           ],
         }),
       (error: unknown) =>
@@ -192,79 +188,77 @@ describe("Published config variables", () => {
   it("strips trailing slashes from the configured public base url", () => {
     const vars = buildConfigVars({
       publicBaseUrl: `${PUBLIC_BASE_URL}//`,
-      servers: [
-        { protocol: "http", host: TEST_HOST, port: RESERVED_FREE_PORT },
-      ],
+      servers: [{ protocol: "http", host: TEST_HOST, port: BOUND_FREE_PORT }],
     });
 
     assert.equal(vars[API_PUBLIC_BASE_URL], PUBLIC_BASE_URL);
   });
 });
 
-describe("Port reservation", () => {
+describe("Port binding", () => {
   const blockers: net.Server[] = [];
-  let reservations: ReservedPort[] = [];
+  let listeners: BoundListener[] = [];
 
   async function blockPort(port: number): Promise<void> {
     blockers.push(await occupyPort(port));
   }
 
   afterEach(async () => {
-    await releaseReservedPorts(reservations);
-    reservations = [];
+    await closeListeners(listeners);
+    listeners = [];
     await Promise.all(blockers.map((blocker) => closeServer(blocker)));
     blockers.length = 0;
   });
 
-  it("reserves the requested port and writes it back to the config", async () => {
-    const servers = singleServerConfig(RESERVED_FREE_PORT).servers ?? [];
+  it("binds the requested port and writes it back to the config", async () => {
+    const servers = singleServerConfig(BOUND_FREE_PORT).servers ?? [];
 
-    reservations = await reserveServerPorts(servers, false);
+    listeners = await bindServerPorts(servers, false);
 
-    assert.equal(reservations[0].port, RESERVED_FREE_PORT);
-    assert.equal(servers[0].port, RESERVED_FREE_PORT);
+    assert.equal(listeners[0].port, BOUND_FREE_PORT);
+    assert.equal(servers[0].port, BOUND_FREE_PORT);
   });
 
-  it("reserves the next free port when fallback is allowed", async () => {
-    await blockPort(RESERVED_TAKEN_PORT);
-    const servers = singleServerConfig(RESERVED_TAKEN_PORT).servers ?? [];
+  it("binds the next free port when fallback is allowed", async () => {
+    await blockPort(BOUND_TAKEN_PORT);
+    const servers = singleServerConfig(BOUND_TAKEN_PORT).servers ?? [];
 
-    reservations = await reserveServerPorts(servers, true);
+    listeners = await bindServerPorts(servers, true);
 
-    assert.equal(reservations[0].port, RESERVED_TAKEN_PORT + 1);
-    assert.equal(servers[0].port, RESERVED_TAKEN_PORT + 1);
+    assert.equal(listeners[0].port, BOUND_TAKEN_PORT + 1);
+    assert.equal(servers[0].port, BOUND_TAKEN_PORT + 1);
   });
 
   it("fails with a named error when fallback is not allowed", async () => {
-    await blockPort(RESERVED_STRICT_PORT);
-    const servers = singleServerConfig(RESERVED_STRICT_PORT).servers ?? [];
+    await blockPort(BOUND_STRICT_PORT);
+    const servers = singleServerConfig(BOUND_STRICT_PORT).servers ?? [];
 
     await assert.rejects(
-      reserveServerPorts(servers, false),
-      (error: unknown) =>
+      bindServerPorts(servers, false),
+      (error: Error) =>
         error instanceof PortReservationError &&
         error.name === "PortReservationError" &&
-        error.message.includes(String(RESERVED_STRICT_PORT)),
+        error.message.includes(String(BOUND_STRICT_PORT)),
     );
   });
 
-  it("reserves an operating system assigned port for port 0", async () => {
+  it("binds an operating system assigned port for port 0", async () => {
     const servers = singleServerConfig(RANDOM_PORT).servers ?? [];
 
-    reservations = await reserveServerPorts(servers, false);
+    listeners = await bindServerPorts(servers, false);
 
-    assert.ok(reservations[0].port > 0);
-    assert.equal(servers[0].port, reservations[0].port);
+    assert.ok(listeners[0].port > 0);
+    assert.equal(servers[0].port, listeners[0].port);
   });
 
-  it("releases every reservation when one of them fails", async () => {
-    await blockPort(RESERVED_STRICT_PORT);
+  it("closes every listener when one of them fails", async () => {
+    await blockPort(BOUND_STRICT_PORT);
 
     await assert.rejects(
-      reserveServerPorts(
+      bindServerPorts(
         [
           { protocol: "http", host: TEST_HOST, port: SECONDARY_PORT },
-          { protocol: "http", host: TEST_HOST, port: RESERVED_STRICT_PORT },
+          { protocol: "http", host: TEST_HOST, port: BOUND_STRICT_PORT },
         ],
         false,
       ),
@@ -318,7 +312,7 @@ describe("Config variables publication", () => {
     assert.equal(vars[API_PUBLIC_BASE_URL], PUBLIC_BASE_URL);
   });
 
-  it("publishes the reserved port and binds it without drift", async () => {
+  it("publishes the bound port and serves it without drift", async () => {
     stubRuntime(true);
     await blockPort(CONSTRUCT_TAKEN_PORT);
 
@@ -333,7 +327,7 @@ describe("Config variables publication", () => {
     assert.equal(endpoints[0].port, vars[API_PORT]);
   });
 
-  it("re-applies the reservation to the configuration construct receives", async () => {
+  it("re-applies the bound port to the configuration construct receives", async () => {
     stubRuntime(true);
     await blockPort(REBUILT_CONFIG_PORT);
 
@@ -352,23 +346,23 @@ describe("Config variables publication", () => {
     assert.equal(getListeningEndpoints()[0].port, vars[API_PORT]);
   });
 
-  it("holds the reservation across a long provide to start window", async () => {
+  it("holds the bound port across a long provide to start window", async () => {
     stubRuntime(false);
 
-    const vars = await publish(singleServerConfig(HELD_RESERVATION_PORT));
-    assert.equal(vars[API_PORT], HELD_RESERVATION_PORT);
+    const vars = await publish(singleServerConfig(HELD_LISTENER_PORT));
+    assert.equal(vars[API_PORT], HELD_LISTENER_PORT);
 
-    await assert.rejects(occupyPort(HELD_RESERVATION_PORT), isPortInUseError);
-    await delay(RESERVATION_HOLD_MS);
-    await assert.rejects(occupyPort(HELD_RESERVATION_PORT), isPortInUseError);
+    await assert.rejects(occupyPort(HELD_LISTENER_PORT), isPortInUseError);
+    await delay(LISTENER_HOLD_MS);
+    await assert.rejects(occupyPort(HELD_LISTENER_PORT), isPortInUseError);
 
     start();
     await listenServers();
 
-    assert.equal(getListeningEndpoints()[0].port, HELD_RESERVATION_PORT);
+    assert.equal(getListeningEndpoints()[0].port, HELD_LISTENER_PORT);
   });
 
-  it("fails the boot when strictPort cannot reserve the requested port", async () => {
+  it("fails the boot when strictPort cannot bind the requested port", async () => {
     stubRuntime(true);
     await blockPort(CONSTRUCT_STRICT_PORT);
 
@@ -453,12 +447,12 @@ describe("Advertised host agreement", () => {
     for (const host of loopbackHosts) {
       const vars = buildConfigVars({
         publicBaseUrl: PUBLIC_BASE_URL,
-        servers: [{ protocol: "http", host, port: RESERVED_FREE_PORT }],
+        servers: [{ protocol: "http", host, port: BOUND_FREE_PORT }],
       });
 
       assert.equal(
         vars[API_LOCAL_BASE_URL],
-        `http://${LOOPBACK_HOST}:${RESERVED_FREE_PORT}`,
+        `http://${LOOPBACK_HOST}:${BOUND_FREE_PORT}`,
         `bind host ${String(host)}`,
       );
     }

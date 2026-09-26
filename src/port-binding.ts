@@ -10,33 +10,6 @@ import {
 
 const MAX_PORT_FALLBACK_OFFSET = 20;
 
-function listenOnce(
-  server: net.Server,
-  port: number,
-  host?: string,
-): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const onListening = () => {
-      cleanup();
-      resolve();
-    };
-
-    const onError = (error: Error) => {
-      cleanup();
-      reject(error);
-    };
-
-    const cleanup = () => {
-      server.off("listening", onListening);
-      server.off("error", onError);
-    };
-
-    server.once("listening", onListening);
-    server.once("error", onError);
-    server.listen(port, host);
-  });
-}
-
 export function isPortInUseError(error: unknown): boolean {
   return (error as NodeJS.ErrnoException)?.code === "EADDRINUSE";
 }
@@ -81,33 +54,10 @@ export function buildCandidatePorts(
   return [...sequentialPorts, RANDOM_PORT];
 }
 
-async function listenServerWithFallback(
-  server: net.Server,
-  config: ServerConfig,
-  requestedPort: number,
-  allowPortFallback: boolean,
-): Promise<number> {
-  const candidatePorts = buildCandidatePorts(requestedPort, allowPortFallback);
-  let portInUseError: unknown = new Error(
-    `Unable to bind ${config.protocol} server on port ${requestedPort}`,
-  );
-
-  for (const candidatePort of candidatePorts) {
-    try {
-      await listenOnce(server, candidatePort, config.host);
-      return resolveBoundPort(server, candidatePort);
-    } catch (error) {
-      if (!isPortInUseError(error)) {
-        throw error;
-      }
-      portInUseError = error;
-    }
-  }
-
-  throw portInUseError;
-}
-
-function logServerStarted(
+/**
+ * Logs where a server listens, naming the fallback when it moved.
+ */
+export function logServerStarted(
   config: ServerConfig,
   requestedPort: number,
   boundPort: number,
@@ -121,24 +71,4 @@ function logServerStarted(
   Logging.Info(
     `Port ${requestedPort} in use, listening on ${serverUrl} instead`,
   );
-}
-
-export async function listenServer(
-  server: net.Server,
-  config: ServerConfig,
-  allowPortFallback: boolean,
-): Promise<void> {
-  if (server.listening) {
-    return;
-  }
-
-  const requestedPort = resolveRequestedPort(config);
-  const boundPort = await listenServerWithFallback(
-    server,
-    config,
-    requestedPort,
-    allowPortFallback,
-  );
-  config.port = boundPort;
-  logServerStarted(config, requestedPort, boundPort);
 }
