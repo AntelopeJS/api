@@ -10,6 +10,9 @@ import {
 
 const MAX_PORT_FALLBACK_OFFSET = 20;
 
+const STRICT_PORT_FALLBACK_HINT =
+  "Set strictPort: true in the server config to fail instead of falling back.";
+
 export function isPortInUseError(error: unknown): boolean {
   return (error as NodeJS.ErrnoException)?.code === "EADDRINUSE";
 }
@@ -55,7 +58,7 @@ export function buildCandidatePorts(
 }
 
 /**
- * Logs where a server listens, naming the fallback when it moved.
+ * Logs where a server listens, warning about the fallback when it moved.
  */
 export function logServerStarted(
   config: ServerConfig,
@@ -68,7 +71,7 @@ export function logServerStarted(
     return;
   }
 
-  Logging.Info(
-    `Port ${requestedPort} in use, listening on ${serverUrl} instead`,
+  Logging.Warn(
+    `Port ${requestedPort} in use, listening on ${serverUrl} instead. ${STRICT_PORT_FALLBACK_HINT}`,
   );
 }

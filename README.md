@@ -123,7 +123,7 @@ Connections that arrive before `start` wait unread in the socket's queue and are
 Binding honours the existing port rules:
 
 - `strictPort: true`, or any non-development runtime, binds exactly the requested port or fails the boot with a `PortReservationError` naming the port.
-- In development, binding falls back to the next free port (up to 20 above the requested one, then an OS-assigned port).
+- In development, binding falls back to the next free port (up to 20 above the requested one, then an OS-assigned port) and logs a warning naming the requested port, the bound URL and the `strictPort: true` opt-out.
 - `port: 0` binds an OS-assigned port and publishes it.
 
 ### One advertised origin
