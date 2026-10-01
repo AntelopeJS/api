@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.3.2
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.3.1...v1.3.2)
+
+### 🩹 Fixes
+
+- **port-binding:** Warn when the server falls back to another port ([#57](https://github.com/AntelopeJS/api/pull/57))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.3.1
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.0...v1.3.1)
