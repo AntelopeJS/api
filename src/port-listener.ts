@@ -31,7 +31,11 @@ export interface BoundListener extends ListenerAddress {
   socket: net.Server;
   /** Hands every queued and future connection to `server`. */
   serve: (server: net.Server) => void;
-  /** Stops accepting, drops unserved connections and frees the port. */
+  /**
+   * Stops accepting and frees the port once every connection has ended.
+   * Unserved connections are dropped at once; served ones get
+   * `CONNECTION_GRACE_PERIOD_MS` to finish before they are destroyed.
+   */
   close: () => Promise<void>;
 }
 
@@ -47,6 +51,17 @@ interface ListenAttempt {
   socket?: net.Server;
   error?: unknown;
 }
+
+/**
+ * How long served connections may stay open once their listener closes.
+ * In-flight requests get this long to complete; long-lived connections,
+ * such as event streams, websockets or busy keep-alive connections, are
+ * destroyed when it elapses so they cannot hold `stop` until the core
+ * gives up on it.
+ */
+export const CONNECTION_GRACE_PERIOD_MS = 1000;
+
+const UNSERVED_GRACE_PERIOD_MS = 0;
 
 const STRICT_PORT_HINT =
   " Port fallback is disabled; set strictPort to false in development to accept the next free port.";
@@ -78,6 +93,34 @@ function adoptAsListening(server: net.Server): void {
   server.emit("listening");
 }
 
+function trackConnection(
+  connections: Set<net.Socket>,
+  connection: net.Socket,
+): void {
+  connections.add(connection);
+  connection.once("close", () => connections.delete(connection));
+}
+
+/**
+ * Stops accepting and resolves once every accepted connection has ended,
+ * destroying the ones still open after `gracePeriodMs`.
+ */
+function closeSocket(
+  socket: net.Server,
+  connections: Set<net.Socket>,
+  gracePeriodMs: number,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const forcedClose = setTimeout(() => {
+      connections.forEach((connection) => connection.destroy());
+    }, gracePeriodMs);
+    socket.close(() => {
+      clearTimeout(forcedClose);
+      resolve();
+    });
+  });
+}
+
 /**
  * Turns a bound socket into a listener. Until served it does not keep the
  * process alive, so a boot that fails after `provide` still exits.
@@ -87,16 +130,17 @@ function createListener(
   address: ListenerAddress,
 ): BoundListener {
   const queued = new Set<net.Socket>();
+  const connections = new Set<net.Socket>();
   let target: net.Server | undefined;
 
   socket.unref();
   socket.on("connection", (connection: net.Socket) => {
+    trackConnection(connections, connection);
     if (target) {
       handOver(target, connection);
       return;
     }
-    queued.add(connection);
-    connection.once("close", () => queued.delete(connection));
+    trackConnection(queued, connection);
   });
 
   return {
@@ -110,10 +154,11 @@ function createListener(
       queued.clear();
     },
     close: () =>
-      new Promise((resolve) => {
-        socket.close(() => resolve());
-        queued.forEach((connection) => connection.destroy());
-      }),
+      closeSocket(
+        socket,
+        connections,
+        target ? CONNECTION_GRACE_PERIOD_MS : UNSERVED_GRACE_PERIOD_MS,
+      ),
   };
 }
 
