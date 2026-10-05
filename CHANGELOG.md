@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.3.3
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.3.2...v1.3.3)
+
+### 🩹 Fixes
+
+- **shutdown:** End open connections within a grace period on stop ([#58](https://github.com/AntelopeJS/api/pull/58))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.3.2
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.1...v1.3.2)
