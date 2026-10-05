@@ -19,9 +19,16 @@ ajs project modules add @antelopejs/api
 
 This module implements the API interfaces who provide a HTTP framework with decorator controllers and middleware support. The interfaces are installed separately to maintain modularity and minimize dependencies.
 
-| Name | Install command              |                                                              |
-| ---- | ---------------------------- | ------------------------------------------------------------ |
-| API  | `ajs module imports add api` | [Documentation](https://github.com/AntelopeJS/interface-api) |
+| Name     | Install command                           |                                                                   |
+| -------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| API      | `pnpm add @antelopejs/interface-api`      | [Documentation](https://github.com/AntelopeJS/interface-api)      |
+| API Util | `pnpm add @antelopejs/interface-api-util` | [Documentation](https://github.com/AntelopeJS/interface-api-util) |
+
+Run the install command in the module that uses the interface. In the project, `ajs project modules install` then adds this module when a module depends on `@antelopejs/interface-api` and no module implements it yet:
+
+```bash
+ajs project modules install
+```
 
 ## Overview
 
