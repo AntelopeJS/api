@@ -39,7 +39,7 @@
     "@antelopejs/interface-api-util": "^0.1.2",
     "@antelopejs/interface-core": ">=0.1.1 <1.0.0",
     "reflect-metadata": "^0.2.2",
-    "ws": "^8.20.0"
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@antelopejs/core": "^1.13.4",
