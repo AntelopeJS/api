@@ -4,6 +4,7 @@ import {
   type ComputedParameter,
   ControllerMeta,
   type CorsConfig,
+  HTTPResult,
   type RouteHandler,
 } from "@antelopejs/interface-api";
 
@@ -55,6 +56,9 @@ interface HandlerPlan {
   parameters: ParameterResolver[];
 }
 
+const BAD_REQUEST_STATUS = 400;
+const MALFORMED_REQUEST_PREFIX = "Malformed request";
+
 const classCacheSymbol = Symbol();
 const registeredRoutes = new Map<string, RouteHandler>();
 const controllerPlans = new WeakMap<ControllerClass, ControllerPlan>();
@@ -81,16 +85,46 @@ function compileParameter(
   const { provider } = parameter;
   const modifiers = [...parameter.modifiers];
   if (modifiers.length === 0) {
-    return (context, controller) => provider.call(controller, context);
+    return (context, controller) => callProvider(provider, controller, context);
   }
 
   return (context, controller) =>
     applyModifiers(
-      provider.call(controller, context),
+      callProvider(provider, controller, context),
       modifiers,
       context,
       controller,
     );
+}
+
+function toRequestError(error: unknown): unknown {
+  if (!(error instanceof SyntaxError)) {
+    return error;
+  }
+  return new HTTPResult(
+    BAD_REQUEST_STATUS,
+    `${MALFORMED_REQUEST_PREFIX}: ${error.message}`,
+  );
+}
+
+function rejectAsRequestError(error: unknown): never {
+  throw toRequestError(error);
+}
+
+function callProvider(
+  provider: NonNullable<ComputedParameter["provider"]>,
+  controller: UnknownRecord,
+  context: RequestContextDev,
+): unknown {
+  try {
+    const value = provider.call(controller, context);
+    const then = getThen(value);
+    return then
+      ? resolveThenable(value, then).catch(rejectAsRequestError)
+      : value;
+  } catch (error) {
+    return rejectAsRequestError(error);
+  }
 }
 
 function applyModifiers(
