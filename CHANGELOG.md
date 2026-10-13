@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.3.4
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.3.3...v1.3.4)
+
+### 🩹 Fixes
+
+- **api:** Answer 400 when a request parameter fails to parse ([#62](https://github.com/AntelopeJS/api/pull/62))
+
+### 📖 Documentation
+
+- **readme:** Fix the outdated CLI commands in the README ([#60](https://github.com/AntelopeJS/api/pull/60))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.3.3
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.2...v1.3.3)
