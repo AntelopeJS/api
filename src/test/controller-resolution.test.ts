@@ -6,6 +6,7 @@ import { GetMetadata } from "@antelopejs/interface-core";
 import {
   type ComputedParameter,
   ControllerMeta,
+  JSONBody,
   type RouteHandler,
 } from "@antelopejs/interface-api";
 
@@ -112,6 +113,26 @@ async function get(
     headers: requestId ? { "x-request-id": requestId } : undefined,
   });
   return { status: response.status, body: await response.text() };
+}
+
+async function post(
+  port: number,
+  path: string,
+  body: string,
+): Promise<TestResponse> {
+  const response = await fetch(`${TEST_ORIGIN}:${port}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body,
+  });
+  return { status: response.status, body: await response.text() };
+}
+
+function jsonBodyParameter(): ComputedParameter {
+  const Controller = createController();
+  JSONBody()(Controller.prototype, "handle", 0);
+  const metadata = GetMetadata(Controller, ControllerMeta) as ControllerMeta;
+  return metadata.computed_params.handle[0];
 }
 
 describe("Controller resolution", () => {
@@ -456,5 +477,33 @@ describe("Controller resolution", () => {
       status: 500,
       body: "modifier failed",
     });
+  });
+
+  it("answers 400 when a JSON body does not parse", async () => {
+    const Controller = createController();
+    register({
+      ...createHandler(
+        Controller,
+        (body: unknown) => JSON.stringify(body),
+        "/controller-resolution/json-body",
+        [jsonBodyParameter()],
+      ),
+      method: "post",
+    });
+
+    const valid = await post(
+      port,
+      "/controller-resolution/json-body",
+      '{"name":"value"}',
+    );
+    const malformed = await post(
+      port,
+      "/controller-resolution/json-body",
+      "{not json",
+    );
+
+    assert.deepEqual(valid, { status: 200, body: '{"name":"value"}' });
+    assert.equal(malformed.status, 400);
+    assert.match(malformed.body, /^Malformed request: /);
   });
 });
