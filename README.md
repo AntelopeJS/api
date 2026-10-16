@@ -119,6 +119,12 @@ export function stop(): void {}
 
 Run the project with `ajs project dev`, then call `GET http://localhost:8080/hello?name=Ada`.
 
+## Documentation
+
+- [API](https://interfaces.antelopejs.com/docs/api/introduction): the `@antelopejs/interface-api` contract this module implements
+- [API Util](https://interfaces.antelopejs.com/docs/api-util/introduction): the `@antelopejs/interface-api-util` contract this module implements
+- [Configuration](https://framework.antelopejs.com/docs/concepts/configuration): module sources, `config` blocks and config variables in `antelope.config.ts`
+
 ## Compatibility
 
 | Package                          | Supported range   |
