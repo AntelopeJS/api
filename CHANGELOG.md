@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.3.5
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.3.4...v1.3.5)
+
+### 📖 Documentation
+
+- Rewrite the README ([#64](https://github.com/AntelopeJS/api/pull/64))
+- **agents:** Simplify repository guidance ([#65](https://github.com/AntelopeJS/api/pull/65))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.3.4
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.3...v1.3.4)
