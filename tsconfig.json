@@ -17,7 +17,8 @@
     "declaration": true,
     "noEmitOnError": true,
     "sourceMap": true,
-    "useDefineForClassFields": true
+    "useDefineForClassFields": true,
+    "types": ["node", "mocha"]
   },
   "include": ["src/**/*.ts"]
 }
