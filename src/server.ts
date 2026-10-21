@@ -3,6 +3,9 @@ import { type WebSocket, WebSocketServer } from "ws";
 import { type IncomingMessage, ServerResponse } from "node:http";
 import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 
+import { gateResponse } from "./startup-gate";
+import { applyCors } from "./middlewares/cors";
+
 export type RouteCallback = (context: RequestContext) => unknown;
 interface IdentifiableRouteCallback {
   id: string;
@@ -854,6 +857,20 @@ function completeRequest(
   );
 }
 
+/**
+ * Answers a request the startup gate holds back. CORS goes first, so a
+ * browser can complete its preflight and read the 503. No route,
+ * middleware or monitor runs: modules may not be ready for them.
+ */
+function answerFromGate(requestContext: RequestContext): boolean {
+  const gated = gateResponse(requestContext);
+  if (!gated) {
+    return false;
+  }
+  replaceResponse(requestContext, applyCors(requestContext) ?? gated, 200);
+  return true;
+}
+
 function processRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -870,6 +887,13 @@ function processRequest(
     routeParameters: {},
     response: new HTTPResult(),
   };
+  if (answerFromGate(requestContext)) {
+    return handleResult(
+      req.method === "HEAD",
+      requestContext.response,
+      requestContext.rawResponse,
+    );
+  }
   const path = url.pathname.split("/").filter((part) => part);
   const method = req.method?.toLowerCase() || "get";
 
@@ -930,6 +954,11 @@ export async function upgradeListener(
     response: new HTTPResult(404, "Not Found"),
   };
 
+  if (answerFromGate(requestContext)) {
+    handleResult(false, requestContext.response, res);
+    socket.destroy();
+    return;
+  }
   const path = url.pathname.split("/").filter((part) => part);
   const method = req.method?.toLowerCase() || "get";
   let requestError: unknown;

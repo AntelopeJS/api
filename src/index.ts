@@ -8,6 +8,7 @@ import { resolveDevMode } from "./dev-mode";
 import { logServerStarted } from "./port-binding";
 import type { Config } from "./server-config";
 import { buildConfigVars } from "./config-vars";
+import { unwatchModulesLifecycle, watchModulesLifecycle } from "./startup-gate";
 import { createConfiguredServer } from "./server-factory";
 import { configure, getConfig, setCorsConfig } from "./module-config";
 
@@ -101,9 +102,13 @@ export async function construct(config: Config): Promise<void> {
     await import("@antelopejs/interface-api"),
     await import("./implementations/api"),
   );
+  watchModulesLifecycle();
+  start();
 }
 
-export function destroy(): void {}
+export function destroy(): void {
+  unwatchModulesLifecycle();
+}
 
 function closeServers(): Promise<void> {
   const closing = servers.map(
@@ -122,6 +127,10 @@ function closeServers(): Promise<void> {
  * serves them from the listening sockets. Calling it again replaces the
  * servers: the sockets stay bound and hand their connections to the new
  * ones.
+ *
+ * `construct` already calls it, so the port answers 503 with `Retry-After`
+ * until every module has started: a pending connection tells a client
+ * nothing and runs out the timeout of every proxy on the way.
  */
 export function start(): void {
   void closeServers();

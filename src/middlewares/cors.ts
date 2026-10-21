@@ -169,29 +169,39 @@ function addStandardCorsHeaders(
   addCredentialsHeader(requestContext.response, cors);
 }
 
+/**
+ * Adds the CORS headers to the response, and returns the whole response
+ * for a preflight request.
+ */
+export function applyCors(
+  requestContext: RequestContext,
+): HTTPResult | undefined {
+  const cors = resolveCorsConfig();
+
+  if (!cors) {
+    return undefined;
+  }
+
+  const requestOrigin = requestContext.rawRequest.headers.origin;
+  const isAllowed = requestOrigin
+    ? isRequestOriginAllowed(requestOrigin, cors)
+    : false;
+  const allowedOriginHeader =
+    isAllowed && requestOrigin ? requestOrigin : FALSE_ORIGIN;
+
+  if (isPreflightRequest(requestContext)) {
+    const response = new HTTPResult(204, null);
+    addPreflightHeaders(response, requestContext, allowedOriginHeader, cors);
+    return response;
+  }
+
+  addStandardCorsHeaders(requestContext, allowedOriginHeader, cors);
+  return undefined;
+}
+
 export class Cors extends Controller("") {
   @Prefix("any", "/", HandlerPriority.HIGHEST)
   cors(@Context() requestContext: RequestContext): HTTPResult | undefined {
-    const cors = resolveCorsConfig();
-
-    if (!cors) {
-      return undefined;
-    }
-
-    const requestOrigin = requestContext.rawRequest.headers.origin;
-    const isAllowed = requestOrigin
-      ? isRequestOriginAllowed(requestOrigin, cors)
-      : false;
-    const allowedOriginHeader =
-      isAllowed && requestOrigin ? requestOrigin : FALSE_ORIGIN;
-
-    if (isPreflightRequest(requestContext)) {
-      const response = new HTTPResult(204, null);
-      addPreflightHeaders(response, requestContext, allowedOriginHeader, cors);
-      return response;
-    }
-
-    addStandardCorsHeaders(requestContext, allowedOriginHeader, cors);
-    return undefined;
+    return applyCors(requestContext);
   }
 }

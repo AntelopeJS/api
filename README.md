@@ -91,6 +91,12 @@ modules: {
 
 The module binds its listening sockets before any other module constructs, so `API_PORT` is always the port the server serves.
 
+### Startup gate
+
+The port is served from `construct` on, but every request is answered `503` with the body `error.server_starting` and `Retry-After: 1` until the core announces that every module has started (`antelopejs.modules.started`). It answers `503` again from the moment modules start stopping (`antelopejs.modules.stopping`), at shutdown or before a reload. Nothing runs for a held request, so clients can retry it. CORS preflights are answered while the gate is closed, so a browser can read the `503`.
+
+`GET /_live` always answers `200`: use it as the liveness probe, and a normal route as the readiness probe.
+
 ## Quick start
 
 In the module that serves the routes, add the interface:
