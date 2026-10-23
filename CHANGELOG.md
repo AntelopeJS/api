@@ -4,6 +4,11 @@
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.4.0...v1.5.0)
 
+### Upgrade notes
+
+- `package.json` declares `antelopeJs.configVarsFile: "dist/config-vars.js"`, which exports `configVars(config)`, the pure function computing `API_PORT`, `API_LOCAL_BASE_URL` and `API_PUBLIC_BASE_URL` ([#72](https://github.com/AntelopeJS/api/pull/72)). Tools that read the project without starting it (`ajs dms build`, `ajs dms start`, dms-frontend 0.9) resolve `${@api.*}` from it. Without `publicBaseUrl`, `configVars` falls back to `API_LOCAL_BASE_URL`; `provide()` still refuses a missing `publicBaseUrl` outside development.
+- With `@antelopejs/core` 1.17.1, the startup gate closes only when the whole project stops: stopping, reloading or uninstalling one module no longer makes the api answer `503` ([#73](https://github.com/AntelopeJS/api/pull/73)). Core 1.17.0 still closes it on a single-module stop.
+
 ### 🚀 Enhancements
 
 - **config-vars:** Declare configVars as antelopeJs.configVarsFile ([#72](https://github.com/AntelopeJS/api/pull/72))
