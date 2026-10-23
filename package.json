@@ -41,14 +41,14 @@
     "knip": "knip"
   },
   "dependencies": {
-    "@antelopejs/interface-api": ">=0.0.15 <1.0.0",
+    "@antelopejs/interface-api": ">=0.0.16 <1.0.0",
     "@antelopejs/interface-api-util": "^0.1.3",
-    "@antelopejs/interface-core": ">=0.2.4 <1.0.0",
+    "@antelopejs/interface-core": ">=0.2.6 <1.0.0",
     "reflect-metadata": "^0.2.2",
     "ws": "^8.20.0"
   },
   "devDependencies": {
-    "@antelopejs/core": "^1.16.0",
+    "@antelopejs/core": "^1.17.0",
     "@antelopejs/tooling-configs": "^0.0.9",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.19.15",
@@ -64,6 +64,14 @@
     "rimraf": "^6.1.3",
     "sinon": "^21.0.3",
     "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@antelopejs/core": ">=1.17.0 <2"
+  },
+  "peerDependenciesMeta": {
+    "@antelopejs/core": {
+      "optional": true
+    }
   },
   "packageManager": "pnpm@10.6.5",
   "antelopeJs": {

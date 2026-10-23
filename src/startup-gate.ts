@@ -1,10 +1,5 @@
-import diagnostics_channel from "node:diagnostics_channel";
 import { HTTPResult, type RequestContext } from "@antelopejs/interface-api";
-
-/** Published by `@antelopejs/core` once every module has started. */
-const MODULES_STARTED_CHANNEL = "antelopejs.modules.started";
-/** Published by `@antelopejs/core` before the first module stops. */
-const MODULES_STOPPING_CHANNEL = "antelopejs.modules.stopping";
+import { Events } from "@antelopejs/interface-core/modules";
 
 /** Answers 200 whatever the gate says, so a slow start is not taken for a dead process. */
 const LIVENESS_PATH = "/_live";
@@ -26,17 +21,19 @@ function close(): void {
 }
 
 /**
- * Follows the core lifecycle: requests are served once every module has
- * started, and answered 503 again from the moment modules start stopping.
+ * Follows the core lifecycle (`Events.ModulesStarted` / `ModulesStopping`,
+ * emitted by `@antelopejs/core` 1.17 and later): requests are served once
+ * every module has started, and answered 503 again from the moment modules
+ * start stopping.
  */
 export function watchModulesLifecycle(): void {
-  diagnostics_channel.subscribe(MODULES_STARTED_CHANNEL, open);
-  diagnostics_channel.subscribe(MODULES_STOPPING_CHANNEL, close);
+  Events.ModulesStarted.register(open);
+  Events.ModulesStopping.register(close);
 }
 
 export function unwatchModulesLifecycle(): void {
-  diagnostics_channel.unsubscribe(MODULES_STARTED_CHANNEL, open);
-  diagnostics_channel.unsubscribe(MODULES_STOPPING_CHANNEL, close);
+  Events.ModulesStarted.unregister(open);
+  Events.ModulesStopping.unregister(close);
   close();
 }
 
