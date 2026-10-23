@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.4.0
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.3.5...v1.4.0)
+
+### 🚀 Enhancements
+
+- **server:** Answer 503 until every module has started ([#67](https://github.com/AntelopeJS/api/pull/67))
+- **startup-gate:** Follow core lifecycle through interface-core events ([#70](https://github.com/AntelopeJS/api/pull/70))
+
+### 📦 Build
+
+- Compile with the package's own type packages only ([#68](https://github.com/AntelopeJS/api/pull/68))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.3.5
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.4...v1.3.5)
