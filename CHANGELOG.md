@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.5.0
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.4.0...v1.5.0)
+
+### 🚀 Enhancements
+
+- **config-vars:** Declare configVars as antelopeJs.configVarsFile ([#72](https://github.com/AntelopeJS/api/pull/72))
+
+### 📖 Documentation
+
+- **changelog:** Upgrade notes for 1.4.0 ([#71](https://github.com/AntelopeJS/api/pull/71))
+- **readme:** The startup gate closes only when the whole project stops ([#73](https://github.com/AntelopeJS/api/pull/73))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.4.0
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.5...v1.4.0)
