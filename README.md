@@ -91,6 +91,8 @@ modules: {
 
 The module binds its listening sockets before any other module constructs, so `API_PORT` is always the port the server serves.
 
+The package also declares the function computing them from the configuration, `configVars` in `dist/config-vars.js`, as `antelopeJs.configVarsFile`. A tool that reads the project without running it, such as `ajs dms build`, resolves `${@api.<NAME>}` from that function: `API_PORT` is then the configured port, and `API_PUBLIC_BASE_URL` falls back to `API_LOCAL_BASE_URL` when `publicBaseUrl` is not set.
+
 ### Startup gate
 
 The port is served from `construct` on, but every request is answered `503` with the body `error.server_starting` and `Retry-After: 1` until the core announces that every module has started (`Events.ModulesStarted` of `@antelopejs/interface-core/modules`, emitted by `@antelopejs/core` 1.17 and later). It answers `503` again from the moment modules start stopping (`Events.ModulesStopping`), at shutdown or before a reload. A module that fails to start leaves the project answering `503`, and so does a `start()` that has not settled after 120 s, which fails the start. Nothing runs for a held request, so clients can retry it. CORS preflights are answered while the gate is closed, so a browser can read the `503`.

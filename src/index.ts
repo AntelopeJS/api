@@ -4,10 +4,10 @@ import { ImplementInterface } from "@antelopejs/interface-core";
 import type { ConfigVars } from "@antelopejs/interface-core/config";
 import type { DevServerEndpoint } from "@antelopejs/interface-core/runtime";
 
-import { resolveDevMode } from "./dev-mode";
+import { isDevMode, resolveDevMode } from "./dev-mode";
 import { logServerStarted } from "./port-binding";
 import type { Config } from "./server-config";
-import { buildConfigVars } from "./config-vars";
+import { assertPublicBaseUrl, configVars } from "./config-vars";
 import { unwatchModulesLifecycle, watchModulesLifecycle } from "./startup-gate";
 import { createConfiguredServer } from "./server-factory";
 import { configure, getConfig, setCorsConfig } from "./module-config";
@@ -71,7 +71,8 @@ async function publishConfigVars(): Promise<ConfigVars> {
   await bindConfiguredPorts();
 
   try {
-    return buildConfigVars(getConfig());
+    assertPublicBaseUrl(getConfig(), isDevMode());
+    return configVars(getConfig());
   } catch (error) {
     await releaseListeners();
     throw error;
