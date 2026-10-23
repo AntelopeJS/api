@@ -1,23 +1,19 @@
 import assert from "node:assert";
-import diagnostics_channel from "node:diagnostics_channel";
 import { createServer, type Server } from "node:http";
 import { HandlerPriority } from "@antelopejs/interface-api";
+import { Events } from "@antelopejs/interface-core/modules";
 
 import { configure, getConfig } from "../index";
 import { registerHandler, requestListener, unregisterHandler } from "../server";
 
-const STARTED_CHANNEL = "antelopejs.modules.started";
-const STOPPING_CHANNEL = "antelopejs.modules.stopping";
 const ALLOWED_ORIGIN = "https://app.example.com";
 const HANDLER_ID = "startup-gate-handler";
 
-function announce(channelName: string): void {
-  diagnostics_channel.channel(channelName).publish({});
-}
+const announceStarted = (): void => Events.ModulesStarted.emit();
+const announceStopping = (): void => Events.ModulesStopping.emit();
 
-// The core under test may predate the lifecycle channels: every other suite
-// expects the project to have started.
-before(() => announce(STARTED_CHANNEL));
+// Every other suite expects the project to have started.
+before(announceStarted);
 
 describe("Startup gate", () => {
   let server: Server;
@@ -51,13 +47,13 @@ describe("Startup gate", () => {
 
   beforeEach(() => {
     handlerCalls = 0;
-    announce(STOPPING_CHANNEL);
+    announceStopping();
   });
 
   after(async () => {
     unregisterHandler(HANDLER_ID);
     configure(originalConfig);
-    announce(STARTED_CHANNEL);
+    announceStarted();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
@@ -71,9 +67,9 @@ describe("Startup gate", () => {
   });
 
   it("opens once modules started and closes again when they stop", async () => {
-    announce(STARTED_CHANNEL);
+    announceStarted();
     const opened = await fetch(`${baseUrl}/gated`);
-    announce(STOPPING_CHANNEL);
+    announceStopping();
     const closed = await fetch(`${baseUrl}/gated`);
 
     assert.equal(opened.status, 200);
