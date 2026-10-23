@@ -4,6 +4,12 @@
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.3.5...v1.4.0)
 
+### ⚠️ Upgrade notes
+
+- **api 1.4.0 requires `@antelopejs/core` 1.17.0** (and `@antelopejs/interface-core` >=0.2.6): the startup gate opens on `Events.ModulesStarted`, which only core 1.17.0 emits. With an older core, every request stays answered `503 error.server_starting`.
+- A module that fails to start leaves the project answering `503`.
+- A module whose `start()` has not settled after 120 s fails the start, so the project keeps answering `503`.
+
 ### 🚀 Enhancements
 
 - **server:** Answer 503 until every module has started ([#67](https://github.com/AntelopeJS/api/pull/67))
