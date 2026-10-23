@@ -18,7 +18,7 @@ import {
   API_LOCAL_BASE_URL,
   API_PORT,
   API_PUBLIC_BASE_URL,
-  buildConfigVars,
+  configVars,
   MissingPublicBaseUrlError,
 } from "../config-vars";
 import {
@@ -50,6 +50,10 @@ const PUBLIC_BASE_URL = "https://api.example.com";
 interface LocalHostCase {
   bindHost?: string;
   urlHost: string;
+}
+
+interface PackageManifest {
+  antelopeJs: { configVarsFile: string };
 }
 
 interface PortInUseError {
@@ -105,7 +109,7 @@ describe("Published config variables", () => {
   });
 
   it("derives every variable from the first configured server", () => {
-    const vars = buildConfigVars({
+    const vars = configVars({
       publicBaseUrl: PUBLIC_BASE_URL,
       servers: [
         { protocol: "http", host: TEST_HOST, port: BOUND_FREE_PORT },
@@ -134,7 +138,7 @@ describe("Published config variables", () => {
     ];
 
     for (const { bindHost, urlHost } of hostCases) {
-      const vars = buildConfigVars({
+      const vars = configVars({
         publicBaseUrl: PUBLIC_BASE_URL,
         servers: [{ protocol: "http", host: bindHost, port: BOUND_FREE_PORT }],
       });
@@ -148,7 +152,7 @@ describe("Published config variables", () => {
   });
 
   it("follows the protocol of the first configured server", () => {
-    const vars = buildConfigVars({
+    const vars = configVars({
       publicBaseUrl: PUBLIC_BASE_URL,
       servers: [{ protocol: "https", host: TEST_HOST, port: SECONDARY_PORT }],
     });
@@ -159,34 +163,25 @@ describe("Published config variables", () => {
     );
   });
 
-  it("defaults the public base url to the local one in development", () => {
-    setDevMode(true);
-
-    const vars = buildConfigVars({
+  it("falls back to the local base url when no public base url is configured", () => {
+    const vars = configVars({
       servers: [{ protocol: "http", host: TEST_HOST, port: BOUND_FREE_PORT }],
     });
 
     assert.equal(vars[API_PUBLIC_BASE_URL], vars[API_LOCAL_BASE_URL]);
   });
 
-  it("rejects a missing public base url outside of development", () => {
-    setDevMode(false);
+  it("declares the file of its pure config variables function", () => {
+    const manifest = require("../../package.json") as PackageManifest;
+    const declared = require(
+      `../../${manifest.antelopeJs.configVarsFile}`,
+    ) as typeof import("../config-vars");
 
-    assert.throws(
-      () =>
-        buildConfigVars({
-          servers: [
-            { protocol: "http", host: TEST_HOST, port: BOUND_FREE_PORT },
-          ],
-        }),
-      (error: unknown) =>
-        error instanceof MissingPublicBaseUrlError &&
-        error.message.includes("publicBaseUrl"),
-    );
+    assert.equal(declared.configVars, configVars);
   });
 
   it("strips trailing slashes from the configured public base url", () => {
-    const vars = buildConfigVars({
+    const vars = configVars({
       publicBaseUrl: `${PUBLIC_BASE_URL}//`,
       servers: [{ protocol: "http", host: TEST_HOST, port: BOUND_FREE_PORT }],
     });
@@ -445,7 +440,7 @@ describe("Advertised host agreement", () => {
     const loopbackHosts = [undefined, "0.0.0.0", "::", "[::]"];
 
     for (const host of loopbackHosts) {
-      const vars = buildConfigVars({
+      const vars = configVars({
         publicBaseUrl: PUBLIC_BASE_URL,
         servers: [{ protocol: "http", host, port: BOUND_FREE_PORT }],
       });
@@ -468,7 +463,7 @@ describe("Advertised host agreement", () => {
         ];
 
         const [endpoint] = collectListeningEndpoints([server], servers);
-        const vars = buildConfigVars({
+        const vars = configVars({
           publicBaseUrl: PUBLIC_BASE_URL,
           servers,
         });

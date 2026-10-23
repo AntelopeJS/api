@@ -84,6 +84,7 @@
       "API_LOCAL_BASE_URL",
       "API_PUBLIC_BASE_URL"
     ],
+    "configVarsFile": "dist/config-vars.js",
     "test": "src/test/antelope.test.ts",
     "defaultConfig": {
       "servers": [
