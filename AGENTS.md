@@ -5,7 +5,7 @@ The HTTP and WebSocket server module of AntelopeJS, published as `@antelopejs/ap
 ## Layout
 
 - `src/index.ts` is the module entry (`provide`, `construct`, `start`, `stop`, `destroy`); `src/implementations/api` binds the interface-api proxies, and `src/middlewares/cors.ts` holds CORS.
-- `src/config-vars.ts` compiles to `dist/config-vars.js`, which `antelopeJs.configVarsFile` names. Tools load it by path without starting the project to resolve `${@api.API_PORT}`, `${@api.API_LOCAL_BASE_URL}` and `${@api.API_PUBLIC_BASE_URL}`, so keep it a pure function of the module config. Renaming it or a config var is a breaking change.
+- `src/config-vars.ts` compiles to `dist/config-vars.js`, which `antelopeJs.configVarsFile` names. Tools load it by path without starting the project to resolve `${@api.API_PORT}`, `${@api.API_LOCAL_BASE_URL}` and `${@api.API_PUBLIC_BASE_URL}`, so keep it a pure function of the module config. Renaming a config var, or the `configVarsFile` entry, is a breaking change.
 - `playground/` is a pnpm workspace package: a project that loads this module from `..`. It is not part of the published package.
 
 ## Versioning
