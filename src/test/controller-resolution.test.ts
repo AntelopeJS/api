@@ -54,16 +54,19 @@ function createController(): ControllerConstructor {
 
 function statefulThenable(value: string): StatefulThenable {
   let reads = 0;
-  const thenable = Object.create(null);
-  Object.defineProperty(thenable, THEN_PROPERTY, {
-    get: () => {
-      reads += 1;
-      if (reads > 1) {
-        throw new Error("then getter read more than once");
-      }
-      return (resolve: (resolved: string) => unknown) => resolve(value);
+  const thenable = Object.defineProperty<PromiseLike<string>>(
+    Object.create(null),
+    THEN_PROPERTY,
+    {
+      get: () => {
+        reads += 1;
+        if (reads > 1) {
+          throw new Error("then getter read more than once");
+        }
+        return (resolve: (resolved: string) => void) => resolve(value);
+      },
     },
-  });
+  );
   return { readCount: () => reads, value: thenable };
 }
 
@@ -90,7 +93,7 @@ function listen(server: Server): Promise<number> {
   return new Promise((resolve) => {
     server.listen(0, TEST_HOST, () => {
       const address = server.address();
-      if (!address || typeof address === "string") {
+      if (!(address instanceof Object)) {
         throw new Error("Unable to resolve test server port");
       }
       resolve(address.port);
@@ -131,7 +134,7 @@ async function post(
 function jsonBodyParameter(): ComputedParameter {
   const Controller = createController();
   JSONBody()(Controller.prototype, "handle", 0);
-  const metadata = GetMetadata(Controller, ControllerMeta) as ControllerMeta;
+  const metadata = GetMetadata(Controller, ControllerMeta);
   return metadata.computed_params.handle[0];
 }
 
@@ -336,7 +339,7 @@ describe("Controller resolution", () => {
         [
           async function (this: TestController, _context, value) {
             this.sequence += 1;
-            return `${value}:computed`;
+            return `${String(value)}:computed`;
           },
         ],
       ),
@@ -390,11 +393,11 @@ describe("Controller resolution", () => {
             [
               function (this: TestController, _context, value) {
                 this.sequence += 1;
-                return `${value}:first`;
+                return `${String(value)}:first`;
               },
               function (this: TestController, _context, value) {
                 this.sequence += 1;
-                return `${value}:second`;
+                return `${String(value)}:second`;
               },
             ],
           ),
@@ -422,11 +425,11 @@ describe("Controller resolution", () => {
         }, [
           (_context, value) => {
             events.push("async");
-            return Promise.resolve(`${value}:async`);
+            return Promise.resolve(`${String(value)}:async`);
           },
           (_context, value) => {
             events.push("remaining");
-            return `${value}:remaining`;
+            return `${String(value)}:remaining`;
           },
         ]),
       ]),
@@ -484,7 +487,7 @@ describe("Controller resolution", () => {
     register({
       ...createHandler(
         Controller,
-        (body: unknown) => JSON.stringify(body),
+        (body) => JSON.stringify(body),
         "/controller-resolution/json-body",
         [jsonBodyParameter()],
       ),

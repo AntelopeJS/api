@@ -8,7 +8,7 @@ import * as coreRuntime from "@antelopejs/interface-core/runtime";
 import type { Config } from "../server-config";
 import { CONNECTION_GRACE_PERIOD_MS } from "../port-listener";
 import {
-  type RequestContext,
+  type RouteCallback,
   registerHandler,
   unregisterHandler,
 } from "../server";
@@ -38,7 +38,6 @@ const STOP_MARGIN_MS = 1000;
 const STOP_DEADLINE_MS = CONNECTION_GRACE_PERIOD_MS + STOP_MARGIN_MS;
 
 type RouteMode = "handler" | "websocket";
-type RouteCallback = (context: RequestContext) => unknown;
 
 interface CapturedResponse {
   status: number;
@@ -193,7 +192,8 @@ describe("Stopping with open connections", () => {
 
   it("ends an open websocket within the grace period", async () => {
     register("websocket", SOCKET_PATH, (context) => {
-      (context.connection as WebSocket).send("connected");
+      assert.ok(context.connection);
+      context.connection.send("connected");
     });
     await serve(WEBSOCKET_PORT);
     const socket = await openWebSocket(WEBSOCKET_PORT);

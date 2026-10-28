@@ -12,6 +12,7 @@ import {
   stop,
 } from "../index";
 
+const PORT_IN_USE = { code: "EADDRINUSE" };
 const TEST_HOST = "127.0.0.1";
 const FALLBACK_BASE_PORT = 25040;
 const EXPLICIT_FALSE_PORT = 25060;
@@ -24,10 +25,6 @@ const MULTI_OCCUPIED_PORT = 25140;
 const MULTI_FREE_PORT = 25150;
 const STRING_PORT = 25160;
 const RANDOM_PORT = 0;
-
-interface PortInUseError {
-  code?: string;
-}
 
 function occupyPort(port: number): Promise<net.Server> {
   return new Promise((resolve, reject) => {
@@ -50,10 +47,6 @@ function configureSingleServer(port: number, strictPort?: boolean): void {
     servers: [{ protocol: "http", host: TEST_HOST, port }],
   });
   start();
-}
-
-function isPortInUseError(error: unknown): boolean {
-  return (error as PortInUseError).code === "EADDRINUSE";
 }
 
 function stubRuntime(dev: boolean): sinon.SinonStub {
@@ -161,7 +154,7 @@ describe("Port fallback", () => {
 
     configureSingleServer(STRICT_PORT, true);
 
-    await assert.rejects(listenServers(), isPortInUseError);
+    await assert.rejects(listenServers(), PORT_IN_USE);
   });
 
   it("binds the requested port when strictPort is enabled and the port is free", async () => {
@@ -182,7 +175,7 @@ describe("Port fallback", () => {
 
     configureSingleServer(PROD_PORT);
 
-    await assert.rejects(listenServers(), isPortInUseError);
+    await assert.rejects(listenServers(), PORT_IN_USE);
   });
 
   it("reports actual endpoints when listening on a random port", async () => {

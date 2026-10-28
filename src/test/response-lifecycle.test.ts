@@ -1,9 +1,10 @@
+import sinon from "sinon";
 import assert from "node:assert";
 import * as http from "node:http";
 import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 
 import {
-  type RequestContext,
+  type RouteCallback,
   registerHandler,
   requestListener,
   unregisterHandler,
@@ -22,7 +23,7 @@ interface CapturedResponse {
 function register(
   mode: "prefix" | "postfix" | "handler" | "monitor",
   path: string,
-  callback: (context: RequestContext) => unknown,
+  callback: RouteCallback,
 ) {
   const id = `${mode}-${path}-${registeredHandlers.length}`;
   registeredHandlers.push(id);
@@ -34,7 +35,7 @@ function listen(server: http.Server): Promise<number> {
     server.once("error", reject);
     server.listen(0, HOST, () => {
       const address = server.address();
-      assert.ok(address && typeof address === "object");
+      assert.ok(address instanceof Object);
       resolve(address.port);
     });
   });
@@ -87,18 +88,13 @@ describe("HTTP response lifecycle", () => {
     let contextResponse: HTTPResult | undefined;
     let initialStatus = 0;
     let initialBody: unknown;
-    let headerReads = 0;
-    const originalGetHeaders = HTTPResult.prototype.getHeaders;
+    const getHeaders = sinon.spy(HTTPResult.prototype, "getHeaders");
     register("handler", path, (context) => {
       contextResponse = context.response;
       initialStatus = context.response.getStatus();
       initialBody = context.response.getBody();
       return { ok: true };
     });
-    HTTPResult.prototype.getHeaders = function getHeaders() {
-      headerReads += 1;
-      return originalGetHeaders.call(this);
-    };
 
     try {
       const response = await request(port, path);
@@ -108,29 +104,24 @@ describe("HTTP response lifecycle", () => {
       assert.equal(initialBody, "");
       assert.equal(contextResponse?.getStatus(), 200);
       assert.equal(contextResponse?.getBody(), '{"ok":true}');
-      assert.equal(headerReads, 0);
+      assert.equal(getHeaders.callCount, 0);
     } finally {
-      HTTPResult.prototype.getHeaders = originalGetHeaders;
+      getHeaders.restore();
     }
   });
 
   it("uses the published non-allocating header lookup", async () => {
     const path = `${ROUTE_ROOT}/peek-headers`;
-    let headerReads = 0;
-    const originalGetHeaders = HTTPResult.prototype.getHeaders;
+    const getHeaders = sinon.spy(HTTPResult.prototype, "getHeaders");
     register("handler", path, () => new HTTPResult(203, "result"));
-    HTTPResult.prototype.getHeaders = function getHeaders() {
-      headerReads += 1;
-      return originalGetHeaders.call(this);
-    };
 
     try {
       const response = await request(port, path);
       assert.equal(response.status, 203);
       assert.equal(response.body, "result");
-      assert.equal(headerReads, 0);
+      assert.equal(getHeaders.callCount, 0);
     } finally {
-      HTTPResult.prototype.getHeaders = originalGetHeaders;
+      getHeaders.restore();
     }
   });
 

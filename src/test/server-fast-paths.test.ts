@@ -29,7 +29,7 @@ function listen(server: Server): Promise<number> {
     server.once("error", reject);
     server.listen(0, TEST_HOST, () => {
       const address = server.address();
-      if (!address || typeof address === "string") {
+      if (!(address instanceof Object)) {
         reject(new Error("Test server did not bind a TCP port"));
         return;
       }

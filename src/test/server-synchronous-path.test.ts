@@ -7,7 +7,7 @@ import { execFile } from "node:child_process";
 import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 
 import {
-  type RequestContext,
+  type RouteCallback,
   registerHandler,
   requestListener,
   unregisterHandler,
@@ -37,37 +37,46 @@ interface StatefulThenable {
 }
 
 function immediateThenable<T>(value: T): PromiseLike<T> {
-  const thenable = Object.create(null);
-  Object.defineProperty(thenable, THEN_PROPERTY, {
-    value: (resolve: (resolved: T) => unknown) => resolve(value),
-  });
-  return thenable as PromiseLike<T>;
+  return Object.defineProperty<PromiseLike<T>>(
+    Object.create(null),
+    THEN_PROPERTY,
+    {
+      value: (resolve: (resolved: T) => void) => resolve(value),
+    },
+  );
 }
 
-function rejectedThenable(error: unknown): PromiseLike<never> {
-  const thenable = Object.create(null);
-  Object.defineProperty(thenable, THEN_PROPERTY, {
-    value: (_resolve: unknown, reject: (reason: unknown) => unknown) =>
-      reject(error),
-  });
-  return thenable as PromiseLike<never>;
+function rejectedThenable(error: Error): PromiseLike<never> {
+  return Object.defineProperty<PromiseLike<never>>(
+    Object.create(null),
+    THEN_PROPERTY,
+    {
+      value: (
+        _resolve: (resolved: never) => void,
+        reject: (reason: Error) => void,
+      ) => reject(error),
+    },
+  );
 }
 
 function statefulThenable(value: string): StatefulThenable {
   let readCount = 0;
-  const thenable = Object.create(null);
-  Object.defineProperty(thenable, THEN_PROPERTY, {
-    get: () => {
-      readCount += 1;
-      if (readCount > 1) {
-        throw new Error("then getter read more than once");
-      }
-      return (resolve: (resolved: string) => unknown) => resolve(value);
+  const thenable = Object.defineProperty<PromiseLike<string>>(
+    Object.create(null),
+    THEN_PROPERTY,
+    {
+      get: () => {
+        readCount += 1;
+        if (readCount > 1) {
+          throw new Error("then getter read more than once");
+        }
+        return (resolve: (resolved: string) => void) => resolve(value);
+      },
     },
-  });
+  );
   return {
     getReadCount: () => readCount,
-    value: thenable as PromiseLike<string>,
+    value: thenable,
   };
 }
 
@@ -75,7 +84,7 @@ function listen(server: http.Server): Promise<number> {
   return new Promise((resolve) => {
     server.listen(0, TEST_HOST, () => {
       const address = server.address();
-      if (!address || typeof address === "string") {
+      if (!(address instanceof Object)) {
         throw new Error("Expected an IP server address");
       }
       resolve(address.port);
@@ -153,7 +162,7 @@ describe("Synchronous HTTP request path", () => {
     mode: "prefix" | "postfix" | "handler" | "monitor" | "websocket",
     method: string | undefined,
     location: string,
-    callback: (context: RequestContext) => unknown,
+    callback: RouteCallback,
     priority = HandlerPriority.NORMAL,
   ): void {
     routeIds.push(id);
@@ -296,8 +305,11 @@ describe("Synchronous HTTP request path", () => {
     assert.equal(rejected.body, "async failure");
     assert.equal(thenable.status, SERVER_ERROR_STATUS);
     assert.equal(thenable.body, "thenable failure");
-    assert.equal((errors[0] as Error).message, "sync failure");
-    assert.equal((errors[1] as Error).message, "async failure");
+    const [syncError, asyncError] = errors;
+    assert.ok(syncError instanceof Error);
+    assert.equal(syncError.message, "sync failure");
+    assert.ok(asyncError instanceof Error);
+    assert.equal(asyncError.message, "async failure");
   });
 
   it("isolates monitor failures and continues remaining monitors", async () => {
@@ -393,7 +405,8 @@ describe("Synchronous HTTP request path", () => {
     });
     register("ws-handler", "websocket", "GET", "/socket", (context) => {
       order.push("handler");
-      (context.connection as WebSocket).send("connected");
+      assert.ok(context.connection);
+      context.connection.send("connected");
     });
     register("ws-monitor", "monitor", "GET", "/socket", () => {
       order.push("monitor");
@@ -401,7 +414,7 @@ describe("Synchronous HTTP request path", () => {
 
     const message = await new Promise<string>((resolve, reject) => {
       const socket = new WebSocket(`ws://${TEST_HOST}:${port}/socket`);
-      socket.on("message", (data) => {
+      socket.on("message", (data: Buffer) => {
         resolve(data.toString());
         socket.close();
       });

@@ -12,7 +12,14 @@ import type {
   SocketProtocol,
 } from "./server-config";
 
-type ServerFactory = (config: ServerConfig) => net.Server;
+interface ConfigByProtocol {
+  http: HTTPConfig;
+  https: HTTPSConfig;
+}
+
+type ServerFactories = {
+  [P in ServerProtocol]: (config: ConfigByProtocol[P]) => net.Server;
+};
 
 function attachServerListeners(
   server: net.Server,
@@ -43,11 +50,17 @@ function createHTTPSServer(config: HTTPSConfig): net.Server {
   return server;
 }
 
-const SERVER_FACTORY_BY_PROTOCOL: Record<ServerProtocol, ServerFactory> = {
-  http: (config) => createHTTPServer(config as HTTPConfig),
-  https: (config) => createHTTPSServer(config as HTTPSConfig),
+const SERVER_FACTORY_BY_PROTOCOL: ServerFactories = {
+  http: (config) => createHTTPServer(config),
+  https: (config) => createHTTPSServer(config),
 };
 
-export function createConfiguredServer(config: ServerConfig): net.Server {
+function createServerFor<P extends ServerProtocol>(
+  config: ConfigByProtocol[P] & { protocol: P },
+): net.Server {
   return SERVER_FACTORY_BY_PROTOCOL[config.protocol](config);
+}
+
+export function createConfiguredServer(config: ServerConfig): net.Server {
+  return createServerFor(config);
 }

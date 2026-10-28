@@ -5,15 +5,27 @@ import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 
 import { gateResponse } from "./startup-gate";
 import { applyCors } from "./middlewares/cors";
+import { type Awaitable, pendingOf } from "./thenable";
 
-export type RouteCallback = (context: RequestContext) => unknown;
+/** What a route returns: the body of the response it answers with, or an `HTTPResult`. */
+export type RouteResult = ConstructorParameters<typeof HTTPResult>[1];
+
+export type RouteCallback = (context: RequestContext) => Awaitable<RouteResult>;
 interface IdentifiableRouteCallback {
   id: string;
   callback: RouteCallback;
   priority: HandlerPriority;
 }
 
-type HandlerMode = "prefix" | "postfix" | "handler" | "monitor" | "websocket";
+const HANDLER_MODES = [
+  "handler",
+  "prefix",
+  "postfix",
+  "monitor",
+  "websocket",
+] as const;
+
+type HandlerMode = (typeof HANDLER_MODES)[number];
 type MiddlewareMode = "prefix" | "postfix";
 
 interface IndexedRouteCallback extends IdentifiableRouteCallback {
@@ -27,7 +39,7 @@ export interface RequestContext {
   routeParameters: Record<string, string>;
   response: HTTPResult;
   error?: unknown;
-  connection?: unknown;
+  connection?: WebSocket;
 }
 
 interface DynamicRoute {
@@ -80,16 +92,7 @@ type HandlerLookupResult =
   | RouteCallback
   | HandlerResult[]
   | undefined;
-type Awaitable<T> = T | PromiseLike<T>;
-type ThenCallback = (
-  onfulfilled: (value: unknown) => unknown,
-  onrejected: (reason: unknown) => unknown,
-) => unknown;
 type ExactHandlerIndex = Record<string, Map<string, RouteCallback>>;
-
-interface PromiseLikeValue {
-  then?: unknown;
-}
 
 const exactHandlerIndexes = new WeakMap<
   Record<string, RouteLevel>,
@@ -536,10 +539,10 @@ export function registerHandler(
 }
 
 export function unregisterHandler(id: string) {
-  for (const [mode, source] of Object.entries(roots)) {
-    const removedCount = removeHandler(id, source);
+  for (const mode of HANDLER_MODES) {
+    const removedCount = removeHandler(id, roots[mode]);
     if (removedCount > 0) {
-      handlerCounts[mode as HandlerMode] -= removedCount;
+      handlerCounts[mode] -= removedCount;
       return;
     }
   }
@@ -557,9 +560,15 @@ function handleResult(
   }
 }
 
-function extractError(error: unknown) {
-  if (typeof error === "object" && error && "message" in error) {
-    return (error as { message?: unknown }).message ?? error;
+function hasMessage(
+  error: RequestContext["error"],
+): error is { message: RouteResult } {
+  return typeof error === "object" && error !== null && "message" in error;
+}
+
+function extractError(error: RequestContext["error"]) {
+  if (hasMessage(error)) {
+    return error.message ?? error;
   }
   return error;
 }
@@ -575,7 +584,7 @@ function copyHeaders(source: HTTPResult, target: HTTPResult) {
 
 function replaceResponse(
   requestContext: RequestContext,
-  result: unknown,
+  result: RouteResult,
   status: number,
 ) {
   const previousResponse = requestContext.response;
@@ -585,7 +594,10 @@ function replaceResponse(
   requestContext.response = response;
 }
 
-function setHandlerResponse(requestContext: RequestContext, result: unknown) {
+function setHandlerResponse(
+  requestContext: RequestContext,
+  result: RouteResult,
+) {
   if (requestContext.response.isStream()) {
     return;
   }
@@ -616,60 +628,40 @@ function getMultiHandlers(
   return Array.isArray(handlers) ? handlers : [];
 }
 
+function isRouteCallback(
+  handler: HandlerResult | RouteCallback,
+): handler is RouteCallback {
+  return typeof handler === "function";
+}
+
 function executeHandler(
   handler: HandlerResult | RouteCallback,
   requestContext: RequestContext,
 ) {
-  if (typeof handler === "function") {
+  if (isRouteCallback(handler)) {
     return handler(requestContext);
   }
   requestContext.routeParameters = handler.parameters;
   return handler.handler(requestContext);
 }
 
-function getThen(value: unknown): ThenCallback | undefined {
-  if (
-    value === null ||
-    (typeof value !== "object" && typeof value !== "function")
-  ) {
-    return;
-  }
-  const then = (value as PromiseLikeValue).then;
-  return typeof then === "function" ? (then as ThenCallback) : undefined;
-}
-
-function resolveThenable(value: unknown, then: ThenCallback): Promise<unknown> {
-  if (value instanceof Promise) {
-    return value;
-  }
-  return new Promise((resolve, reject) => {
-    queueMicrotask(() => {
-      try {
-        then.call(value, resolve, reject);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  });
-}
-
-function continueExecution<T, U>(
-  value: Awaitable<T>,
-  next: (result: T) => Awaitable<U>,
+function continueExecution<U>(
+  value: Awaitable<RouteResult>,
+  next: (result: RouteResult) => Awaitable<U>,
 ): Awaitable<U> {
-  const then = getThen(value);
-  if (then) {
+  const pending = pendingOf(value);
+  if (pending) {
     // oxlint-disable-next-line promise/no-callback-in-promise -- continuation-passing keeps the synchronous fast path allocation-free
-    return resolveThenable(value, then).then((result) => next(result as T));
+    return pending.then((result) => next(result));
   }
-  return next(value as T);
+  return next(value);
 }
 
 function executePriorityHandlers(
   handlers: HandlerResult[],
   requestContext: RequestContext,
   startIndex = 0,
-): Awaitable<unknown> {
+): Awaitable<RouteResult> {
   if (startIndex === 0 && handlers.length > 1) {
     handlers.sort((a, b) => a.priority - b.priority);
   }
@@ -677,9 +669,9 @@ function executePriorityHandlers(
     const { handler, parameters } = handlers[index];
     requestContext.routeParameters = parameters;
     const result = handler(requestContext);
-    const then = getThen(result);
-    if (then) {
-      return resolveThenable(result, then).then((resolved) =>
+    const pending = pendingOf(result);
+    if (pending) {
+      return pending.then((resolved) =>
         resolved
           ? resolved
           : executePriorityHandlers(handlers, requestContext, index + 1),
@@ -697,7 +689,7 @@ function executeMiddleware(
   method: string,
   path: string[],
   requestContext: RequestContext,
-): Awaitable<unknown> {
+): Awaitable<RouteResult> {
   if (handlerCounts[mode] === 0) {
     return undefined;
   }
@@ -721,9 +713,9 @@ function runMonitors(
     monitorContext.routeParameters = parameters;
     try {
       const result = handler(monitorContext);
-      const then = getThen(result);
-      if (then) {
-        return resolveThenable(result, then).then(
+      const pending = pendingOf(result);
+      if (pending) {
+        return pending.then(
           () => runMonitors(monitors, monitorContext, index + 1),
           (error) => {
             console.error(error);
@@ -759,7 +751,7 @@ function executeMonitors(
 
 function setMiddlewareResponse(
   requestContext: RequestContext,
-  result: unknown,
+  result: RouteResult,
 ): void {
   if (!result) {
     return;
@@ -836,7 +828,7 @@ function executeRequest(
 
 function completeRequest(
   didFail: boolean,
-  error: unknown,
+  error: RequestContext["error"],
   method: string,
   path: string[],
   requestContext: RequestContext,
@@ -902,9 +894,9 @@ function processRequest(
       url.pathname,
       requestContext,
     );
-    const then = getThen(execution);
-    if (then) {
-      return resolveThenable(execution, then).then(
+    const pending = pendingOf(execution);
+    if (pending) {
+      return pending.then(
         () => completeRequest(false, undefined, method, path, requestContext),
         (error) => completeRequest(true, error, method, path, requestContext),
       );
@@ -982,7 +974,9 @@ export async function upgradeListener(
         path,
         requestContext,
       );
-      const prefixResult = prefixExecution ? await prefixExecution : undefined;
+      const prefixResult = prefixExecution
+        ? await Promise.resolve(prefixExecution)
+        : undefined;
       if (prefixResult) {
         setMiddlewareResponse(requestContext, prefixResult);
         mustSendResponse = true;

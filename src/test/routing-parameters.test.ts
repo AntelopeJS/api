@@ -1,6 +1,5 @@
 import assert from "node:assert";
 import * as http from "node:http";
-import type { AddressInfo } from "node:net";
 import { HandlerPriority } from "@antelopejs/interface-api";
 
 import {
@@ -42,7 +41,8 @@ describe("Compiled route parameter extraction", () => {
     await new Promise<void>((resolve) =>
       testServer.listen(0, "127.0.0.1", resolve),
     );
-    const address = testServer.address() as AddressInfo;
+    const address = testServer.address();
+    assert.ok(address instanceof Object);
     baseUrl = `http://127.0.0.1:${address.port}`;
   });
 
