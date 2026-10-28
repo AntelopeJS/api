@@ -1,7 +1,6 @@
 {
   "rules": {
     "antelopejs/no-comments": 11,
-    "antelopejs/require-assertion": 1,
     "anti-slop/no-chained-type-assertions": 3,
     "anti-slop/no-known-value-widening": 4,
     "anti-slop/no-runtime-typeof": 16,
