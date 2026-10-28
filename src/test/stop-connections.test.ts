@@ -127,7 +127,16 @@ describe("Stopping with open connections", () => {
   function register(mode: RouteMode, path: string, callback: RouteCallback) {
     const id = `stop-connections-${registeredIds.length}`;
     registeredIds.push(id);
-    registerHandler(id, mode, "get", path, callback, HandlerPriority.NORMAL);
+    registerHandler(
+      id,
+      {
+        mode: mode,
+        method: "get",
+        location: path,
+        priority: HandlerPriority.NORMAL,
+      },
+      callback,
+    );
   }
 
   before(() => {

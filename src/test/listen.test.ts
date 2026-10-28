@@ -73,37 +73,15 @@ async function waitForListening(): Promise<void> {
   }
 }
 
-describe("Port fallback", () => {
-  const blockers: net.Server[] = [];
-  let originalConfig: ReturnType<typeof getConfig>;
+const blockers: net.Server[] = [];
 
-  async function blockPort(port: number): Promise<void> {
-    blockers.push(await occupyPort(port));
-  }
+let originalConfig: ReturnType<typeof getConfig>;
 
-  before(() => {
-    originalConfig = getConfig();
-  });
+async function blockPort(port: number): Promise<void> {
+  blockers.push(await occupyPort(port));
+}
 
-  after(async () => {
-    if (!originalConfig.servers?.length) {
-      return;
-    }
-
-    configure(originalConfig);
-    start();
-    if (originalConfig.autoListen !== false) {
-      await waitForListening();
-    }
-  });
-
-  afterEach(async () => {
-    await stop();
-    sinon.restore();
-    await Promise.all(blockers.map((blocker) => closeServer(blocker)));
-    blockers.length = 0;
-  });
-
+function fallbackCases(): void {
   it("falls back to the next available port in dev runtime", async () => {
     const registerStub = stubRuntime(true);
     await blockPort(FALLBACK_BASE_PORT);
@@ -191,7 +169,9 @@ describe("Port fallback", () => {
     assert.equal(endpoints[0].host, TEST_HOST);
     assert.equal(getConfig().servers?.[0].port, endpoints[0].port);
   });
+}
 
+function portSelectionCases(): void {
   it("binds a single random port when port 0 is requested in dev runtime", async () => {
     stubRuntime(true);
 
@@ -267,4 +247,32 @@ describe("Port fallback", () => {
 
     assert.deepEqual(getListeningEndpoints(), []);
   });
+}
+
+describe("Port fallback", () => {
+  before(() => {
+    originalConfig = getConfig();
+  });
+
+  after(async () => {
+    if (!originalConfig.servers?.length) {
+      return;
+    }
+
+    configure(originalConfig);
+    start();
+    if (originalConfig.autoListen !== false) {
+      await waitForListening();
+    }
+  });
+
+  afterEach(async () => {
+    await stop();
+    sinon.restore();
+    await Promise.all(blockers.map((blocker) => closeServer(blocker)));
+    blockers.length = 0;
+  });
+
+  fallbackCases();
+  portSelectionCases();
 });

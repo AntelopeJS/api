@@ -27,7 +27,16 @@ function register(
 ) {
   const id = `${mode}-${path}-${registeredHandlers.length}`;
   registeredHandlers.push(id);
-  registerHandler(id, mode, "get", path, callback, HandlerPriority.NORMAL);
+  registerHandler(
+    id,
+    {
+      mode: mode,
+      method: "get",
+      location: path,
+      priority: HandlerPriority.NORMAL,
+    },
+    callback,
+  );
 }
 
 function listen(server: http.Server): Promise<number> {
@@ -65,24 +74,11 @@ function request(port: number, path: string, method = "GET") {
   });
 }
 
-describe("HTTP response lifecycle", () => {
-  let server: http.Server;
-  let port: number;
+let server: http.Server;
 
-  before(async () => {
-    server = http.createServer(
-      (req, res) => void requestListener(req, res, "http"),
-    );
-    port = await listen(server);
-  });
+let port: number;
 
-  after(async () => {
-    for (const id of registeredHandlers) {
-      unregisterHandler(id);
-    }
-    await close(server);
-  });
-
+function headerCases(): void {
   it("reuses the matched route response without observing headers", async () => {
     const path = `${ROUTE_ROOT}/common`;
     let contextResponse: HTTPResult | undefined;
@@ -157,7 +153,9 @@ describe("HTTP response lifecycle", () => {
     assert.equal(response.body, '{"created":true}');
     assert.equal(response.headers["content-type"], "application/json");
   });
+}
 
+function responseOutcomeCases(): void {
   it("creates the Not Found response only for a route miss", async () => {
     const path = `${ROUTE_ROOT}/missing`;
     let monitorStatus = 0;
@@ -232,4 +230,23 @@ describe("HTTP response lifecycle", () => {
     assert.equal(response.headers["content-type"], "text/event-stream");
     assert.equal(response.headers["x-stream"], "kept");
   });
+}
+
+describe("HTTP response lifecycle", () => {
+  before(async () => {
+    server = http.createServer(
+      (req, res) => void requestListener(req, res, "http"),
+    );
+    port = await listen(server);
+  });
+
+  after(async () => {
+    for (const id of registeredHandlers) {
+      unregisterHandler(id);
+    }
+    await close(server);
+  });
+
+  headerCases();
+  responseOutcomeCases();
 });

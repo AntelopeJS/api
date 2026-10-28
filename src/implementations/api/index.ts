@@ -322,14 +322,16 @@ export const routesProxy = {
     let plan: HandlerPlan | undefined;
     registerHandler(
       `dev/${id}`,
-      handler.mode,
-      handler.method,
-      handler.location,
+      {
+        mode: handler.mode,
+        method: handler.method,
+        location: handler.location,
+        priority: handler.priority,
+      },
       (context: RequestContextDev) => {
         plan ??= compileHandler(handler);
         return invokeHandler(plan, context);
       },
-      handler.priority,
     );
   },
   unregister: (id: string): void => {

@@ -13,6 +13,7 @@ import {
   unregisterHandler,
   upgradeListener,
 } from "../server";
+import type { RouteDefinition } from "../route-table";
 
 const TEST_HOST = "127.0.0.1";
 const SUCCESS_STATUS = 200;
@@ -130,10 +131,10 @@ async function getIsolatedListenerResult(): Promise<string> {
   const script = [
     'const http = require("node:http");',
     "const api = require(process.argv[1]);",
-    'api.registerHandler("p", "prefix", "GET", "/", () => undefined);',
-    'api.registerHandler("h", "handler", "GET", "/", () => "ok");',
-    'api.registerHandler("x", "postfix", "GET", "/", () => undefined);',
-    'api.registerHandler("m", "monitor", "GET", "/", () => undefined);',
+    'api.registerHandler("p", { mode: "prefix", method: "GET", location: "/" }, () => undefined);',
+    'api.registerHandler("h", { mode: "handler", method: "GET", location: "/" }, () => "ok");',
+    'api.registerHandler("x", { mode: "postfix", method: "GET", location: "/" }, () => undefined);',
+    'api.registerHandler("m", { mode: "monitor", method: "GET", location: "/" }, () => undefined);',
     "let result;",
     'const server = http.createServer((req, res) => { result = api.requestListener(req, res, "http"); });',
     'server.listen(0, "127.0.0.1", () => {',
@@ -151,57 +152,55 @@ async function getIsolatedListenerResult(): Promise<string> {
   return stdout;
 }
 
-describe("Synchronous HTTP request path", () => {
-  const routeIds: string[] = [];
-  let server: http.Server;
-  let port: number;
-  let listenerResult: unknown;
+const routeIds: string[] = [];
 
-  function register(
-    id: string,
-    mode: "prefix" | "postfix" | "handler" | "monitor" | "websocket",
-    method: string | undefined,
-    location: string,
-    callback: RouteCallback,
-    priority = HandlerPriority.NORMAL,
-  ): void {
-    routeIds.push(id);
-    registerHandler(id, mode, method, location, callback, priority);
-  }
+let server: http.Server;
 
-  beforeEach(async () => {
-    listenerResult = undefined;
-    server = http.createServer((request, response) => {
-      listenerResult = requestListener(request, response, "http");
-    });
-    server.on("upgrade", (request, socket, head) => {
-      void upgradeListener(request, socket, head, "ws");
-    });
-    port = await listen(server);
-  });
+let port: number;
 
-  afterEach(async () => {
-    for (const id of routeIds.splice(0)) {
-      unregisterHandler(id);
-    }
-    await close(server);
-  });
+let listenerResult: unknown;
 
+function register(
+  id: string,
+  route: RouteDefinition,
+  callback: RouteCallback,
+): void {
+  routeIds.push(id);
+  registerHandler(id, route, callback);
+}
+
+function synchronousOrderCases(): void {
   it("completes synchronous callbacks in request order", async () => {
     const order: string[] = [];
-    register("sync-prefix", "prefix", "GET", "/sync", () => {
-      order.push("prefix");
-    });
-    register("sync-handler", "handler", "GET", "/sync", () => {
-      order.push("handler");
-      return "ok";
-    });
-    register("sync-postfix", "postfix", "GET", "/sync", () => {
-      order.push("postfix");
-    });
-    register("sync-monitor", "monitor", "GET", "/sync", () => {
-      order.push("monitor");
-    });
+    register(
+      "sync-prefix",
+      { mode: "prefix", method: "GET", location: "/sync" },
+      () => {
+        order.push("prefix");
+      },
+    );
+    register(
+      "sync-handler",
+      { mode: "handler", method: "GET", location: "/sync" },
+      () => {
+        order.push("handler");
+        return "ok";
+      },
+    );
+    register(
+      "sync-postfix",
+      { mode: "postfix", method: "GET", location: "/sync" },
+      () => {
+        order.push("postfix");
+      },
+    );
+    register(
+      "sync-monitor",
+      { mode: "monitor", method: "GET", location: "/sync" },
+      () => {
+        order.push("monitor");
+      },
+    );
 
     const response = await sendRequest(port);
 
@@ -217,21 +216,34 @@ describe("Synchronous HTTP request path", () => {
   it("continues in order when each phase returns a promise or thenable", async () => {
     const order: string[] = [];
     const handlerResult = statefulThenable("async-ok");
-    register("async-prefix", "prefix", "GET", "/async", () =>
-      Promise.resolve().then(() => {
-        order.push("prefix");
-      }),
+    register(
+      "async-prefix",
+      { mode: "prefix", method: "GET", location: "/async" },
+      () =>
+        Promise.resolve().then(() => {
+          order.push("prefix");
+        }),
     );
-    register("thenable-handler", "handler", "GET", "/async", () => {
-      order.push("handler");
-      return handlerResult.value;
-    });
-    register("thenable-postfix", "postfix", "GET", "/async", () => {
-      order.push("postfix");
-      return immediateThenable(undefined);
-    });
-    register("async-monitor", "monitor", "GET", "/async", () =>
-      Promise.resolve().then(() => order.push("monitor")),
+    register(
+      "thenable-handler",
+      { mode: "handler", method: "GET", location: "/async" },
+      () => {
+        order.push("handler");
+        return handlerResult.value;
+      },
+    );
+    register(
+      "thenable-postfix",
+      { mode: "postfix", method: "GET", location: "/async" },
+      () => {
+        order.push("postfix");
+        return immediateThenable(undefined);
+      },
+    );
+    register(
+      "async-monitor",
+      { mode: "monitor", method: "GET", location: "/async" },
+      () => Promise.resolve().then(() => order.push("monitor")),
     );
 
     const response = await sendRequest(port, { path: "/async" });
@@ -241,34 +253,48 @@ describe("Synchronous HTTP request path", () => {
     assert.equal(handlerResult.getReadCount(), 1);
     assert.deepEqual(order, ["prefix", "handler", "postfix", "monitor"]);
   });
+}
 
+function priorityAndErrorCases(): void {
   it("preserves priorities, dynamic parameters, and early responses", async () => {
     const order: string[] = [];
     register(
       "priority-low",
-      "prefix",
-      "GET",
-      "/priority/:id",
+      {
+        mode: "prefix",
+        method: "GET",
+        location: "/priority/:id",
+        priority: HandlerPriority.LOW,
+      },
       () => order.push("low"),
-      HandlerPriority.LOW,
     );
     register(
       "priority-high",
-      "prefix",
-      "GET",
-      "/priority/:id",
+      {
+        mode: "prefix",
+        method: "GET",
+        location: "/priority/:id",
+        priority: HandlerPriority.HIGH,
+      },
       (context) => {
         order.push(`high:${context.routeParameters.id}`);
         return new HTTPResult(202, "early");
       },
-      HandlerPriority.HIGH,
     );
-    register("skipped-handler", "handler", "GET", "/priority/:id", () => {
-      order.push("handler");
-    });
-    register("early-monitor", "monitor", "GET", "/priority/:id", () => {
-      order.push("monitor");
-    });
+    register(
+      "skipped-handler",
+      { mode: "handler", method: "GET", location: "/priority/:id" },
+      () => {
+        order.push("handler");
+      },
+    );
+    register(
+      "early-monitor",
+      { mode: "monitor", method: "GET", location: "/priority/:id" },
+      () => {
+        order.push("monitor");
+      },
+    );
 
     const response = await sendRequest(port, { path: "/priority/42" });
 
@@ -279,20 +305,36 @@ describe("Synchronous HTTP request path", () => {
 
   it("turns synchronous throws and asynchronous rejections into errors", async () => {
     const errors: unknown[] = [];
-    register("throw-handler", "handler", "GET", "/throw", () => {
-      throw new Error("sync failure");
-    });
-    register("throw-monitor", "monitor", "GET", "/throw", (context) => {
-      errors.push(context.error);
-    });
-    register("reject-handler", "handler", "GET", "/reject", () =>
-      Promise.reject(new Error("async failure")),
+    register(
+      "throw-handler",
+      { mode: "handler", method: "GET", location: "/throw" },
+      () => {
+        throw new Error("sync failure");
+      },
     );
-    register("reject-monitor", "monitor", "GET", "/reject", (context) => {
-      errors.push(context.error);
-    });
-    register("thenable-reject", "handler", "GET", "/thenable-reject", () =>
-      rejectedThenable(new Error("thenable failure")),
+    register(
+      "throw-monitor",
+      { mode: "monitor", method: "GET", location: "/throw" },
+      (context) => {
+        errors.push(context.error);
+      },
+    );
+    register(
+      "reject-handler",
+      { mode: "handler", method: "GET", location: "/reject" },
+      () => Promise.reject(new Error("async failure")),
+    );
+    register(
+      "reject-monitor",
+      { mode: "monitor", method: "GET", location: "/reject" },
+      (context) => {
+        errors.push(context.error);
+      },
+    );
+    register(
+      "thenable-reject",
+      { mode: "handler", method: "GET", location: "/thenable-reject" },
+      () => rejectedThenable(new Error("thenable failure")),
     );
 
     const thrown = await sendRequest(port, { path: "/throw" });
@@ -311,41 +353,53 @@ describe("Synchronous HTTP request path", () => {
     assert.ok(asyncError instanceof Error);
     assert.equal(asyncError.message, "async failure");
   });
+}
 
+function monitorAndDispatchCases(): void {
   it("isolates monitor failures and continues remaining monitors", async () => {
     const order: string[] = [];
     const originalConsoleError = console.error;
     console.error = () => undefined;
-    register("monitor-handler", "handler", "GET", "/monitors", () => "ok");
+    register(
+      "monitor-handler",
+      { mode: "handler", method: "GET", location: "/monitors" },
+      () => "ok",
+    );
     register(
       "monitor-throw",
-      "monitor",
-      "GET",
-      "/monitors",
+      {
+        mode: "monitor",
+        method: "GET",
+        location: "/monitors",
+        priority: HandlerPriority.HIGH,
+      },
       () => {
         order.push("throw");
         throw new Error("ignored");
       },
-      HandlerPriority.HIGH,
     );
     register(
       "monitor-reject",
-      "monitor",
-      "GET",
-      "/monitors",
+      {
+        mode: "monitor",
+        method: "GET",
+        location: "/monitors",
+        priority: HandlerPriority.NORMAL,
+      },
       () => {
         order.push("reject");
         return Promise.reject(new Error("ignored"));
       },
-      HandlerPriority.NORMAL,
     );
     register(
       "monitor-final",
-      "monitor",
-      "GET",
-      "/monitors",
+      {
+        mode: "monitor",
+        method: "GET",
+        location: "/monitors",
+        priority: HandlerPriority.LOW,
+      },
       () => order.push("final"),
-      HandlerPriority.LOW,
     );
 
     try {
@@ -358,15 +412,21 @@ describe("Synchronous HTTP request path", () => {
   });
 
   it("preserves HEAD fallback, OPTIONS handling, and hot reload", async () => {
-    register("head-get", "handler", "GET", "/head", () => "head-body");
+    register(
+      "head-get",
+      { mode: "handler", method: "GET", location: "/head" },
+      () => "head-body",
+    );
     register(
       "options-prefix",
-      "prefix",
-      "OPTIONS",
-      "/options",
+      { mode: "prefix", method: "OPTIONS", location: "/options" },
       () => new HTTPResult(204, null),
     );
-    register("reload-first", "handler", "GET", "/reload", () => "first");
+    register(
+      "reload-first",
+      { mode: "handler", method: "GET", location: "/reload" },
+      () => "first",
+    );
 
     const head = await sendRequest(port, { method: "HEAD", path: "/head" });
     const options = await sendRequest(port, {
@@ -375,7 +435,11 @@ describe("Synchronous HTTP request path", () => {
     });
     const first = await sendRequest(port, { path: "/reload" });
     unregisterHandler("reload-first");
-    register("reload-second", "handler", "GET", "/reload", () => "second");
+    register(
+      "reload-second",
+      { mode: "handler", method: "GET", location: "/reload" },
+      () => "second",
+    );
     const second = await sendRequest(port, { path: "/reload" });
 
     assert.equal(head.status, SUCCESS_STATUS);
@@ -386,31 +450,49 @@ describe("Synchronous HTTP request path", () => {
   });
 
   it("keeps stream responses intact", async () => {
-    register("stream-handler", "handler", "GET", "/stream", (context) => {
-      const output = context.response.getWriteStream("text/plain");
-      output.end("streamed");
-      return "replacement";
-    });
+    register(
+      "stream-handler",
+      { mode: "handler", method: "GET", location: "/stream" },
+      (context) => {
+        const output = context.response.getWriteStream("text/plain");
+        output.end("streamed");
+        return "replacement";
+      },
+    );
 
     const response = await sendRequest(port, { path: "/stream" });
 
     assert.equal(response.status, SUCCESS_STATUS);
     assert.equal(response.body, "streamed");
   });
+}
 
+function websocketCases(): void {
   it("does not alter WebSocket prefix, handler, and monitor ordering", async () => {
     const order: string[] = [];
-    register("ws-prefix", "prefix", "GET", "/socket", () => {
-      order.push("prefix");
-    });
-    register("ws-handler", "websocket", "GET", "/socket", (context) => {
-      order.push("handler");
-      assert.ok(context.connection);
-      context.connection.send("connected");
-    });
-    register("ws-monitor", "monitor", "GET", "/socket", () => {
-      order.push("monitor");
-    });
+    register(
+      "ws-prefix",
+      { mode: "prefix", method: "GET", location: "/socket" },
+      () => {
+        order.push("prefix");
+      },
+    );
+    register(
+      "ws-handler",
+      { mode: "websocket", method: "GET", location: "/socket" },
+      (context) => {
+        order.push("handler");
+        assert.ok(context.connection);
+        context.connection.send("connected");
+      },
+    );
+    register(
+      "ws-monitor",
+      { mode: "monitor", method: "GET", location: "/socket" },
+      () => {
+        order.push("monitor");
+      },
+    );
 
     const message = await new Promise<string>((resolve, reject) => {
       const socket = new WebSocket(`ws://${TEST_HOST}:${port}/socket`);
@@ -424,4 +506,29 @@ describe("Synchronous HTTP request path", () => {
     assert.equal(message, "connected");
     assert.deepEqual(order, ["prefix", "handler", "monitor"]);
   });
+}
+
+describe("Synchronous HTTP request path", () => {
+  beforeEach(async () => {
+    listenerResult = undefined;
+    server = http.createServer((request, response) => {
+      listenerResult = requestListener(request, response, "http");
+    });
+    server.on("upgrade", (request, socket, head) => {
+      void upgradeListener(request, socket, head, "ws");
+    });
+    port = await listen(server);
+  });
+
+  afterEach(async () => {
+    for (const id of routeIds.splice(0)) {
+      unregisterHandler(id);
+    }
+    await close(server);
+  });
+
+  synchronousOrderCases();
+  priorityAndErrorCases();
+  monitorAndDispatchCases();
+  websocketCases();
 });

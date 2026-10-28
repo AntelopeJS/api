@@ -76,10 +76,9 @@ function createHandler(
   location: string,
   parameters: RouteHandler["parameters"] = [],
   properties: RouteHandler["properties"] = {},
-  mode: RouteHandler["mode"] = "handler",
 ): RouteHandler {
   return {
-    mode,
+    mode: "handler",
     method: "get",
     location,
     callback,
@@ -138,33 +137,23 @@ function jsonBodyParameter(): ComputedParameter {
   return metadata.computed_params.handle[0];
 }
 
-describe("Controller resolution", () => {
-  const routeIds: string[] = [];
-  let server: Server;
-  let port: number;
-  let nextRouteId = 0;
-  let listenerResult: unknown;
+const routeIds: string[] = [];
 
-  function register(handler: RouteHandler): void {
-    const id = `controller-resolution-${nextRouteId++}`;
-    routeIds.push(id);
-    routesProxy.register(id, handler);
-  }
+let server: Server;
 
-  before(async () => {
-    server = createServer((request, response) => {
-      listenerResult = requestListener(request, response, "http");
-    });
-    port = await listen(server);
-  });
+let port: number;
 
-  after(async () => {
-    routeIds.forEach((id) => {
-      routesProxy.unregister(id);
-    });
-    await close(server);
-  });
+let nextRouteId = 0;
 
+let listenerResult: unknown;
+
+function register(handler: RouteHandler): void {
+  const id = `controller-resolution-${nextRouteId++}`;
+  routeIds.push(id);
+  routesProxy.register(id, handler);
+}
+
+function controllerInstanceCases(): void {
   it("attaches the full implementation through the nested interface contract", () => {
     const result = spawnSync(
       process.execPath,
@@ -227,18 +216,16 @@ describe("Controller resolution", () => {
   it("reuses one controller within a request", async () => {
     const Controller = createController();
     const location = "/controller-resolution/reuse";
-    register(
-      createHandler(
+    register({
+      ...createHandler(
         Controller,
         function (this: TestController) {
           this.sequence += 1;
         },
         location,
-        [],
-        {},
-        "prefix",
       ),
-    );
+      mode: "prefix",
+    });
     register(
       createHandler(
         Controller,
@@ -253,7 +240,9 @@ describe("Controller resolution", () => {
     assert.deepEqual(await get(port, location), { status: 200, body: "2" });
     assert.deepEqual(await get(port, location), { status: 200, body: "2" });
   });
+}
 
+function computedMetadataCases(): void {
   it("applies inherited computed metadata", async () => {
     const Parent = createController();
     class Child extends Parent {}
@@ -327,7 +316,9 @@ describe("Controller resolution", () => {
       body: "symbol value",
     });
   });
+}
 
+function computedValueCases(): void {
   it("resolves computed values and handler parameters with controller this", async () => {
     const Controller = createController();
     const properties = {
@@ -442,7 +433,9 @@ describe("Controller resolution", () => {
     assert.deepEqual(events, ["provider", "async", "remaining"]);
     assert.equal(thenable.readCount(), 1);
   });
+}
 
+function requestErrorCases(): void {
   it("turns provider and modifier failures into request errors", async () => {
     const ProviderController = createController();
     const ModifierController = createController();
@@ -509,4 +502,25 @@ describe("Controller resolution", () => {
     assert.equal(malformed.status, 400);
     assert.match(malformed.body, /^Malformed request: /);
   });
+}
+
+describe("Controller resolution", () => {
+  before(async () => {
+    server = createServer((request, response) => {
+      listenerResult = requestListener(request, response, "http");
+    });
+    port = await listen(server);
+  });
+
+  after(async () => {
+    routeIds.forEach((id) => {
+      routesProxy.unregister(id);
+    });
+    await close(server);
+  });
+
+  controllerInstanceCases();
+  computedMetadataCases();
+  computedValueCases();
+  requestErrorCases();
 });

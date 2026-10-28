@@ -33,14 +33,16 @@ describe("Startup gate", () => {
     baseUrl = `http://127.0.0.1:${address.port}`;
     registerHandler(
       HANDLER_ID,
-      "handler",
-      "GET",
-      "/gated",
+      {
+        mode: "handler",
+        method: "GET",
+        location: "/gated",
+        priority: HandlerPriority.NORMAL,
+      },
       () => {
         handlerCalls += 1;
         return "served";
       },
-      HandlerPriority.NORMAL,
     );
   });
 

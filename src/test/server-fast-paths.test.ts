@@ -58,10 +58,14 @@ describe("Server middleware fast paths", () => {
 
   before(async () => {
     port = await listen(server);
-    registerHandler(HANDLER_ID, "handler", "get", TEST_PATH, () => {
-      events.push("handler");
-      return "ok";
-    });
+    registerHandler(
+      HANDLER_ID,
+      { mode: "handler", method: "get", location: TEST_PATH },
+      () => {
+        events.push("handler");
+        return "ok";
+      },
+    );
   });
 
   after(async () => {
@@ -79,30 +83,42 @@ describe("Server middleware fast paths", () => {
 
     registerHandler(
       PREFIX_LOW_ID,
-      "prefix",
-      "get",
-      TEST_PATH,
+      {
+        mode: "prefix",
+        method: "get",
+        location: TEST_PATH,
+        priority: HandlerPriority.LOW,
+      },
       () => {
         events.push("prefix-low");
       },
-      HandlerPriority.LOW,
     );
     registerHandler(
       PREFIX_HIGH_ID,
-      "prefix",
-      "get",
-      TEST_PATH,
+      {
+        mode: "prefix",
+        method: "get",
+        location: TEST_PATH,
+        priority: HandlerPriority.HIGH,
+      },
       () => {
         events.push("prefix-high");
       },
-      HandlerPriority.HIGH,
     );
-    registerHandler(POSTFIX_ID, "postfix", "get", TEST_PATH, () => {
-      events.push("postfix");
-    });
-    registerHandler(MONITOR_ID, "monitor", "get", TEST_PATH, () => {
-      events.push("monitor");
-    });
+    registerHandler(
+      POSTFIX_ID,
+      { mode: "postfix", method: "get", location: TEST_PATH },
+      () => {
+        events.push("postfix");
+      },
+    );
+    registerHandler(
+      MONITOR_ID,
+      { mode: "monitor", method: "get", location: TEST_PATH },
+      () => {
+        events.push("monitor");
+      },
+    );
 
     events.length = 0;
     assert.deepEqual(await request(port), { status: 200, body: "ok" });

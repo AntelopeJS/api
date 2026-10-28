@@ -2,12 +2,7 @@
   "rules": {
     "anti-slop/no-chained-type-assertions": 2,
     "anti-slop/no-unknown-parameters": 1,
-    "anti-slop/require-safety-comment-for-type-assertion": 5,
-    "eslint/complexity": 2,
-    "eslint/max-lines-per-function": 7,
-    "eslint/max-params": 6
+    "anti-slop/require-safety-comment-for-type-assertion": 5
   },
-  "oversizeFiles": {
-    "src/server.ts": 25822
-  }
+  "oversizeFiles": {}
 }
