@@ -4,7 +4,7 @@
     "antelopejs/require-assertion": 1,
     "anti-slop/no-chained-type-assertions": 3,
     "anti-slop/no-known-value-widening": 4,
-    "anti-slop/no-runtime-typeof": 20,
+    "anti-slop/no-runtime-typeof": 16,
     "anti-slop/no-unknown-parameters": 25,
     "anti-slop/no-unknown-returns": 25,
     "anti-slop/no-unsafe-dictionary-type": 2,
