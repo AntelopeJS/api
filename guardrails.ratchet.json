@@ -1,6 +1,5 @@
 {
   "rules": {
-    "antelopejs/no-comments": 11,
     "anti-slop/no-chained-type-assertions": 3,
     "anti-slop/no-known-value-widening": 4,
     "anti-slop/no-runtime-typeof": 16,
@@ -17,6 +16,6 @@
     "typescript/unbound-method": 2
   },
   "oversizeFiles": {
-    "src/server.ts": 26387
+    "src/server.ts": 26105
   }
 }

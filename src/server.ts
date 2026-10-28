@@ -27,7 +27,7 @@ export interface RequestContext {
   routeParameters: Record<string, string>;
   response: HTTPResult;
   error?: unknown;
-  connection?: unknown /* WebsocketConnection */;
+  connection?: unknown;
 }
 
 interface DynamicRoute {
@@ -242,12 +242,10 @@ function findHandlers(
     }
   }
 
-  // Catch-all routes are evaluated last (after static and dynamic routes).
   for (const catchAll of level.catchAllRoutes) {
     const remaining = path.length - depth;
     const suffixLen = catchAll.suffix.length;
 
-    // Need at least one segment captured by ::paramName.
     if (remaining < 1 + suffixLen) {
       continue;
     }
@@ -977,7 +975,6 @@ export async function upgradeListener(
     if (!handler || Array.isArray(handler)) {
       mustSendResponse = true;
       mustDestroySocket = true;
-      // Fall through to finally block to execute monitors.
     } else {
       const prefixExecution = executeMiddleware(
         "prefix",
@@ -990,7 +987,6 @@ export async function upgradeListener(
         setMiddlewareResponse(requestContext, prefixResult);
         mustSendResponse = true;
         mustDestroySocket = true;
-        // Fall through to finally block to execute monitors.
       } else {
         requestContext.connection = await upgrader(req, socket, head);
         hasUpgradedConnection = true;

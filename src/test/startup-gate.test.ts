@@ -12,8 +12,7 @@ const HANDLER_ID = "startup-gate-handler";
 const announceStarted = (): void => Events.ModulesStarted.emit();
 const announceStopping = (): void => Events.ModulesStopping.emit();
 
-// Every other suite expects the project to have started.
-before(announceStarted);
+before("every suite runs against a started project", announceStarted);
 
 describe("Startup gate", () => {
   let server: Server;
