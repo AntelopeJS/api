@@ -141,6 +141,8 @@ Run the project with `ajs project dev`, then call `GET http://localhost:8080/hel
 | `@antelopejs/interface-api-util` | `>=0.2.0 <0.3.0` |
 | `@antelopejs/interface-core`     | `>=0.1.1 <1.0.0` |
 
+Since 1.6.0 the module requires `@antelopejs/interface-api` 0.1 and `@antelopejs/interface-api-util` 0.2, and loads those copies. `@antelopejs/core` refuses to start a project in which another module, or the project itself, declares a range that excludes the shared copy, and reports `Incompatible interface package resolution` (for example `my-module requires @antelopejs/interface-api-util@^0.1.3, but the shared copy is 0.2.0`). Widen such ranges to admit `@antelopejs/interface-api` 0.1 and `@antelopejs/interface-api-util` 0.2 before upgrading, or keep `@antelopejs/api` at 1.5.0, which still loads `@antelopejs/interface-api-util` 0.1.
+
 The module is developed and tested against `@antelopejs/core` `^1.13.4` on Node.js 24.
 
 ## Contributing
