@@ -1,0 +1,13 @@
+name: mutation
+
+on:
+  schedule:
+    - cron: "2 6 * * 5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    uses: AntelopeJS/.github/.github/workflows/mutation.yml@v1

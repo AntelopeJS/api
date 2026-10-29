@@ -54,16 +54,19 @@ function createController(): ControllerConstructor {
 
 function statefulThenable(value: string): StatefulThenable {
   let reads = 0;
-  const thenable = Object.create(null);
-  Object.defineProperty(thenable, THEN_PROPERTY, {
-    get: () => {
-      reads += 1;
-      if (reads > 1) {
-        throw new Error("then getter read more than once");
-      }
-      return (resolve: (resolved: string) => unknown) => resolve(value);
+  const thenable = Object.defineProperty<PromiseLike<string>>(
+    Object.create(null),
+    THEN_PROPERTY,
+    {
+      get: () => {
+        reads += 1;
+        if (reads > 1) {
+          throw new Error("then getter read more than once");
+        }
+        return (resolve: (resolved: string) => void) => resolve(value);
+      },
     },
-  });
+  );
   return { readCount: () => reads, value: thenable };
 }
 
@@ -73,10 +76,9 @@ function createHandler(
   location: string,
   parameters: RouteHandler["parameters"] = [],
   properties: RouteHandler["properties"] = {},
-  mode: RouteHandler["mode"] = "handler",
 ): RouteHandler {
   return {
-    mode,
+    mode: "handler",
     method: "get",
     location,
     callback,
@@ -90,7 +92,7 @@ function listen(server: Server): Promise<number> {
   return new Promise((resolve) => {
     server.listen(0, TEST_HOST, () => {
       const address = server.address();
-      if (!address || typeof address === "string") {
+      if (!(address instanceof Object)) {
         throw new Error("Unable to resolve test server port");
       }
       resolve(address.port);
@@ -131,37 +133,27 @@ async function post(
 function jsonBodyParameter(): ComputedParameter {
   const Controller = createController();
   JSONBody()(Controller.prototype, "handle", 0);
-  const metadata = GetMetadata(Controller, ControllerMeta) as ControllerMeta;
+  const metadata = GetMetadata(Controller, ControllerMeta);
   return metadata.computed_params.handle[0];
 }
 
-describe("Controller resolution", () => {
-  const routeIds: string[] = [];
-  let server: Server;
-  let port: number;
-  let nextRouteId = 0;
-  let listenerResult: unknown;
+const routeIds: string[] = [];
 
-  function register(handler: RouteHandler): void {
-    const id = `controller-resolution-${nextRouteId++}`;
-    routeIds.push(id);
-    routesProxy.register(id, handler);
-  }
+let server: Server;
 
-  before(async () => {
-    server = createServer((request, response) => {
-      listenerResult = requestListener(request, response, "http");
-    });
-    port = await listen(server);
-  });
+let port: number;
 
-  after(async () => {
-    routeIds.forEach((id) => {
-      routesProxy.unregister(id);
-    });
-    await close(server);
-  });
+let nextRouteId = 0;
 
+let listenerResult: unknown;
+
+function register(handler: RouteHandler): void {
+  const id = `controller-resolution-${nextRouteId++}`;
+  routeIds.push(id);
+  routesProxy.register(id, handler);
+}
+
+function controllerInstanceCases(): void {
   it("attaches the full implementation through the nested interface contract", () => {
     const result = spawnSync(
       process.execPath,
@@ -224,18 +216,16 @@ describe("Controller resolution", () => {
   it("reuses one controller within a request", async () => {
     const Controller = createController();
     const location = "/controller-resolution/reuse";
-    register(
-      createHandler(
+    register({
+      ...createHandler(
         Controller,
         function (this: TestController) {
           this.sequence += 1;
         },
         location,
-        [],
-        {},
-        "prefix",
       ),
-    );
+      mode: "prefix",
+    });
     register(
       createHandler(
         Controller,
@@ -250,7 +240,9 @@ describe("Controller resolution", () => {
     assert.deepEqual(await get(port, location), { status: 200, body: "2" });
     assert.deepEqual(await get(port, location), { status: 200, body: "2" });
   });
+}
 
+function computedMetadataCases(): void {
   it("applies inherited computed metadata", async () => {
     const Parent = createController();
     class Child extends Parent {}
@@ -324,7 +316,9 @@ describe("Controller resolution", () => {
       body: "symbol value",
     });
   });
+}
 
+function computedValueCases(): void {
   it("resolves computed values and handler parameters with controller this", async () => {
     const Controller = createController();
     const properties = {
@@ -336,7 +330,7 @@ describe("Controller resolution", () => {
         [
           async function (this: TestController, _context, value) {
             this.sequence += 1;
-            return `${value}:computed`;
+            return `${String(value)}:computed`;
           },
         ],
       ),
@@ -390,11 +384,11 @@ describe("Controller resolution", () => {
             [
               function (this: TestController, _context, value) {
                 this.sequence += 1;
-                return `${value}:first`;
+                return `${String(value)}:first`;
               },
               function (this: TestController, _context, value) {
                 this.sequence += 1;
-                return `${value}:second`;
+                return `${String(value)}:second`;
               },
             ],
           ),
@@ -422,11 +416,11 @@ describe("Controller resolution", () => {
         }, [
           (_context, value) => {
             events.push("async");
-            return Promise.resolve(`${value}:async`);
+            return Promise.resolve(`${String(value)}:async`);
           },
           (_context, value) => {
             events.push("remaining");
-            return `${value}:remaining`;
+            return `${String(value)}:remaining`;
           },
         ]),
       ]),
@@ -439,7 +433,9 @@ describe("Controller resolution", () => {
     assert.deepEqual(events, ["provider", "async", "remaining"]);
     assert.equal(thenable.readCount(), 1);
   });
+}
 
+function requestErrorCases(): void {
   it("turns provider and modifier failures into request errors", async () => {
     const ProviderController = createController();
     const ModifierController = createController();
@@ -484,7 +480,7 @@ describe("Controller resolution", () => {
     register({
       ...createHandler(
         Controller,
-        (body: unknown) => JSON.stringify(body),
+        (body) => JSON.stringify(body),
         "/controller-resolution/json-body",
         [jsonBodyParameter()],
       ),
@@ -506,4 +502,25 @@ describe("Controller resolution", () => {
     assert.equal(malformed.status, 400);
     assert.match(malformed.body, /^Malformed request: /);
   });
+}
+
+describe("Controller resolution", () => {
+  before(async () => {
+    server = createServer((request, response) => {
+      listenerResult = requestListener(request, response, "http");
+    });
+    port = await listen(server);
+  });
+
+  after(async () => {
+    routeIds.forEach((id) => {
+      routesProxy.unregister(id);
+    });
+    await close(server);
+  });
+
+  controllerInstanceCases();
+  computedMetadataCases();
+  computedValueCases();
+  requestErrorCases();
 });

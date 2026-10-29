@@ -1,7 +1,5 @@
 import assert from "node:assert";
 import * as http from "node:http";
-import type { AddressInfo } from "node:net";
-import { HandlerPriority } from "@antelopejs/interface-api";
 
 import {
   type RequestContext,
@@ -10,23 +8,15 @@ import {
   requestListener,
   unregisterHandler,
 } from "../server";
-
-type RouteMode = Parameters<typeof registerHandler>[1];
+import type { RouteDefinition } from "../route-table";
 
 const registeredIds: string[] = [];
 let testServer: http.Server;
 let baseUrl: string;
 
-function register(
-  id: string,
-  mode: RouteMode,
-  method: string | undefined,
-  location: string,
-  callback: RouteCallback,
-  priority = HandlerPriority.NORMAL,
-) {
+function register(id: string, route: RouteDefinition, callback: RouteCallback) {
   registeredIds.push(id);
-  registerHandler(id, mode, method, location, callback, priority);
+  registerHandler(id, route, callback);
 }
 
 async function request(path: string, method = "GET") {
@@ -34,50 +24,21 @@ async function request(path: string, method = "GET") {
   return { status: response.status, body: await response.text() };
 }
 
-describe("Compiled route parameter extraction", () => {
-  before(async () => {
-    testServer = http.createServer(
-      (req, res) => void requestListener(req, res, "http"),
-    );
-    await new Promise<void>((resolve) =>
-      testServer.listen(0, "127.0.0.1", resolve),
-    );
-    const address = testServer.address() as AddressInfo;
-    baseUrl = `http://127.0.0.1:${address.port}`;
-  });
-
-  after(async () => {
-    await new Promise<void>((resolve, reject) =>
-      testServer.close((error) => (error ? reject(error) : resolve())),
-    );
-  });
-
-  afterEach(() => {
-    for (const id of registeredIds.splice(0)) {
-      unregisterHandler(id);
-    }
-  });
-
+function segmentMatchingCases(): void {
   it("preserves static, dynamic, then catch-all precedence", async () => {
     register(
       "compiled-static",
-      "handler",
-      "get",
-      "/compiled/static",
+      { mode: "handler", method: "get", location: "/compiled/static" },
       () => "static",
     );
     register(
       "compiled-dynamic",
-      "handler",
-      "get",
-      "/compiled/:id",
+      { mode: "handler", method: "get", location: "/compiled/:id" },
       () => "dynamic",
     );
     register(
       "compiled-catch",
-      "handler",
-      "get",
-      "/compiled/::path",
+      { mode: "handler", method: "get", location: "/compiled/::path" },
       () => "catch-all",
     );
 
@@ -89,9 +50,11 @@ describe("Compiled route parameter extraction", () => {
   it("extracts multiple segments and patterned segment parameters", async () => {
     register(
       "compiled-pattern",
-      "handler",
-      "get",
-      "/compiled/:team/files/:base.:extension",
+      {
+        mode: "handler",
+        method: "get",
+        location: "/compiled/:team/files/:base.:extension",
+      },
       ({ routeParameters }) => JSON.stringify(routeParameters),
     );
 
@@ -106,9 +69,7 @@ describe("Compiled route parameter extraction", () => {
   it("keeps URL-encoded captures unchanged", async () => {
     register(
       "compiled-encoded",
-      "handler",
-      "get",
-      "/compiled/encoded/:value",
+      { mode: "handler", method: "get", location: "/compiled/encoded/:value" },
       ({ routeParameters }) => routeParameters.value,
     );
 
@@ -121,30 +82,34 @@ describe("Compiled route parameter extraction", () => {
   it("backtracks across concurrent dynamic routes", async () => {
     register(
       "compiled-early",
-      "handler",
-      "get",
-      "/compiled/items/p:id",
+      { mode: "handler", method: "get", location: "/compiled/items/p:id" },
       () => "early",
     );
     register(
       "compiled-late",
-      "handler",
-      "get",
-      "/compiled/items/:slug.json",
+      {
+        mode: "handler",
+        method: "get",
+        location: "/compiled/items/:slug.json",
+      },
       ({ routeParameters }) => routeParameters.slug,
     );
     register(
       "compiled-dead-branch",
-      "handler",
-      "get",
-      "/compiled/branch/:first/missing",
+      {
+        mode: "handler",
+        method: "get",
+        location: "/compiled/branch/:first/missing",
+      },
       () => "dead",
     );
     register(
       "compiled-live-branch",
-      "handler",
-      "get",
-      "/compiled/branch/:second/:third",
+      {
+        mode: "handler",
+        method: "get",
+        location: "/compiled/branch/:second/:third",
+      },
       ({ routeParameters }) => JSON.stringify(routeParameters),
     );
 
@@ -155,20 +120,26 @@ describe("Compiled route parameter extraction", () => {
       third: "b",
     });
   });
+}
 
+function parameterIsolationCases(): void {
   it("preserves prefixed and suffixed dynamic segment matching", async () => {
     register(
       "compiled-filter-prefix",
-      "handler",
-      "get",
-      "/compiled/filter/pre:id.json",
+      {
+        mode: "handler",
+        method: "get",
+        location: "/compiled/filter/pre:id.json",
+      },
       ({ routeParameters }) => `prefix:${routeParameters.id}`,
     );
     register(
       "compiled-filter-suffix",
-      "handler",
-      "get",
-      "/compiled/filter/:first-:second.tail",
+      {
+        mode: "handler",
+        method: "get",
+        location: "/compiled/filter/:first-:second.tail",
+      },
       ({ routeParameters }) =>
         `suffix:${routeParameters.first}:${routeParameters.second}`,
     );
@@ -188,9 +159,7 @@ describe("Compiled route parameter extraction", () => {
     const observed: string[] = [];
     register(
       "compiled-prefix-first",
-      "prefix",
-      "get",
-      "/compiled/isolated/:id",
+      { mode: "prefix", method: "get", location: "/compiled/isolated/:id" },
       ({ routeParameters }) => {
         observed.push(routeParameters.id);
         routeParameters.id = "mutated";
@@ -198,18 +167,14 @@ describe("Compiled route parameter extraction", () => {
     );
     register(
       "compiled-prefix-second",
-      "prefix",
-      "get",
-      "/compiled/isolated/:id",
+      { mode: "prefix", method: "get", location: "/compiled/isolated/:id" },
       ({ routeParameters }) => {
         observed.push(routeParameters.id);
       },
     );
     register(
       "compiled-isolated-handler",
-      "handler",
-      "get",
-      "/compiled/isolated/:id",
+      { mode: "handler", method: "get", location: "/compiled/isolated/:id" },
       ({ routeParameters }) => routeParameters.id,
     );
 
@@ -227,30 +192,22 @@ describe("Compiled route parameter extraction", () => {
     };
     register(
       "compiled-modes-prefix",
-      "prefix",
-      "get",
-      "/compiled/modes/:id",
+      { mode: "prefix", method: "get", location: "/compiled/modes/:id" },
       observe,
     );
     register(
       "compiled-modes-handler",
-      "handler",
-      "get",
-      "/compiled/modes/:id",
+      { mode: "handler", method: "get", location: "/compiled/modes/:id" },
       observe,
     );
     register(
       "compiled-modes-postfix",
-      "postfix",
-      "get",
-      "/compiled/modes/:id",
+      { mode: "postfix", method: "get", location: "/compiled/modes/:id" },
       observe,
     );
     register(
       "compiled-modes-monitor",
-      "monitor",
-      "get",
-      "/compiled/modes/:id",
+      { mode: "monitor", method: "get", location: "/compiled/modes/:id" },
       observe,
     );
 
@@ -262,13 +219,13 @@ describe("Compiled route parameter extraction", () => {
     );
     assert.equal(new Set(parameters).size, 4);
   });
+}
 
+function routeLifecycleCases(): void {
   it("falls back to any handlers with extracted parameters", async () => {
     register(
       "compiled-any",
-      "handler",
-      undefined,
-      "/compiled/any/:id",
+      { mode: "handler", method: undefined, location: "/compiled/any/:id" },
       ({ routeParameters }) => routeParameters.id,
     );
 
@@ -278,9 +235,7 @@ describe("Compiled route parameter extraction", () => {
   it("reuses compiled routes after unregister and re-register", async () => {
     register(
       "compiled-lifecycle-old",
-      "handler",
-      "get",
-      "/compiled/lifecycle/:id",
+      { mode: "handler", method: "get", location: "/compiled/lifecycle/:id" },
       () => "old",
     );
     assert.equal((await request("/compiled/lifecycle/value")).body, "old");
@@ -291,9 +246,7 @@ describe("Compiled route parameter extraction", () => {
 
     register(
       "compiled-lifecycle-new",
-      "handler",
-      "get",
-      "/compiled/lifecycle/:id",
+      { mode: "handler", method: "get", location: "/compiled/lifecycle/:id" },
       ({ routeParameters }) => `new:${routeParameters.id}`,
     );
     assert.equal(
@@ -301,4 +254,34 @@ describe("Compiled route parameter extraction", () => {
       "new:value",
     );
   });
+}
+
+describe("Compiled route parameter extraction", () => {
+  before(async () => {
+    testServer = http.createServer(
+      (req, res) => void requestListener(req, res, "http"),
+    );
+    await new Promise<void>((resolve) =>
+      testServer.listen(0, "127.0.0.1", resolve),
+    );
+    const address = testServer.address();
+    assert.ok(address instanceof Object);
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  after(async () => {
+    await new Promise<void>((resolve, reject) =>
+      testServer.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
+
+  afterEach(() => {
+    for (const id of registeredIds.splice(0)) {
+      unregisterHandler(id);
+    }
+  });
+
+  segmentMatchingCases();
+  parameterIsolationCases();
+  routeLifecycleCases();
 });

@@ -1,5 +1,4 @@
 import sinon from "sinon";
-import assert from "node:assert";
 import { Logging } from "@antelopejs/interface-core/logging";
 
 import { logServerStarted } from "../port-binding";
@@ -56,9 +55,12 @@ describe("Server start logging", () => {
 
     sinon.assert.notCalled(info);
     sinon.assert.calledOnce(warn);
-    const [message] = warn.firstCall.args as string[];
-    assert.match(message, new RegExp(`Port ${REQUESTED_PORT} in use`));
-    assert.ok(message.includes(`http://127.0.0.1:${FALLBACK_PORT}`));
-    assert.ok(message.includes("strictPort: true"));
+    sinon.assert.calledWithMatch(
+      warn,
+      sinon
+        .match(new RegExp(`Port ${REQUESTED_PORT} in use`))
+        .and(sinon.match(`http://127.0.0.1:${FALLBACK_PORT}`))
+        .and(sinon.match("strictPort: true")),
+    );
   });
 });

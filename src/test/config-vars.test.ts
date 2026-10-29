@@ -32,6 +32,7 @@ import {
   stop,
 } from "../index";
 
+const PORT_IN_USE = { code: "EADDRINUSE" };
 const TEST_HOST = "127.0.0.1";
 const BOUND_FREE_PORT = 25200;
 const BOUND_TAKEN_PORT = 25210;
@@ -50,18 +51,6 @@ const PUBLIC_BASE_URL = "https://api.example.com";
 interface LocalHostCase {
   bindHost?: string;
   urlHost: string;
-}
-
-interface PackageManifest {
-  antelopeJs: { configVarsFile: string };
-}
-
-interface PortInUseError {
-  code?: string;
-}
-
-function isPortInUseError(error: unknown): boolean {
-  return (error as PortInUseError).code === "EADDRINUSE";
 }
 
 function delay(ms: number): Promise<void> {
@@ -100,6 +89,18 @@ function singleServerConfig(port: number, host = TEST_HOST): Config {
     publicBaseUrl: PUBLIC_BASE_URL,
     servers: [{ protocol: "http", host, port }],
   };
+}
+
+function declaresConfigVarsFile(
+  manifest: unknown,
+): manifest is { antelopeJs: { configVarsFile: string } } {
+  return (
+    manifest instanceof Object &&
+    "antelopeJs" in manifest &&
+    manifest.antelopeJs instanceof Object &&
+    "configVarsFile" in manifest.antelopeJs &&
+    typeof manifest.antelopeJs.configVarsFile === "string"
+  );
 }
 
 describe("Published config variables", () => {
@@ -172,12 +173,13 @@ describe("Published config variables", () => {
   });
 
   it("declares the file of its pure config variables function", () => {
-    const manifest = require("../../package.json") as PackageManifest;
-    const declared = require(
-      `../../${manifest.antelopeJs.configVarsFile}`,
-    ) as typeof import("../config-vars");
+    const manifest: unknown = require("../../package.json");
+    assert.ok(declaresConfigVarsFile(manifest));
 
-    assert.equal(declared.configVars, configVars);
+    assert.equal(
+      require(`../../${manifest.antelopeJs.configVarsFile}`).configVars,
+      configVars,
+    );
   });
 
   it("strips trailing slashes from the configured public base url", () => {
@@ -347,9 +349,9 @@ describe("Config variables publication", () => {
     const vars = await publish(singleServerConfig(HELD_LISTENER_PORT));
     assert.equal(vars[API_PORT], HELD_LISTENER_PORT);
 
-    await assert.rejects(occupyPort(HELD_LISTENER_PORT), isPortInUseError);
+    await assert.rejects(occupyPort(HELD_LISTENER_PORT), PORT_IN_USE);
     await delay(LISTENER_HOLD_MS);
-    await assert.rejects(occupyPort(HELD_LISTENER_PORT), isPortInUseError);
+    await assert.rejects(occupyPort(HELD_LISTENER_PORT), PORT_IN_USE);
 
     start();
     await listenServers();
@@ -432,7 +434,7 @@ describe("Advertised host agreement", () => {
 
   function boundPort(server: net.Server): number {
     const address = server.address();
-    assert.ok(address && typeof address === "object");
+    assert.ok(address instanceof Object);
     return address.port;
   }
 
