@@ -26,6 +26,17 @@ const MULTI_FREE_PORT = 25150;
 const STRING_PORT = 25160;
 const RANDOM_PORT = 0;
 
+interface JsonServerConfig {
+  protocol: "http";
+  host: string;
+  port: string | number;
+}
+
+const configureFromJson = configure as (config: {
+  autoListen: boolean;
+  servers: JsonServerConfig[];
+}) => void;
+
 function occupyPort(port: number): Promise<net.Server> {
   return new Promise((resolve, reject) => {
     const blocker = net.createServer();
@@ -211,12 +222,12 @@ function portSelectionCases(): void {
   it("binds the numeric port when the configured port is a string", async () => {
     stubRuntime(true);
 
-    configure({
+    configureFromJson({
       autoListen: false,
       servers: [
         { protocol: "http", host: TEST_HOST, port: String(STRING_PORT) },
       ],
-    } as unknown as Parameters<typeof configure>[0]);
+    });
     start();
     await listenServers();
 
@@ -229,10 +240,10 @@ function portSelectionCases(): void {
   it("rejects when the configured port is not a valid number", async () => {
     stubRuntime(true);
 
-    configure({
+    configureFromJson({
       autoListen: false,
       servers: [{ protocol: "http", host: TEST_HOST, port: "not-a-port" }],
-    } as unknown as Parameters<typeof configure>[0]);
+    });
     start();
 
     await assert.rejects(listenServers(), /Invalid http server port/);
