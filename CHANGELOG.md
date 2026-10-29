@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.6.0
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.5.0...v1.6.0)
+
+### 🚀 Enhancements
+
+- Require interface-api 0.1 and interface-api-util 0.2 ([#80](https://github.com/AntelopeJS/api/pull/80))
+
+### 💅 Refactors
+
+- Clean the repo with the guardrail pack ([#77](https://github.com/AntelopeJS/api/pull/77))
+
+### 📖 Documentation
+
+- **changelog:** Upgrade notes of api 1.5.0 ([#74](https://github.com/AntelopeJS/api/pull/74))
+
+### 📦 Build
+
+- **deps:** Adopt @antelopejs/interface-api 0.1.0 ([#78](https://github.com/AntelopeJS/api/pull/78))
+- **deps:** Adopt @antelopejs/interface-api-util 0.2.0 ([#79](https://github.com/AntelopeJS/api/pull/79))
+
+### 🏡 Chore
+
+- Adopt the guardrail pack from tooling-configs 0.2.0 ([#75](https://github.com/AntelopeJS/api/pull/75))
+- Configure Renovate with the shared preset ([#76](https://github.com/AntelopeJS/api/pull/76))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli <rizzitelli.antony@pm.me>
+
 ## v1.5.0
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.4.0...v1.5.0)

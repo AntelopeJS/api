@@ -1,6 +1,6 @@
 {
   "name": "@antelopejs/api",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "HTTP and WebSocket server module for AntelopeJS, implementing the API interfaces with the Node.js http, https and ws servers",
   "keywords": [
     "antelopejs",
