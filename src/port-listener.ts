@@ -49,7 +49,7 @@ export class PortReservationError extends Error {
 
 interface ListenAttempt {
   socket?: net.Server;
-  error?: unknown;
+  error?: NodeJS.ErrnoException;
 }
 
 /**
@@ -69,7 +69,7 @@ const STRICT_PORT_HINT =
 function listenOnce(port: number, host?: string): Promise<ListenAttempt> {
   return new Promise((resolve) => {
     const socket = net.createServer({ pauseOnConnect: true });
-    socket.once("error", (error: Error) => resolve({ error }));
+    socket.once("error", (error: NodeJS.ErrnoException) => resolve({ error }));
     socket.listen({ port, host }, () => resolve({ socket }));
   });
 }

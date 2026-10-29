@@ -1,9 +1,10 @@
+import sinon from "sinon";
 import assert from "node:assert";
 import * as http from "node:http";
 import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 
 import {
-  type RequestContext,
+  type RouteCallback,
   registerHandler,
   requestListener,
   unregisterHandler,
@@ -22,11 +23,20 @@ interface CapturedResponse {
 function register(
   mode: "prefix" | "postfix" | "handler" | "monitor",
   path: string,
-  callback: (context: RequestContext) => unknown,
+  callback: RouteCallback,
 ) {
   const id = `${mode}-${path}-${registeredHandlers.length}`;
   registeredHandlers.push(id);
-  registerHandler(id, mode, "get", path, callback, HandlerPriority.NORMAL);
+  registerHandler(
+    id,
+    {
+      mode: mode,
+      method: "get",
+      location: path,
+      priority: HandlerPriority.NORMAL,
+    },
+    callback,
+  );
 }
 
 function listen(server: http.Server): Promise<number> {
@@ -34,7 +44,7 @@ function listen(server: http.Server): Promise<number> {
     server.once("error", reject);
     server.listen(0, HOST, () => {
       const address = server.address();
-      assert.ok(address && typeof address === "object");
+      assert.ok(address instanceof Object);
       resolve(address.port);
     });
   });
@@ -64,41 +74,23 @@ function request(port: number, path: string, method = "GET") {
   });
 }
 
-describe("HTTP response lifecycle", () => {
-  let server: http.Server;
-  let port: number;
+let server: http.Server;
 
-  before(async () => {
-    server = http.createServer(
-      (req, res) => void requestListener(req, res, "http"),
-    );
-    port = await listen(server);
-  });
+let port: number;
 
-  after(async () => {
-    for (const id of registeredHandlers) {
-      unregisterHandler(id);
-    }
-    await close(server);
-  });
-
+function headerCases(): void {
   it("reuses the matched route response without observing headers", async () => {
     const path = `${ROUTE_ROOT}/common`;
     let contextResponse: HTTPResult | undefined;
     let initialStatus = 0;
     let initialBody: unknown;
-    let headerReads = 0;
-    const originalGetHeaders = HTTPResult.prototype.getHeaders;
+    const getHeaders = sinon.spy(HTTPResult.prototype, "getHeaders");
     register("handler", path, (context) => {
       contextResponse = context.response;
       initialStatus = context.response.getStatus();
       initialBody = context.response.getBody();
       return { ok: true };
     });
-    HTTPResult.prototype.getHeaders = function getHeaders() {
-      headerReads += 1;
-      return originalGetHeaders.call(this);
-    };
 
     try {
       const response = await request(port, path);
@@ -108,29 +100,24 @@ describe("HTTP response lifecycle", () => {
       assert.equal(initialBody, "");
       assert.equal(contextResponse?.getStatus(), 200);
       assert.equal(contextResponse?.getBody(), '{"ok":true}');
-      assert.equal(headerReads, 0);
+      assert.equal(getHeaders.callCount, 0);
     } finally {
-      HTTPResult.prototype.getHeaders = originalGetHeaders;
+      getHeaders.restore();
     }
   });
 
   it("uses the published non-allocating header lookup", async () => {
     const path = `${ROUTE_ROOT}/peek-headers`;
-    let headerReads = 0;
-    const originalGetHeaders = HTTPResult.prototype.getHeaders;
+    const getHeaders = sinon.spy(HTTPResult.prototype, "getHeaders");
     register("handler", path, () => new HTTPResult(203, "result"));
-    HTTPResult.prototype.getHeaders = function getHeaders() {
-      headerReads += 1;
-      return originalGetHeaders.call(this);
-    };
 
     try {
       const response = await request(port, path);
       assert.equal(response.status, 203);
       assert.equal(response.body, "result");
-      assert.equal(headerReads, 0);
+      assert.equal(getHeaders.callCount, 0);
     } finally {
-      HTTPResult.prototype.getHeaders = originalGetHeaders;
+      getHeaders.restore();
     }
   });
 
@@ -166,7 +153,9 @@ describe("HTTP response lifecycle", () => {
     assert.equal(response.body, '{"created":true}');
     assert.equal(response.headers["content-type"], "application/json");
   });
+}
 
+function responseOutcomeCases(): void {
   it("creates the Not Found response only for a route miss", async () => {
     const path = `${ROUTE_ROOT}/missing`;
     let monitorStatus = 0;
@@ -241,4 +230,23 @@ describe("HTTP response lifecycle", () => {
     assert.equal(response.headers["content-type"], "text/event-stream");
     assert.equal(response.headers["x-stream"], "kept");
   });
+}
+
+describe("HTTP response lifecycle", () => {
+  before(async () => {
+    server = http.createServer(
+      (req, res) => void requestListener(req, res, "http"),
+    );
+    port = await listen(server);
+  });
+
+  after(async () => {
+    for (const id of registeredHandlers) {
+      unregisterHandler(id);
+    }
+    await close(server);
+  });
+
+  headerCases();
+  responseOutcomeCases();
 });

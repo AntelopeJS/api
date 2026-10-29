@@ -196,7 +196,9 @@ describe("Connections accepted before the server starts", () => {
     await startServing();
     await requestStatus(KEEP_ALIVE_PORT, agent);
 
-    await withinDeadline(stop(), "Stop waited on an idle connection");
+    await assert.doesNotReject(
+      withinDeadline(stop(), "Stop waited on an idle connection"),
+    );
     agent.destroy();
   });
 });

@@ -1,4 +1,6 @@
 import assert from "node:assert";
+import { Socket } from "node:net";
+import { IncomingMessage, ServerResponse } from "node:http";
 import { HTTPResult, type RequestContext } from "@antelopejs/interface-api";
 
 import { Cors } from "../middlewares/cors";
@@ -36,10 +38,16 @@ const PREFLIGHT_REQUESTED_METHOD = "GET";
 const corsController = new Cors();
 
 function buildContext(method: string, headers: RequestHeaders): RequestContext {
+  const rawRequest = new IncomingMessage(new Socket());
+  rawRequest.method = method;
+  rawRequest.headers = { ...headers };
   return {
-    rawRequest: { method, headers },
+    rawRequest,
+    rawResponse: new ServerResponse(rawRequest),
+    url: new URL("http://localhost/"),
+    routeParameters: {},
     response: new HTTPResult(),
-  } as unknown as RequestContext;
+  };
 }
 
 function preflightHeaders(headers: RequestHeaders): Record<string, string> {

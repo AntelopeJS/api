@@ -5,39 +5,31 @@ import {
   ControllerMeta,
   type CorsConfig,
   HTTPResult,
+  type ParameterModifier,
+  type RequestContext,
   type RouteHandler,
 } from "@antelopejs/interface-api";
 
 import { getConfig, listenServers, setCorsConfig } from "../../index";
 import {
-  type RequestContext,
+  type RouteResult,
   registerHandler,
   unregisterHandler,
 } from "../../server";
+import { type Awaitable, pendingOf } from "../../thenable";
 
-type UnknownRecord = Record<PropertyKey, unknown>;
+type ComputedValue = ReturnType<ParameterModifier>;
 
-type ControllerClass = Class<unknown> & {
+type ControllerInstance = Record<PropertyKey, ComputedValue>;
+
+type ControllerClass = Class<ControllerInstance> & {
   location: string;
 };
 
-interface ControllerMetadata {
-  computed_props: Record<PropertyKey, ComputedParameter>;
-}
-
 type ParameterResolver = (
   context: RequestContextDev,
-  controllerInstance: UnknownRecord,
-) => unknown;
-
-type ThenCallback = (
-  onfulfilled: (value: unknown) => unknown,
-  onrejected: (reason: unknown) => unknown,
-) => unknown;
-
-interface PromiseLikeValue {
-  then?: unknown;
-}
+  controllerInstance: ControllerInstance,
+) => Awaitable<ComputedValue>;
 
 interface ComputedPropertyResolver {
   key: PropertyKey;
@@ -64,12 +56,14 @@ const registeredRoutes = new Map<string, RouteHandler>();
 const controllerPlans = new WeakMap<ControllerClass, ControllerPlan>();
 
 interface RequestContextDev extends RequestContext {
-  [classCacheSymbol]?: Map<object, unknown>;
+  [classCacheSymbol]?: Map<object, ControllerInstance>;
 }
 
-function getControllerCache(context: RequestContextDev): Map<object, unknown> {
+function getControllerCache(
+  context: RequestContextDev,
+): Map<object, ControllerInstance> {
   if (!context[classCacheSymbol]) {
-    context[classCacheSymbol] = new Map<object, unknown>();
+    context[classCacheSymbol] = new Map<object, ControllerInstance>();
   }
 
   return context[classCacheSymbol];
@@ -97,7 +91,7 @@ function compileParameter(
     );
 }
 
-function toRequestError(error: unknown): unknown {
+function toRequestError(error: RequestContext["error"]) {
   if (!(error instanceof SyntaxError)) {
     return error;
   }
@@ -107,71 +101,42 @@ function toRequestError(error: unknown): unknown {
   );
 }
 
-function rejectAsRequestError(error: unknown): never {
+function rejectAsRequestError(error: RequestContext["error"]): never {
   throw toRequestError(error);
 }
 
 function callProvider(
   provider: NonNullable<ComputedParameter["provider"]>,
-  controller: UnknownRecord,
+  controller: ControllerInstance,
   context: RequestContextDev,
-): unknown {
+): Awaitable<ComputedValue> {
   try {
     const value = provider.call(controller, context);
-    const then = getThen(value);
-    return then
-      ? resolveThenable(value, then).catch(rejectAsRequestError)
-      : value;
+    const pending = pendingOf(value);
+    return pending ? pending.catch(rejectAsRequestError) : value;
   } catch (error) {
     return rejectAsRequestError(error);
   }
 }
 
 function applyModifiers(
-  initialValue: unknown,
+  initialValue: Awaitable<ComputedValue>,
   modifiers: ComputedParameter["modifiers"],
   context: RequestContextDev,
-  controller: UnknownRecord,
+  controller: ControllerInstance,
   startIndex = 0,
-): unknown {
+): Awaitable<ComputedValue> {
   let value = initialValue;
   for (let index = startIndex; index < modifiers.length; index += 1) {
-    const then = getThen(value);
-    if (then) {
-      return resolveThenable(value, then).then((resolved) =>
+    const pending = pendingOf(value);
+    if (pending) {
+      return pending.then((resolved) =>
         applyModifiers(resolved, modifiers, context, controller, index),
       );
     }
     value = modifiers[index].call(controller, context, value);
   }
-  const then = getThen(value);
-  return then ? resolveThenable(value, then) : value;
-}
-
-function getThen(value: unknown): ThenCallback | undefined {
-  if (
-    value === null ||
-    (typeof value !== "object" && typeof value !== "function")
-  ) {
-    return;
-  }
-  const then = (value as PromiseLikeValue).then;
-  return typeof then === "function" ? (then as ThenCallback) : undefined;
-}
-
-function resolveThenable(value: unknown, then: ThenCallback): Promise<unknown> {
-  if (value instanceof Promise) {
-    return value;
-  }
-  return new Promise((resolve, reject) => {
-    queueMicrotask(() => {
-      try {
-        then.call(value, resolve, reject);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  });
+  return pendingOf(value) ?? value;
 }
 
 function compileController(
@@ -199,14 +164,11 @@ function getControllerPlan(controllerClass: ControllerClass): ControllerPlan {
     return cachedPlan;
   }
 
-  const metadata = GetMetadata(
-    controllerClass,
-    ControllerMeta,
-  ) as ControllerMetadata;
+  const metadata = GetMetadata(controllerClass, ControllerMeta);
   return compileController(controllerClass, metadata.computed_props);
 }
 
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+function isPromiseLike<V>(value: Awaitable<V>): value is PromiseLike<V> {
   return (
     value !== null &&
     (typeof value === "object" || typeof value === "function") &&
@@ -216,7 +178,7 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
 }
 
 function applyComputedProperties(
-  controllerInstance: UnknownRecord,
+  controllerInstance: ControllerInstance,
   computedProperties: ComputedPropertyResolver[],
   context: RequestContextDev,
 ): void | Promise<void> {
@@ -246,17 +208,15 @@ function applyComputedProperties(
 function resolveControllerInstance(
   plan: ControllerPlan,
   context: RequestContextDev,
-): UnknownRecord | Promise<UnknownRecord> {
+): ControllerInstance | Promise<ControllerInstance> {
   const controllerCache = getControllerCache(context);
-  const cachedController = controllerCache.get(plan.cacheKey) as
-    | UnknownRecord
-    | undefined;
+  const cachedController = controllerCache.get(plan.cacheKey);
 
   if (cachedController) {
     return cachedController;
   }
 
-  const controllerInstance = new plan.controllerClass() as UnknownRecord;
+  const controllerInstance = new plan.controllerClass();
   const computed = applyComputedProperties(
     controllerInstance,
     plan.computedProperties,
@@ -276,9 +236,9 @@ function resolveControllerInstance(
 export async function GetControllerInstance(
   controllerClass: Class<unknown>,
   context: RequestContext,
-): Promise<unknown> {
+) {
   const plan = getControllerPlan(controllerClass as ControllerClass);
-  return resolveControllerInstance(plan, context as RequestContextDev);
+  return resolveControllerInstance(plan, context);
 }
 
 export async function Listen(): Promise<void> {
@@ -304,9 +264,9 @@ interface RouteInfo {
 
 function invokeCallback(
   plan: HandlerPlan,
-  controllerInstance: UnknownRecord,
+  controllerInstance: ControllerInstance,
   context: RequestContextDev,
-): unknown {
+): Awaitable<RouteResult> {
   if (plan.parameters.length === 0) {
     return plan.callback.call(controllerInstance);
   }
@@ -331,7 +291,10 @@ function invokeCallback(
   return plan.callback.apply(controllerInstance, parameters);
 }
 
-function invokeHandler(plan: HandlerPlan, context: RequestContextDev): unknown {
+function invokeHandler(
+  plan: HandlerPlan,
+  context: RequestContextDev,
+): Awaitable<RouteResult> {
   const controllerInstance = resolveControllerInstance(
     plan.controller,
     context,
@@ -345,7 +308,7 @@ function invokeHandler(plan: HandlerPlan, context: RequestContextDev): unknown {
 }
 
 function compileHandler(handler: RouteHandler): HandlerPlan {
-  const controllerClass = handler.proto.constructor as ControllerClass;
+  const controllerClass: ControllerClass = handler.proto.constructor;
   return {
     callback: handler.callback,
     controller: compileController(controllerClass, handler.properties),
@@ -359,14 +322,16 @@ export const routesProxy = {
     let plan: HandlerPlan | undefined;
     registerHandler(
       `dev/${id}`,
-      handler.mode,
-      handler.method,
-      handler.location,
+      {
+        mode: handler.mode,
+        method: handler.method,
+        location: handler.location,
+        priority: handler.priority,
+      },
       (context: RequestContextDev) => {
         plan ??= compileHandler(handler);
         return invokeHandler(plan, context);
       },
-      handler.priority,
     );
   },
   unregister: (id: string): void => {

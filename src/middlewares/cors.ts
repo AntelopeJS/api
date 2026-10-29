@@ -25,7 +25,7 @@ const DEV_FALLBACK_CORS_CONFIG: CorsConfig = {};
 const PREFLIGHT_METHOD = "OPTIONS";
 const PREFLIGHT_REQUEST_METHOD_HEADER = "access-control-request-method";
 
-function isString(value: unknown): value is string {
+function isString(value: AllowedOrigin | undefined): value is string {
   return typeof value === "string" || value instanceof String;
 }
 
