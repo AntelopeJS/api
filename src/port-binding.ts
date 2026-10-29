@@ -13,8 +13,16 @@ const MAX_PORT_FALLBACK_OFFSET = 20;
 const STRICT_PORT_FALLBACK_HINT =
   "Set strictPort: true in the server config to fail instead of falling back.";
 
-export function isPortInUseError(error: unknown): boolean {
-  return (error as NodeJS.ErrnoException)?.code === "EADDRINUSE";
+export function isPortInUseError(
+  error: NodeJS.ErrnoException | undefined,
+): boolean {
+  return error?.code === "EADDRINUSE";
+}
+
+function isAddressInfo(
+  address: ReturnType<net.Server["address"]>,
+): address is net.AddressInfo {
+  return address !== null && typeof address === "object";
 }
 
 export function resolveBoundPort(
@@ -22,7 +30,7 @@ export function resolveBoundPort(
   fallbackPort: number,
 ): number {
   const address = server.address();
-  if (address && typeof address === "object") {
+  if (isAddressInfo(address)) {
     return address.port;
   }
 

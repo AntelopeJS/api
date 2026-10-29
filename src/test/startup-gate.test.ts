@@ -12,8 +12,7 @@ const HANDLER_ID = "startup-gate-handler";
 const announceStarted = (): void => Events.ModulesStarted.emit();
 const announceStopping = (): void => Events.ModulesStopping.emit();
 
-// Every other suite expects the project to have started.
-before(announceStarted);
+before("every suite runs against a started project", announceStarted);
 
 describe("Startup gate", () => {
   let server: Server;
@@ -28,20 +27,22 @@ describe("Startup gate", () => {
       server.listen(0, "127.0.0.1", resolve),
     );
     const address = server.address();
-    if (!address || typeof address === "string") {
+    if (!(address instanceof Object)) {
       throw new Error("Test server did not expose a TCP address");
     }
     baseUrl = `http://127.0.0.1:${address.port}`;
     registerHandler(
       HANDLER_ID,
-      "handler",
-      "GET",
-      "/gated",
+      {
+        mode: "handler",
+        method: "GET",
+        location: "/gated",
+        priority: HandlerPriority.NORMAL,
+      },
       () => {
         handlerCalls += 1;
         return "served";
       },
-      HandlerPriority.NORMAL,
     );
   });
 
