@@ -138,7 +138,7 @@ Run the project with `ajs project dev`, then call `GET http://localhost:8080/hel
 | Package                          | Supported range   |
 | -------------------------------- | ----------------- |
 | `@antelopejs/interface-api`      | `>=0.0.14 <1.0.0` |
-| `@antelopejs/interface-api-util` | `^0.1.2`          |
+| `@antelopejs/interface-api-util` | `>=0.2.0 <0.3.0`  |
 | `@antelopejs/interface-core`     | `>=0.1.1 <1.0.0`  |
 
 The module is developed and tested against `@antelopejs/core` `^1.13.4` on Node.js 24.
