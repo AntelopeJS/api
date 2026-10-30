@@ -12,10 +12,10 @@ import {
 
 import { requestListener } from "../server";
 import { routesProxy } from "../implementations/api";
+import { nullPrototypeThenable } from "./thenable";
 
 const TEST_HOST = "127.0.0.1";
 const TEST_ORIGIN = `http://${TEST_HOST}`;
-const THEN_PROPERTY = ["th", "en"].join("");
 const SYMBOL_PROPERTY = Symbol("computed-property");
 
 interface TestController {
@@ -31,11 +31,12 @@ interface TestResponse {
 
 interface StatefulThenable {
   readCount: () => number;
-  value: PromiseLike<string>;
+  value: object;
 }
 
 type ControllerConstructor = (new () => TestController) & {
   location: string;
+  prototype: TestController;
 };
 
 function computedParameter(
@@ -54,19 +55,15 @@ function createController(): ControllerConstructor {
 
 function statefulThenable(value: string): StatefulThenable {
   let reads = 0;
-  const thenable = Object.defineProperty<PromiseLike<string>>(
-    Object.create(null),
-    THEN_PROPERTY,
-    {
-      get: () => {
-        reads += 1;
-        if (reads > 1) {
-          throw new Error("then getter read more than once");
-        }
-        return (resolve: (resolved: string) => void) => resolve(value);
-      },
+  const thenable = nullPrototypeThenable({
+    get: () => {
+      reads += 1;
+      if (reads > 1) {
+        throw new Error("then getter read more than once");
+      }
+      return (resolve: (resolved: string) => void) => resolve(value);
     },
-  );
+  });
   return { readCount: () => reads, value: thenable };
 }
 
@@ -409,7 +406,7 @@ function computedValueCases(): void {
     const thenable = statefulThenable("value:thenable");
     const location = "/controller-resolution/mixed-modifiers";
     register(
-      createHandler(Controller, (value) => value, location, [
+      createHandler(Controller, (value: string) => value, location, [
         computedParameter(() => {
           events.push("provider");
           return thenable.value;

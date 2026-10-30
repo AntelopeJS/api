@@ -14,11 +14,11 @@ import {
   upgradeListener,
 } from "../server";
 import type { RouteDefinition } from "../route-table";
+import { nullPrototypeThenable } from "./thenable";
 
 const TEST_HOST = "127.0.0.1";
 const SUCCESS_STATUS = 200;
 const SERVER_ERROR_STATUS = 500;
-const THEN_PROPERTY = ["th", "en"].join("");
 const execFileAsync = promisify(execFile);
 
 interface TestResponse {
@@ -34,47 +34,35 @@ interface RequestOptions {
 
 interface StatefulThenable {
   getReadCount: () => number;
-  value: PromiseLike<string>;
+  value: object;
 }
 
-function immediateThenable<T>(value: T): PromiseLike<T> {
-  return Object.defineProperty<PromiseLike<T>>(
-    Object.create(null),
-    THEN_PROPERTY,
-    {
-      value: (resolve: (resolved: T) => void) => resolve(value),
-    },
-  );
+function immediateThenable(): object {
+  return nullPrototypeThenable({
+    value: (resolve: (resolved: undefined) => void) => resolve(undefined),
+  });
 }
 
-function rejectedThenable(error: Error): PromiseLike<never> {
-  return Object.defineProperty<PromiseLike<never>>(
-    Object.create(null),
-    THEN_PROPERTY,
-    {
-      value: (
-        _resolve: (resolved: never) => void,
-        reject: (reason: Error) => void,
-      ) => reject(error),
-    },
-  );
+function rejectedThenable(error: Error): object {
+  return nullPrototypeThenable({
+    value: (
+      _resolve: (resolved: never) => void,
+      reject: (reason: Error) => void,
+    ) => reject(error),
+  });
 }
 
 function statefulThenable(value: string): StatefulThenable {
   let readCount = 0;
-  const thenable = Object.defineProperty<PromiseLike<string>>(
-    Object.create(null),
-    THEN_PROPERTY,
-    {
-      get: () => {
-        readCount += 1;
-        if (readCount > 1) {
-          throw new Error("then getter read more than once");
-        }
-        return (resolve: (resolved: string) => void) => resolve(value);
-      },
+  const thenable = nullPrototypeThenable({
+    get: () => {
+      readCount += 1;
+      if (readCount > 1) {
+        throw new Error("then getter read more than once");
+      }
+      return (resolve: (resolved: string) => void) => resolve(value);
     },
-  );
+  });
   return {
     getReadCount: () => readCount,
     value: thenable,
@@ -237,7 +225,7 @@ function synchronousOrderCases(): void {
       { mode: "postfix", method: "GET", location: "/async" },
       () => {
         order.push("postfix");
-        return immediateThenable(undefined);
+        return immediateThenable();
       },
     );
     register(
