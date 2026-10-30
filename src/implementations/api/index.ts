@@ -24,6 +24,7 @@ type ControllerInstance = Record<PropertyKey, ComputedValue>;
 
 type ControllerClass = Class<ControllerInstance> & {
   location: string;
+  prototype: object;
 };
 
 type ParameterResolver = (
@@ -42,8 +43,10 @@ interface ControllerPlan {
   computedProperties: ComputedPropertyResolver[];
 }
 
+type HandlerCallback = (...args: ComputedValue[]) => RouteResult;
+
 interface HandlerPlan {
-  callback: RouteHandler["callback"];
+  callback: HandlerCallback;
   controller: ControllerPlan;
   parameters: ParameterResolver[];
 }
@@ -139,13 +142,23 @@ function applyModifiers(
   return pendingOf(value) ?? value;
 }
 
+function ownEntries(
+  table: Record<PropertyKey, ComputedParameter>,
+): Array<[PropertyKey, ComputedParameter]> {
+  const bySymbol: Record<symbol, ComputedParameter> = table;
+  const symbols = Object.getOwnPropertySymbols(bySymbol).map(
+    (symbol): [PropertyKey, ComputedParameter] => [symbol, bySymbol[symbol]],
+  );
+  return [...Object.entries(table), ...symbols];
+}
+
 function compileController(
   controllerClass: ControllerClass,
   properties: Record<PropertyKey, ComputedParameter>,
 ): ControllerPlan {
-  const computedProperties = Reflect.ownKeys(properties).map((key) => ({
+  const computedProperties = ownEntries(properties).map(([key, parameter]) => ({
     key,
-    resolve: compileParameter(properties[key]),
+    resolve: compileParameter(parameter),
   }));
   const existingPlan = controllerPlans.get(controllerClass);
   const plan = existingPlan ?? {

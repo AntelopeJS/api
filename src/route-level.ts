@@ -41,27 +41,27 @@ export interface HandlerResult {
   priority: HandlerPriority;
 }
 
-const special = {
-  $: true,
-  "-": true,
-  _: true,
-  ".": true,
-  "+": true,
-  "!": true,
-  " ": true,
-  "*": true,
-  "'": true,
-  "(": true,
-  ")": true,
-  ",": true,
-};
+const special = new Set([
+  "$",
+  "-",
+  "_",
+  ".",
+  "+",
+  "!",
+  " ",
+  "*",
+  "'",
+  "(",
+  ")",
+  ",",
+]);
 
 export function compileDynamicRoute(part: string): DynamicRoute {
   const mapping = [];
   const pattern = ["^"];
   let word: string[] | undefined;
   for (const char of part) {
-    if (char in special) {
+    if (special.has(char)) {
       if (word) {
         mapping.push(word.join(""));
         pattern.push(`([^\\${char}]*)`);
