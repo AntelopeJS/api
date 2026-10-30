@@ -185,7 +185,7 @@ function runMonitors(
       if (pending) {
         return pending.then(
           () => runMonitors(monitors, monitorContext, index + 1),
-          (error) => {
+          (error: unknown) => {
             console.error(error);
             return runMonitors(monitors, monitorContext, index + 1);
           },
@@ -366,7 +366,8 @@ function processRequest(
     if (pending) {
       return pending.then(
         () => completeRequest(false, undefined, method, path, requestContext),
-        (error) => completeRequest(true, error, method, path, requestContext),
+        (error: unknown) =>
+          completeRequest(true, error, method, path, requestContext),
       );
     }
   } catch (error) {

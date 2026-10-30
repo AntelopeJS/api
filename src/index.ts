@@ -140,7 +140,7 @@ export function start(): void {
   );
 
   if (getConfig().autoListen !== false) {
-    listenServers().catch((error) => {
+    listenServers().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       Logging.Error(`Unable to start listening servers: ${message}`);
     });
