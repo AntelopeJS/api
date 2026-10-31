@@ -16,7 +16,7 @@ export class PlaygroundController extends Controller("/playground") {
   }
 
   @Post("/echo")
-  async echo(body: any) {
+  async echo(@JSONBody() body: unknown) {
     console.log("echo", body);
     return { received: body };
   }

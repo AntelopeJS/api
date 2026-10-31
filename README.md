@@ -81,7 +81,7 @@ The module publishes three [config variables](https://framework.antelopejs.com/d
 | `API_LOCAL_BASE_URL`  | The same-host origin, for example `http://127.0.0.1:8080`. |
 | `API_PUBLIC_BASE_URL` | `publicBaseUrl`, without trailing slashes.                 |
 
-```typescript [antelope.config.ts]
+```typescript fragment [antelope.config.ts]
 modules: {
   "file-storage-local": {
     config: { baseUrl: "${@api.API_PUBLIC_BASE_URL}" },
@@ -95,7 +95,7 @@ The package also declares the function computing them from the configuration, `c
 
 ### Startup gate
 
-The port is served from `construct` on, but every request is answered `503` with the body `error.server_starting` and `Retry-After: 1` until the core announces that every module has started (`Events.ModulesStarted` of `@antelopejs/interface-core/modules`, emitted by `@antelopejs/core` 1.17 and later). It answers `503` again from the moment the whole project starts stopping (`Events.ModulesStopping`), at shutdown. Stopping, reloading or removing a single module at runtime leaves the gate open; `@antelopejs/core` 1.17.0 still closes it then, the core release after it does not ([AntelopeJS/antelopejs#219](https://github.com/AntelopeJS/antelopejs/pull/219)). A module that fails to start at launch leaves the project answering `503`, and so does a `start()` that has not settled after 120 s, which fails the start. Nothing runs for a held request, so clients can retry it. CORS preflights are answered while the gate is closed, so a browser can read the `503`.
+The port is served from `construct` on, but every request is answered `503` with the body `error.server_starting` and `Retry-After: 1` until the core announces that every module has started (`Events.ModulesStarted` of `@antelopejs/interface-core/modules`, emitted by `@antelopejs/core`). It answers `503` again from the moment the whole project starts stopping (`Events.ModulesStopping`), at shutdown. Stopping, reloading or removing a single module at runtime leaves the gate open; the core release that introduced the gate still closes it then, the next core release does not ([AntelopeJS/antelopejs#219](https://github.com/AntelopeJS/antelopejs/pull/219)). A module that fails to start at launch leaves the project answering `503`, and so does a `start()` that has not settled after 120 s, which fails the start. Nothing runs for a held request, so clients can retry it. CORS preflights are answered while the gate is closed, so a browser can read the `503`.
 
 `GET /_live` always answers `200`: use it as the liveness probe, and a normal route as the readiness probe.
 
@@ -146,15 +146,9 @@ Run the project with `ajs project dev`, then call `GET http://localhost:8080/hel
 
 <!-- antelopejs-docs-compat:end -->
 
-| Package                          | Supported range  |
-| -------------------------------- | ---------------- |
-| `@antelopejs/interface-api`      | `>=0.1.0 <0.2.0` |
-| `@antelopejs/interface-api-util` | `>=0.2.0 <0.3.0` |
-| `@antelopejs/interface-core`     | `>=0.1.1 <1.0.0` |
+Since 1.6.0 the module loads the 0.1 line of `interface-api` and the 0.2 line of `interface-api-util`. `@antelopejs/core` refuses to start a project in which another loaded module declares a range that excludes the shared copy, and reports `Incompatible interface package resolution`, naming the module, its range and the shared copy. Widen such ranges to admit those two lines before upgrading, or stay on the 1.5 release line of this module, which still loads the 0.1 line of `interface-api-util`.
 
-Since 1.6.0 the module requires `@antelopejs/interface-api` 0.1 and `@antelopejs/interface-api-util` 0.2, and loads those copies. `@antelopejs/core` refuses to start a project in which another loaded module declares a range that excludes the shared copy, and reports `Incompatible interface package resolution` (for example `my-module requires @antelopejs/interface-api-util@^0.1.3, but the shared copy is 0.2.0`). Widen such ranges to admit `@antelopejs/interface-api` 0.1 and `@antelopejs/interface-api-util` 0.2 before upgrading, or keep `@antelopejs/api` at 1.5.0, which still loads `@antelopejs/interface-api-util` 0.1.
-
-The module is developed and tested against `@antelopejs/core` `^1.13.4` on Node.js 24.
+The module is developed and tested on Node.js 24.
 
 ## Contributing
 
