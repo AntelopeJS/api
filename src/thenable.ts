@@ -22,28 +22,58 @@ function isThenOf<T>(_value: Awaitable<T>, then: unknown): then is Then<T> {
 }
 
 /**
- * Returns the promise a thenable settles through, or `undefined` for a plain
- * value. `then` is read exactly once; a native promise is returned as is, and
- * any other thenable is called on a later microtask, like `Promise.resolve`.
+ * A value whose `then` is not callable ({@link isThenOf} answered false) is
+ * the plain side of an `Awaitable<T>`.
  */
-export function pendingOf<T>(value: Awaitable<T>): Promise<T> | undefined {
+function isPlainOf<T>(_value: Awaitable<T>, thenable: boolean): _value is T {
+  return !thenable;
+}
+
+function isNativePromise<T>(value: PromiseLike<T>): value is Promise<T> {
+  return value instanceof Promise;
+}
+
+/** How an `Awaitable<T>` continues: a promise to wait for, or its value now. */
+export type Settlement<T> =
+  | { kind: "pending"; promise: Promise<T> }
+  | { kind: "settled"; value: T };
+
+/**
+ * Splits an `Awaitable<T>` into the promise a thenable settles through or the
+ * plain value. `then` is read exactly once; a native promise is returned as
+ * is, and any other thenable is called on a later microtask, like
+ * `Promise.resolve`.
+ */
+export function settle<T>(value: Awaitable<T>): Settlement<T> {
   if (!isObjectLike(value)) {
-    return undefined;
+    return { kind: "settled", value };
   }
   const then = thenProperty(value);
-  if (!isThenOf(value, then)) {
-    return undefined;
+  if (isPlainOf(value, isThenOf(value, then))) {
+    return { kind: "settled", value };
   }
-  if (value instanceof Promise) {
-    return value;
+  if (isNativePromise(value)) {
+    return { kind: "pending", promise: value };
   }
-  return new Promise<T>((resolve, reject) => {
+  const promise = new Promise<T>((resolve, reject) => {
     queueMicrotask(() => {
       try {
-        then.call(value, resolve, reject);
+        if (isThenOf(value, then)) {
+          then.call(value, resolve, reject);
+        }
       } catch (error) {
         reject(error);
       }
     });
   });
+  return { kind: "pending", promise };
+}
+
+/**
+ * Returns the promise a thenable settles through, or `undefined` for a plain
+ * value (see {@link settle}).
+ */
+export function pendingOf<T>(value: Awaitable<T>): Promise<T> | undefined {
+  const settlement = settle(value);
+  return settlement.kind === "pending" ? settlement.promise : undefined;
 }

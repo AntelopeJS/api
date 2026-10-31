@@ -14,7 +14,8 @@ import {
   upgradeListener,
 } from "../server";
 import type { RouteDefinition } from "../route-table";
-import { nullPrototypeThenable } from "./thenable";
+import type { RouteResult } from "../request-context";
+import { nullPrototypeRouteThenable } from "./thenable";
 
 const TEST_HOST = "127.0.0.1";
 const SUCCESS_STATUS = 200;
@@ -34,17 +35,17 @@ interface RequestOptions {
 
 interface StatefulThenable {
   getReadCount: () => number;
-  value: object;
+  value: PromiseLike<RouteResult>;
 }
 
-function immediateThenable(): object {
-  return nullPrototypeThenable({
+function immediateThenable(): PromiseLike<RouteResult> {
+  return nullPrototypeRouteThenable({
     value: (resolve: (resolved: undefined) => void) => resolve(undefined),
   });
 }
 
-function rejectedThenable(error: Error): object {
-  return nullPrototypeThenable({
+function rejectedThenable(error: Error): PromiseLike<RouteResult> {
+  return nullPrototypeRouteThenable({
     value: (
       _resolve: (resolved: never) => void,
       reject: (reason: Error) => void,
@@ -54,7 +55,7 @@ function rejectedThenable(error: Error): object {
 
 function statefulThenable(value: string): StatefulThenable {
   let readCount = 0;
-  const thenable = nullPrototypeThenable({
+  const thenable = nullPrototypeRouteThenable({
     get: () => {
       readCount += 1;
       if (readCount > 1) {

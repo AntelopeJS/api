@@ -5,7 +5,7 @@ import { HTTPResult } from "@antelopejs/interface-api";
 
 import { gateResponse } from "./startup-gate";
 import { applyCors } from "./middlewares/cors";
-import { type Awaitable, pendingOf } from "./thenable";
+import { type Awaitable, pendingOf, settle } from "./thenable";
 import type {
   RequestContext,
   RouteCallback,
@@ -39,15 +39,28 @@ function handleResult(
 
 function hasMessage(
   error: RequestContext["error"],
-): error is { message: RouteResult } {
+): error is { message: RequestContext["error"] } {
   return typeof error === "object" && error !== null && "message" in error;
 }
 
-function extractError(error: RequestContext["error"]) {
-  if (hasMessage(error)) {
-    return error.message ?? error;
+function isText(body: RequestContext["error"]): body is string | undefined {
+  return body === undefined || typeof body === "string";
+}
+
+/**
+ * The response for a thrown value: a thrown `HTTPResult` as is, otherwise
+ * its `message` (or the value itself) as the body, written as JSON unless it
+ * is a string.
+ */
+function errorResult(error: RequestContext["error"], status: number) {
+  const body = hasMessage(error) ? (error.message ?? error) : error;
+  if (body instanceof HTTPResult) {
+    return body;
   }
-  return error;
+  if (isText(body)) {
+    return new HTTPResult(status, body);
+  }
+  return new HTTPResult(status, JSON.stringify(body), "application/json");
 }
 
 function copyHeaders(source: HTTPResult, target: HTTPResult) {
@@ -73,7 +86,7 @@ function replaceResponse(
 
 function setHandlerResponse(
   requestContext: RequestContext,
-  result: RouteResult,
+  result: RouteResult | void,
 ) {
   if (requestContext.response.isStream()) {
     return;
@@ -113,16 +126,16 @@ function executeHandler(
   return handler.handler(requestContext);
 }
 
-function continueExecution<U>(
-  value: Awaitable<RouteResult>,
-  next: (result: RouteResult) => Awaitable<U>,
+function continueExecution<T, U>(
+  value: Awaitable<T>,
+  next: (result: T) => Awaitable<U>,
 ): Awaitable<U> {
-  const pending = pendingOf(value);
-  if (pending) {
+  const settlement = settle(value);
+  if (settlement.kind === "pending") {
     // oxlint-disable-next-line promise/no-callback-in-promise -- continuation-passing keeps the synchronous fast path allocation-free
-    return pending.then((result) => next(result));
+    return settlement.promise.then((result) => next(result));
   }
-  return next(value);
+  return next(settlement.value);
 }
 
 function executePriorityHandlers(
@@ -136,17 +149,16 @@ function executePriorityHandlers(
   for (let index = startIndex; index < handlers.length; index += 1) {
     const { handler, parameters } = handlers[index];
     requestContext.routeParameters = parameters;
-    const result = handler(requestContext);
-    const pending = pendingOf(result);
-    if (pending) {
-      return pending.then((resolved) =>
+    const settlement = settle(handler(requestContext));
+    if (settlement.kind === "pending") {
+      return settlement.promise.then((resolved) =>
         resolved
           ? resolved
           : executePriorityHandlers(handlers, requestContext, index + 1),
       );
     }
-    if (result) {
-      return result;
+    if (settlement.value) {
+      return settlement.value;
     }
   }
   return undefined;
@@ -302,7 +314,7 @@ function completeRequest(
   requestContext: RequestContext,
 ): Awaitable<void> {
   if (didFail) {
-    replaceResponse(requestContext, extractError(error), 500);
+    replaceResponse(requestContext, errorResult(error, 500), 500);
   }
   requestContext.error = error;
   const monitorExecution = executeMonitors(method, path, requestContext);
@@ -454,7 +466,7 @@ export async function upgradeListener(
     requestError = error;
     mustDestroySocket = true;
     if (!hasUpgradedConnection) {
-      replaceResponse(requestContext, extractError(error), 500);
+      replaceResponse(requestContext, errorResult(error, 500), 500);
       mustSendResponse = true;
     }
   } finally {
