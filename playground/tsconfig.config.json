@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": "../node_modules/.cache/playground-config",
+    "tsBuildInfoFile": "../node_modules/.cache/playground-config/.tsbuildinfo"
+  },
+  "include": ["./antelope.config.ts"]
+}
