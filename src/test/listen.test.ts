@@ -26,17 +26,6 @@ const MULTI_FREE_PORT = 25150;
 const STRING_PORT = 25160;
 const RANDOM_PORT = 0;
 
-interface JsonServerConfig {
-  protocol: "http";
-  host: string;
-  port: string | number;
-}
-
-const configureFromJson = configure as (config: {
-  autoListen: boolean;
-  servers: JsonServerConfig[];
-}) => void;
-
 function occupyPort(port: number): Promise<net.Server> {
   return new Promise((resolve, reject) => {
     const blocker = net.createServer();
@@ -222,9 +211,10 @@ function portSelectionCases(): void {
   it("binds the numeric port when the configured port is a string", async () => {
     stubRuntime(true);
 
-    configureFromJson({
+    configure({
       autoListen: false,
       servers: [
+        // @ts-expect-error a JSON-style string port is off-contract input (Config.port is a number); the test asserts it is bound as the numeric port
         { protocol: "http", host: TEST_HOST, port: String(STRING_PORT) },
       ],
     });
@@ -240,9 +230,12 @@ function portSelectionCases(): void {
   it("rejects when the configured port is not a valid number", async () => {
     stubRuntime(true);
 
-    configureFromJson({
+    configure({
       autoListen: false,
-      servers: [{ protocol: "http", host: TEST_HOST, port: "not-a-port" }],
+      servers: [
+        // @ts-expect-error a non-numeric string port is off-contract input (Config.port is a number); the test asserts listenServers rejects it
+        { protocol: "http", host: TEST_HOST, port: "not-a-port" },
+      ],
     });
     start();
 
