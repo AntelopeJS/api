@@ -140,7 +140,7 @@ Run the project with `ajs project dev`, then call `GET http://localhost:8080/hel
 | Package                          | Supported                                                      | Tested with                                                    |
 | -------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------- |
 | `@antelopejs/core`               | `>=1.17.0 <2`                                                  | `1.17.0`                                                       |
-| `@antelopejs/interface-api`      | `file:.campaign/tgz/antelopejs-interface-api-3f9490d.tgz`      | `file:.campaign/tgz/antelopejs-interface-api-3f9490d.tgz`      |
+| `@antelopejs/interface-api`      | `file:.campaign/tgz/antelopejs-interface-api-70e7935.tgz`      | `file:.campaign/tgz/antelopejs-interface-api-70e7935.tgz`      |
 | `@antelopejs/interface-api-util` | `file:.campaign/tgz/antelopejs-interface-api-util-385c5f2.tgz` | `file:.campaign/tgz/antelopejs-interface-api-util-385c5f2.tgz` |
 | `@antelopejs/interface-core`     | `>=0.2.6 <1.0.0`                                               | `0.2.6`                                                        |
 
