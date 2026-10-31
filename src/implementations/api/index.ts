@@ -1,7 +1,7 @@
 import { GetMetadata } from "@antelopejs/interface-core";
-import type { Class } from "@antelopejs/interface-core/decorators";
 import {
   type ComputedParameter,
+  type ControllerClass,
   ControllerMeta,
   type CorsConfig,
   HTTPResult,
@@ -20,12 +20,9 @@ import { type Awaitable, pendingOf } from "../../thenable";
 
 type ComputedValue = ReturnType<ParameterModifier>;
 
-type ControllerInstance = Record<PropertyKey, ComputedValue>;
+type Controller = ControllerClass & { prototype: object };
 
-type ControllerClass = Class<ControllerInstance> & {
-  location: string;
-  prototype: object;
-};
+type ControllerInstance = InstanceType<Controller>;
 
 type ParameterResolver = (
   context: RequestContextDev,
@@ -38,7 +35,7 @@ interface ComputedPropertyResolver {
 }
 
 interface ControllerPlan {
-  controllerClass: ControllerClass;
+  controllerClass: Controller;
   cacheKey: object;
   computedProperties: ComputedPropertyResolver[];
 }
@@ -56,7 +53,7 @@ const MALFORMED_REQUEST_PREFIX = "Malformed request";
 
 const classCacheSymbol = Symbol();
 const registeredRoutes = new Map<string, RouteHandler>();
-const controllerPlans = new WeakMap<ControllerClass, ControllerPlan>();
+const controllerPlans = new WeakMap<Controller, ControllerPlan>();
 
 interface RequestContextDev extends RequestContext {
   [classCacheSymbol]?: Map<object, ControllerInstance>;
@@ -153,7 +150,7 @@ function ownEntries(
 }
 
 function compileController(
-  controllerClass: ControllerClass,
+  controllerClass: Controller,
   properties: Record<PropertyKey, ComputedParameter>,
 ): ControllerPlan {
   const computedProperties = ownEntries(properties).map(([key, parameter]) => ({
@@ -171,7 +168,7 @@ function compileController(
   return plan;
 }
 
-function getControllerPlan(controllerClass: ControllerClass): ControllerPlan {
+function getControllerPlan(controllerClass: Controller): ControllerPlan {
   const cachedPlan = controllerPlans.get(controllerClass);
   if (cachedPlan) {
     return cachedPlan;
@@ -205,11 +202,11 @@ function applyComputedProperties(
     if (isPromiseLike(value)) {
       pending.push(
         Promise.resolve(value).then((resolved) => {
-          controllerInstance[property.key] = resolved;
+          Object.assign(controllerInstance, { [property.key]: resolved });
         }),
       );
     } else {
-      controllerInstance[property.key] = value;
+      Object.assign(controllerInstance, { [property.key]: value });
     }
   }
 
@@ -247,10 +244,10 @@ function resolveControllerInstance(
 }
 
 export async function GetControllerInstance(
-  controllerClass: Class<unknown>,
+  controllerClass: Controller,
   context: RequestContext,
 ) {
-  const plan = getControllerPlan(controllerClass as ControllerClass);
+  const plan = getControllerPlan(controllerClass);
   return resolveControllerInstance(plan, context);
 }
 
@@ -321,7 +318,7 @@ function invokeHandler(
 }
 
 function compileHandler(handler: RouteHandler): HandlerPlan {
-  const controllerClass: ControllerClass = handler.proto.constructor;
+  const controllerClass: Controller = handler.proto.constructor;
   return {
     callback: handler.callback,
     controller: compileController(controllerClass, handler.properties),
