@@ -137,12 +137,12 @@ Run the project with `ajs project dev`, then call `GET http://localhost:8080/hel
 
 <!-- antelopejs-docs-compat:start -->
 
-| Package                          | Supported        | Tested with |
-| -------------------------------- | ---------------- | ----------- |
-| `@antelopejs/core`               | `>=1.17.0 <2`    | `1.17.0`    |
-| `@antelopejs/interface-api`      | `>=0.1.0 <0.2.0` | `0.1.0`     |
-| `@antelopejs/interface-api-util` | `>=0.2.0 <0.3.0` | `0.2.0`     |
-| `@antelopejs/interface-core`     | `>=0.2.6 <1.0.0` | `0.2.6`     |
+| Package                          | Supported                                                 | Tested with                                               |
+| -------------------------------- | --------------------------------------------------------- | --------------------------------------------------------- |
+| `@antelopejs/core`               | `>=1.17.0 <2`                                             | `1.17.0`                                                  |
+| `@antelopejs/interface-api`      | `file:.campaign/tgz/antelopejs-interface-api-71528ee.tgz` | `file:.campaign/tgz/antelopejs-interface-api-71528ee.tgz` |
+| `@antelopejs/interface-api-util` | `>=0.2.0 <0.3.0`                                          | `0.2.0`                                                   |
+| `@antelopejs/interface-core`     | `>=0.2.6 <1.0.0`                                          | `0.2.6`                                                   |
 
 <!-- antelopejs-docs-compat:end -->
 
