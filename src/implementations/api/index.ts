@@ -20,7 +20,7 @@ import { type Awaitable, pendingOf } from "../../thenable";
 
 type ComputedValue = ReturnType<ParameterModifier>;
 
-type Controller = ControllerClass & { prototype: object };
+type Controller = ControllerClass<object> & { prototype: object };
 
 type ControllerInstance = InstanceType<Controller>;
 
