@@ -51,8 +51,8 @@
     "suppressions:update": "antelopejs-suppressions --update"
   },
   "dependencies": {
-    "@antelopejs/interface-api": ">=0.1.0 <0.2.0",
-    "@antelopejs/interface-api-util": ">=0.2.0 <0.3.0",
+    "@antelopejs/interface-api": "file:.campaign/tgz/antelopejs-interface-api-3f9490d.tgz",
+    "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-385c5f2.tgz",
     "@antelopejs/interface-core": ">=0.2.6 <1.0.0",
     "reflect-metadata": "^0.2.2",
     "ws": "^8.20.0"
@@ -85,6 +85,12 @@
     }
   },
   "packageManager": "pnpm@10.6.5",
+  "pnpm": {
+    "overrides": {
+      "@antelopejs/interface-api": "file:.campaign/tgz/antelopejs-interface-api-3f9490d.tgz",
+      "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-385c5f2.tgz"
+    }
+  },
   "antelopeJs": {
     "implements": [
       "@antelopejs/interface-api",
