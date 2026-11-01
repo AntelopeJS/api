@@ -2,6 +2,7 @@ import { GetMetadata } from "@antelopejs/interface-core";
 import {
   type ComputedParameter,
   type ControllerClass,
+  type LegacyController,
   ControllerMeta,
   type CorsConfig,
   HTTPResult,
@@ -21,6 +22,7 @@ import { type Awaitable, pendingOf } from "../../thenable";
 type ComputedValue = ReturnType<ParameterModifier>;
 
 type Controller = ControllerClass<object> & { prototype: object };
+type RegisteredController = Controller | LegacyController;
 
 type ControllerInstance = InstanceType<Controller>;
 
@@ -35,7 +37,7 @@ interface ComputedPropertyResolver {
 }
 
 interface ControllerPlan {
-  controllerClass: Controller;
+  controllerClass: RegisteredController;
   cacheKey: object;
   computedProperties: ComputedPropertyResolver[];
 }
@@ -53,7 +55,7 @@ const MALFORMED_REQUEST_PREFIX = "Malformed request";
 
 const classCacheSymbol = Symbol();
 const registeredRoutes = new Map<string, RouteHandler>();
-const controllerPlans = new WeakMap<Controller, ControllerPlan>();
+const controllerPlans = new WeakMap<RegisteredController, ControllerPlan>();
 
 interface RequestContextDev extends RequestContext {
   [classCacheSymbol]?: Map<object, ControllerInstance>;
@@ -150,7 +152,7 @@ function ownEntries(
 }
 
 function compileController(
-  controllerClass: Controller,
+  controllerClass: RegisteredController,
   properties: Record<PropertyKey, ComputedParameter>,
 ): ControllerPlan {
   const computedProperties = ownEntries(properties).map(([key, parameter]) => ({
@@ -318,7 +320,7 @@ function invokeHandler(
 }
 
 function compileHandler(handler: RouteHandler): HandlerPlan {
-  const controllerClass: Controller = handler.controller;
+  const controllerClass: RegisteredController = handler.controller;
   return {
     callback: handler.callback,
     controller: compileController(controllerClass, handler.properties),
