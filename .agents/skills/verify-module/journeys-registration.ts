@@ -31,11 +31,11 @@ export const routeRegistration: Journey = {
         routeRow("/dynamic/guarded", "get", "guardedCallback", 0),
         routeRow("/dynamic/health", "get", "healthCallback", 0),
       ]),
-      same("getRegisteredRouteHandlers lists them with the controller they were registered under", pick(registered.value, "handlers"), [
-        { idIsString: true, mode: "handler", method: "post", location: "/dynamic/echo", controller: true, callback: "function" },
-        { idIsString: true, mode: "handler", method: "get", location: "/dynamic/guarded", controller: true, callback: "function" },
-        { idIsString: true, mode: "prefix", method: "get", location: "/dynamic/guarded", controller: true, callback: "function" },
-        { idIsString: true, mode: "handler", method: "get", location: "/dynamic/health", controller: true, callback: "function" },
+      same("getRegisteredRouteHandlers lists them with the controller they were registered under and no proto field", pick(registered.value, "handlers"), [
+        { idIsString: true, mode: "handler", method: "post", location: "/dynamic/echo", controller: true, proto: false, callback: "function" },
+        { idIsString: true, mode: "handler", method: "get", location: "/dynamic/guarded", controller: true, proto: false, callback: "function" },
+        { idIsString: true, mode: "prefix", method: "get", location: "/dynamic/guarded", controller: true, proto: false, callback: "function" },
+        { idIsString: true, mode: "handler", method: "get", location: "/dynamic/health", controller: true, proto: false, callback: "function" },
       ]),
     ]);
     const health = await session.get("GET /dynamic/health", "/dynamic/health");
