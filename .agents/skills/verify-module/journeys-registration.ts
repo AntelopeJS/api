@@ -100,7 +100,7 @@ export const customDecorators: Journey = {
 };
 
 export const controllerRequired: Journey = {
-  title: "RegisterRoute needs the controller class that declares the route: a handler with no controller, or with only the removed proto field, is refused with a TypeError and registers nothing, while the same handler with its controller is registered, listed and removable",
+  title: "RegisterRoute needs the controller class that declares the route: a handler with no controller, or with only the removed proto field, is refused with a TypeError and registers nothing, while the same handler with its controller is registered, listed and served",
   entryPoint: "`RegisterRoute({ ..., controller })` and `RegisterRoute({ ..., proto })` called from a module while the project runs",
   async run(context) {
     const session = await open(context);
