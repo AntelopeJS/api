@@ -15,6 +15,8 @@ export interface RequestSpec {
   /** Aborts the request after this many milliseconds, once the response head arrived. */
   abortAfterMs?: number;
   timeoutMs?: number;
+  /** A GET path requested on the same keep-alive connection once the response has ended. */
+  thenGet?: string;
 }
 
 /** What the client saw. */
@@ -26,13 +28,32 @@ export interface Reply {
   json: Json | undefined;
   chunks: { atMs: number; text: string }[];
   error: string | null;
+  /** The follow-up GET of `thenGet`: its status and whether it went over the connection of the first request. */
+  followUp: { status: number | null; sameConnection: boolean } | null;
 }
 
 const SCRIPT = String.raw`const spec = JSON.parse(process.argv[1]);
 const url = new URL(spec.url);
 const http = require(url.protocol === "https:" ? "node:https" : "node:http");
 const started = Date.now();
-const out = { status: null, headers: {}, text: "", chunks: [], error: null };
+const out = { status: null, headers: {}, text: "", chunks: [], error: null, followUp: null };
+const agent = new http.Agent({ keepAlive: true, rejectUnauthorized: false });
+let firstPort = null;
+let responded = false;
+let written = false;
+function followUp() {
+  if (spec.thenGet === undefined || out.followUp !== null || !responded || !written) return;
+  const follow = { status: null, sameConnection: false };
+  out.followUp = follow;
+  const next = http.get({ hostname: url.hostname, port: url.port, path: spec.thenGet, agent, timeout: 4000 }, (response) => {
+    follow.status = response.statusCode;
+    response.resume();
+    response.on("end", finish);
+  });
+  next.on("socket", (socket) => { follow.sameConnection = socket.localPort === firstPort; });
+  next.on("timeout", () => { next.destroy(); finish(); });
+  next.on("error", finish);
+}
 let finished = false;
 function finish() {
   if (finished) return;
@@ -44,7 +65,7 @@ const headers = { ...(spec.headers || {}) };
 const payload = spec.bodyBytes !== undefined ? null : spec.body !== undefined ? Buffer.from(spec.body) : null;
 if (payload && headers["content-length"] === undefined && headers["Content-Length"] === undefined) headers["content-length"] = String(payload.length);
 if (spec.bodyBytes !== undefined && spec.chunked === undefined) headers["content-length"] = String(spec.bodyBytes);
-const request = http.request({ hostname: url.hostname, port: url.port, path: url.pathname + url.search, method: spec.method || "GET", headers, agent: new http.Agent({ keepAlive: true, rejectUnauthorized: false }) }, (response) => {
+const request = http.request({ hostname: url.hostname, port: url.port, path: url.pathname + url.search, method: spec.method || "GET", headers, agent }, (response) => {
   out.status = response.statusCode;
   for (const [name, value] of Object.entries(response.headers)) out.headers[name] = value;
   response.setEncoding("utf8");
@@ -52,11 +73,17 @@ const request = http.request({ hostname: url.hostname, port: url.port, path: url
     out.text += data;
     out.chunks.push({ atMs: Date.now() - started, text: data });
   });
-  response.on("end", finish);
+  response.on("end", () => {
+    responded = true;
+    if (spec.thenGet === undefined) finish();
+    else setImmediate(followUp);
+  });
   response.on("error", (error) => { out.error = String(error.message); finish(); });
   response.on("aborted", () => { out.error = "aborted"; finish(); });
   if (spec.abortAfterMs !== undefined) setTimeout(() => { out.error = "client aborted"; request.destroy(); finish(); }, spec.abortAfterMs);
 });
+request.on("socket", (socket) => { firstPort = socket.localPort; });
+request.on("finish", () => { written = true; setImmediate(followUp); });
 request.on("error", (error) => { if (out.status === null) out.error = error.code + " " + error.message + " after " + (Date.now() - started) + " ms"; finish(); });
 request.setTimeout(spec.timeoutMs || 20000, () => { out.error = "timeout"; request.destroy(); finish(); });
 if (spec.bodyBytes !== undefined) {
@@ -96,6 +123,12 @@ function chunkList(value: Json | undefined): { atMs: number; text: string }[] {
   return chunks;
 }
 
+function followUpOf(value: Json | undefined): Reply["followUp"] {
+  if (value === undefined || value === null) return null;
+  const code = pick(value, "status");
+  return { status: isNumber(code) ? code : null, sameConnection: pick(value, "sameConnection") === true };
+}
+
 /** Sends the request from a Node process and records it as one evidence step. */
 export async function send(context: JourneyContext, name: string, spec: RequestSpec): Promise<Reply> {
   const ran = await context.command(name, "node", ["-e", SCRIPT, JSON.stringify(spec)]);
@@ -115,6 +148,7 @@ export async function send(context: JourneyContext, name: string, spec: RequestS
     json: parseJson(text),
     chunks: chunkList(pick(parsed, "chunks")),
     error: isString(failure) ? failure : ran.exitCode === 0 ? null : ran.stderr.slice(0, 200),
+    followUp: followUpOf(pick(parsed, "followUp")),
   };
 }
 

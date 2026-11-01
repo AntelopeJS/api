@@ -97,8 +97,8 @@ export const bodyStreaming: Journey = {
     const session = await open(context, { controllers: BODIES_SOURCE });
     const big = await session.get("PUT 3 MiB, over the buffered limit", "/body/stream", { method: "PUT", bodyBytes: 3 * MIB, chunked: 65_536 });
     context.expect(big.folder, [status("no limit applies to a streamed body", big, 200), same("every byte arrived, in several chunks", big.json, { bytes: 3 * MIB, chunked: true })]);
-    const early = await session.get("PUT 3 MiB and stop reading after the first chunk", "/body/early", { method: "PUT", bodyBytes: 3 * MIB, chunked: 65_536 });
-    context.expect(early.folder, [status("the client still gets its response", early, 200), same("the handler left the loop", early.json, { left: true })]);
+    const early = await session.get("PUT 3 MiB and stop reading after the first chunk", "/body/early", { method: "PUT", bodyBytes: 3 * MIB, chunked: 65_536, thenGet: "/body/ping" });
+    context.expect(early.folder, [status("the client still gets its response", early, 200), same("the handler left the loop", early.json, { left: true }), same("the rest of the body is discarded, so the same connection serves the next request", early.followUp, { status: 200, sameConnection: true })]);
     const empty = await session.get("PUT an empty body", "/body/stream", { method: "PUT", body: "" });
     context.expect(empty.folder, [status("an empty stream", empty, 200), same("zero bytes", empty.json, { bytes: 0, chunked: false })]);
     const again = await session.get("POST after the early exit", "/body/raw", { method: "POST", body: "still fine" });

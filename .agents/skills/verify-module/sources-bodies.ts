@@ -1,4 +1,4 @@
-export const BODIES_SOURCE = String.raw`import { BodyStream, Context, Controller, JSONBody, Post, Put, RawBody, ReadBody, RequestContext, StreamBody } from "@antelopejs/interface-api";
+export const BODIES_SOURCE = String.raw`import { BodyStream, Context, Controller, Get, JSONBody, Post, Put, RawBody, ReadBody, RequestContext, StreamBody } from "@antelopejs/interface-api";
 
 const TEN_MIBIBYTES = 10 * 1024 * 1024;
 
@@ -44,6 +44,11 @@ export class BodyController extends Controller("/body") {
       chunks += 1;
     }
     return { bytes, chunked: chunks > 1 };
+  }
+
+  @Get("ping")
+  ping() {
+    return { ok: true };
   }
 
   @Put("early")
