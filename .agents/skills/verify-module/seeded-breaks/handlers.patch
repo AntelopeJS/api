@@ -1,0 +1,13 @@
+diff --git a/src/server.ts b/src/server.ts
+index 613a5e7..d4a05da 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -131,7 +131,7 @@ function executePriorityHandlers(
+   startIndex = 0,
+ ): Awaitable<RouteResult> {
+   if (startIndex === 0 && handlers.length > 1) {
+-    handlers.sort((a, b) => a.priority - b.priority);
++    handlers.sort((a, b) => b.priority - a.priority);
+   }
+   for (let index = startIndex; index < handlers.length; index += 1) {
+     const { handler, parameters } = handlers[index];

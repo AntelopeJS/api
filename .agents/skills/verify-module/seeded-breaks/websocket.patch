@@ -1,0 +1,13 @@
+diff --git a/src/server.ts b/src/server.ts
+index 613a5e7..3e6dbba 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -426,7 +426,7 @@ export async function upgradeListener(
+   let mustDestroySocket = false;
+ 
+   try {
+-    const handler = findRouteHandler("websocket", method, path, url.pathname);
++    const handler = findRouteHandler("handler", method, path, url.pathname);
+     if (!handler || Array.isArray(handler)) {
+       mustSendResponse = true;
+       mustDestroySocket = true;

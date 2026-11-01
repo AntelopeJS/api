@@ -1,0 +1,13 @@
+diff --git a/src/server.ts b/src/server.ts
+index 613a5e7..fcaed69 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -83,7 +83,7 @@ function setHandlerResponse(
+     return;
+   }
+   requestContext.response.setBody(result || "");
+-  requestContext.response.setStatus(200);
++  requestContext.response.setStatus(201);
+ }
+ 
+ function cloneResponse(response: HTTPResult) {
