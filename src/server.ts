@@ -5,7 +5,7 @@ import { HTTPResult } from "@antelopejs/interface-api";
 
 import { gateResponse } from "./startup-gate";
 import { applyCors } from "./middlewares/cors";
-import { type Awaitable, pendingOf } from "./thenable";
+import { type Awaitable, continueWith, pendingOf } from "./thenable";
 import type {
   RequestContext,
   RouteCallback,
@@ -39,15 +39,28 @@ function handleResult(
 
 function hasMessage(
   error: RequestContext["error"],
-): error is { message: RouteResult } {
+): error is { message: RequestContext["error"] } {
   return typeof error === "object" && error !== null && "message" in error;
 }
 
-function extractError(error: RequestContext["error"]) {
-  if (hasMessage(error)) {
-    return error.message ?? error;
+function isText(value: RequestContext["error"]): value is string {
+  return typeof value === "string";
+}
+
+/**
+ * The 500 answer for a thrown value: a thrown `HTTPResult` as is, else the
+ * value's `message` (or the value itself) as text when it is a string or
+ * `undefined`, and as its JSON text otherwise.
+ */
+function errorResponse(error: RequestContext["error"]): HTTPResult {
+  const value = hasMessage(error) ? (error.message ?? error) : error;
+  if (value instanceof HTTPResult) {
+    return value;
   }
-  return error;
+  if (value === undefined || isText(value)) {
+    return new HTTPResult(500, value);
+  }
+  return new HTTPResult(500, JSON.stringify(value), "application/json");
 }
 
 function copyHeaders(source: HTTPResult, target: HTTPResult) {
@@ -66,7 +79,9 @@ function replaceResponse(
 ) {
   const previousResponse = requestContext.response;
   const response =
-    result instanceof HTTPResult ? result : new HTTPResult(status, result);
+    result instanceof HTTPResult
+      ? result
+      : new HTTPResult(status, result === undefined ? undefined : result);
   copyHeaders(previousResponse, response);
   requestContext.response = response;
 }
@@ -111,18 +126,6 @@ function executeHandler(
   }
   requestContext.routeParameters = handler.parameters;
   return handler.handler(requestContext);
-}
-
-function continueExecution<U>(
-  value: Awaitable<RouteResult>,
-  next: (result: RouteResult) => Awaitable<U>,
-): Awaitable<U> {
-  const pending = pendingOf(value);
-  if (pending) {
-    // oxlint-disable-next-line promise/no-callback-in-promise -- continuation-passing keeps the synchronous fast path allocation-free
-    return pending.then((result) => next(result));
-  }
-  return next(value);
 }
 
 function executePriorityHandlers(
@@ -238,7 +241,7 @@ function executePostfix(
   requestContext: RequestContext,
 ): Awaitable<void> {
   const execution = executeMiddleware("postfix", method, path, requestContext);
-  return continueExecution(execution, (result) => {
+  return continueWith(execution, (result) => {
     setMiddlewareResponse(requestContext, result);
   });
 }
@@ -250,7 +253,7 @@ function executeHandlerAndPostfix(
   requestContext: RequestContext,
 ): Awaitable<void> {
   const execution = executeHandler(handler, requestContext);
-  return continueExecution(execution, (result) => {
+  return continueWith(execution, (result) => {
     setHandlerResponse(requestContext, result);
     return executePostfix(method, path, requestContext);
   });
@@ -280,7 +283,7 @@ function executeRequest(
     path,
     requestContext,
   );
-  return continueExecution(prefixExecution, (prefixResult) => {
+  return continueWith(prefixExecution, (prefixResult) => {
     setMiddlewareResponse(requestContext, prefixResult);
     if (prefixResult || !selectedHandler) {
       return;
@@ -302,11 +305,11 @@ function completeRequest(
   requestContext: RequestContext,
 ): Awaitable<void> {
   if (didFail) {
-    replaceResponse(requestContext, extractError(error), 500);
+    replaceResponse(requestContext, errorResponse(error), 500);
   }
   requestContext.error = error;
   const monitorExecution = executeMonitors(method, path, requestContext);
-  return continueExecution(monitorExecution, () =>
+  return continueWith(monitorExecution, () =>
     handleResult(
       method === "head",
       requestContext.response,
@@ -454,7 +457,7 @@ export async function upgradeListener(
     requestError = error;
     mustDestroySocket = true;
     if (!hasUpgradedConnection) {
-      replaceResponse(requestContext, extractError(error), 500);
+      replaceResponse(requestContext, errorResponse(error), 500);
       mustSendResponse = true;
     }
   } finally {

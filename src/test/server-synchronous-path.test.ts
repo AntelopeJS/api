@@ -37,9 +37,13 @@ interface StatefulThenable {
   value: object;
 }
 
-function immediateThenable(): object {
+function laterTickThenable(onSettle: () => void): object {
   return nullPrototypeThenable({
-    value: (resolve: (resolved: undefined) => void) => resolve(undefined),
+    value: (resolve: (resolved: undefined) => void) =>
+      setImmediate(() => {
+        onSettle();
+        resolve(undefined);
+      }),
   });
 }
 
@@ -215,6 +219,7 @@ function synchronousOrderCases(): void {
     register(
       "thenable-handler",
       { mode: "handler", method: "GET", location: "/async" },
+      // @ts-expect-error off-contract result: a null-prototype thenable typed `object`; the test asserts its value is answered and its `then` read once
       () => {
         order.push("handler");
         return handlerResult.value;
@@ -223,9 +228,10 @@ function synchronousOrderCases(): void {
     register(
       "thenable-postfix",
       { mode: "postfix", method: "GET", location: "/async" },
+      // @ts-expect-error off-contract result: a null-prototype thenable typed `object`; the test asserts the monitor runs only after that thenable settles on a later tick
       () => {
         order.push("postfix");
-        return immediateThenable();
+        return laterTickThenable(() => order.push("postfix-settled"));
       },
     );
     register(
@@ -239,7 +245,13 @@ function synchronousOrderCases(): void {
     assert.equal(response.body, "async-ok");
     assert.ok(listenerResult instanceof Promise);
     assert.equal(handlerResult.getReadCount(), 1);
-    assert.deepEqual(order, ["prefix", "handler", "postfix", "monitor"]);
+    assert.deepEqual(order, [
+      "prefix",
+      "handler",
+      "postfix",
+      "postfix-settled",
+      "monitor",
+    ]);
   });
 }
 
@@ -322,6 +334,7 @@ function priorityAndErrorCases(): void {
     register(
       "thenable-reject",
       { mode: "handler", method: "GET", location: "/thenable-reject" },
+      // @ts-expect-error off-contract result: a null-prototype thenable typed `object` that rejects; the test asserts a 500 with the rejection message
       () => rejectedThenable(new Error("thenable failure")),
     );
 
