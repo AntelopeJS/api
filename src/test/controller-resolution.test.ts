@@ -66,7 +66,7 @@ function statefulThenable(value: string): StatefulThenable {
 }
 
 function createHandler(
-  Controller: RouteHandler["controller"],
+  Controller: ControllerConstructor,
   callback: RouteHandler["callback"],
   location: string,
   parameters: RouteHandler["parameters"] = [],
@@ -235,30 +235,26 @@ function controllerInstanceCases(): void {
     assert.deepEqual(await get(port, location), { status: 200, body: "2" });
     assert.deepEqual(await get(port, location), { status: 200, body: "2" });
   });
-}
 
-function legacyControllerCases(): void {
-  it("serves a route whose registrant named only an empty proto", async () => {
-    const location = "/controller-resolution/legacy-proto";
-    register({
-      ...createHandler(
-        Object,
-        function () {
-          return "legacy webhook";
-        },
-        location,
-      ),
-      proto: {},
-    });
+  it("refuses a handler without a controller at registration", () => {
+    const location = "/controller-resolution/no-controller";
+    const handler = createHandler(createController(), () => "unused", location);
+    // @ts-expect-error off-contract handler without its required controller; routesProxy.register must throw a TypeError at registration
+    delete handler.controller;
 
-    assert.deepEqual(await get(port, location), {
-      status: 200,
-      body: "legacy webhook",
-    });
-    assert.deepEqual(await get(port, location), {
-      status: 200,
-      body: "legacy webhook",
-    });
+    assert.throws(
+      () => routesProxy.register("controller-resolution-refused", handler),
+      (error) =>
+        error instanceof TypeError &&
+        error.message.includes("GET") &&
+        error.message.includes(location) &&
+        error.message.includes("controller"),
+    );
+
+    assert.equal(
+      routesProxy.getRoutes().some((route) => route.uri === location),
+      false,
+    );
   });
 }
 
@@ -540,7 +536,6 @@ describe("Controller resolution", () => {
   });
 
   controllerInstanceCases();
-  legacyControllerCases();
   computedMetadataCases();
   computedValueCases();
   requestErrorCases();
