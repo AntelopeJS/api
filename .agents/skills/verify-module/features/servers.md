@@ -27,7 +27,7 @@ journeys:
 ## Sub-features
 
 - `server-ports`: two HTTP servers serve the same routes, port 0 binds a free port that `API_PORT` reports, the variables describe the first server, `publicBaseUrl` loses its trailing slashes.
-- `port-fallback`: in development a busy port falls back to a free one that `API_PORT` reports and the log says which port it left, and `strictPort` fails the boot instead.
+- `port-fallback`: in development a busy port falls back to the next free port (busy+1, and busy+2 when that one is busy too) that `API_PORT` reports and the log says which port it left, and `strictPort` fails the boot instead.
 - `server-protocols`: an https server (a generated certificate) beside an http one, the https port refuses plain http, the variables follow the first server's protocol.
 - `server-options`: keys other than protocol, host and port reach the Node.js server: `maxHeaderSize` on one server refuses 4 KiB of headers with 431 while the other accepts them.
 - `dev-registry`: the servers are recorded in `.antelope/dev.json` with a wildcard host as loopback, the protocol and the bound port, and the file is removed when the project stops.

@@ -26,6 +26,27 @@ async function occupy(context: JourneyContext, port: number): Promise<{ close():
   return { close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
 }
 
+/** The first of `count` consecutive loopback ports that are all free: the first is to be held busy and the next ones are for the fallback. */
+async function consecutivePorts(context: JourneyContext, count: number): Promise<number> {
+  for (let tries = 0; tries < 20; tries += 1) {
+    const [first] = await pickPorts(context, 1);
+    const held: { close(): Promise<void> }[] = [];
+    let free = true;
+    for (let offset = 0; offset < count; offset += 1) {
+      const probe = createServer();
+      const bound = await new Promise<boolean>((resolve) => {
+        probe.once("error", () => resolve(false));
+        probe.listen(first + offset, "127.0.0.1", () => resolve(true));
+      });
+      if (!bound) { free = false; break; }
+      held.push({ close: () => new Promise<void>((resolve) => probe.close(() => resolve())) });
+    }
+    await Promise.all(held.map((probe) => probe.close()));
+    if (free) return first;
+  }
+  return context.notVerified(`no ${String(count)} consecutive free loopback ports`);
+}
+
 async function pem(context: JourneyContext): Promise<{ cert: string; key: string }> {
   const made = await context.command("make a self-signed certificate", "bash", ["-c", 'openssl req -x509 -newkey rsa:2048 -nodes -keyout "$PWD/key.pem" -out "$PWD/cert.pem" -subj /CN=localhost -days 1 >/dev/null 2>&1 && cat cert.pem && echo @@@ && cat key.pem'], { cwd: context.work });
   const [cert = "", key = ""] = made.stdout.split("@@@\n");
@@ -69,20 +90,32 @@ wait_ping "$P"
 echo "ping=$(curl -s "http://127.0.0.1:$P/ping")"`;
 
 export const portFallback: Journey = {
-  title: "in development a busy port falls back to a free one that API_PORT reports and the log names, and strictPort makes the boot fail instead",
+  title: "in development a busy port falls back to the next free port, which API_PORT reports and the log names, and strictPort makes the boot fail instead",
   entryPoint: "`servers[].port` on a port another program holds, with and without `strictPort`",
   async run(context) {
-    const [busy] = await pickPorts(context, 1);
+    const busy = await consecutivePorts(context, 3);
     const blocker = await occupy(context, busy);
     try {
       const moved = await attempt(context, "dev", { controllers: CORS_SOURCE, config: { servers: [{ protocol: "http", host: "127.0.0.1", port: busy }] }, appConfig: VARIABLES }, FALLBACK_PROBE);
       const port = Number(/^moved=(\d+)$/m.exec(moved.stdout)?.[1]);
       context.expect(moved.folder, [
         holds("the project came up although its port is busy", moved.ready, moved.stdout.slice(0, 600)),
-        holds("API_PORT is another port than the busy one", port > 0 && port !== busy, `moved ${String(port)}, busy ${String(busy)}`),
+        holds("API_PORT is the next port after the busy one", port === busy + 1, `moved ${String(port)}, busy ${String(busy)}`),
         matches("the routes are served on the port it moved to", moved.stdout, /^ping=\{"ok":true\}$/m),
         matches("the log names the port it left and the one it took", moved.stdout, new RegExp(`Port ${String(busy)} in use, listening on http://127\\.0\\.0\\.1:${String(port)} instead`)),
       ]);
+      const neighbour = await occupy(context, busy + 1);
+      try {
+        const skipped = await attempt(context, "dev", { controllers: CORS_SOURCE, config: { servers: [{ protocol: "http", host: "127.0.0.1", port: busy }] }, appConfig: VARIABLES }, FALLBACK_PROBE);
+        const next = Number(/^moved=(\d+)$/m.exec(skipped.stdout)?.[1]);
+        context.expect(skipped.folder, [
+          holds("the project came up with two busy ports in a row", skipped.ready, skipped.stdout.slice(0, 600)),
+          holds("the fallback goes past a second busy port to the next free one", next === busy + 2, `moved ${String(next)}, busy ${String(busy)} and ${String(busy + 1)}`),
+          matches("the routes are served on that port", skipped.stdout, /^ping=\{"ok":true\}$/m),
+        ]);
+      } finally {
+        await neighbour.close();
+      }
       const strict = await attempt(context, "dev", { controllers: CORS_SOURCE, config: { strictPort: true, servers: [{ protocol: "http", host: "127.0.0.1", port: busy }] } });
       context.expect(strict.folder, [holds("strictPort ends the boot with a failure", strict.ended && strict.projectExit !== "0", `ended ${String(strict.ended)}, exit ${String(strict.projectExit)}`), matches("it says the port is in use", strict.stdout, /EADDRINUSE|address already in use|already in use/i)]);
     } finally {
