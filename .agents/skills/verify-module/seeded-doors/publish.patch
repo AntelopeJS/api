@@ -1,13 +1,14 @@
 diff --git a/.release-it.json b/.release-it.json
-index ca123df..ba00843 100644
+index ca123df..7c58bb7 100644
 --- a/.release-it.json
 +++ b/.release-it.json
-@@ -10,7 +10,7 @@
+@@ -10,7 +10,8 @@
    },
    "npm": {
      "publish": true,
 -    "skipChecks": true
-+    "skipChecks": false
++    "skipChecks": true,
++    "publishPath": "./src"
    },
    "hooks": {
      "before:init": ["pnpm lint"],
