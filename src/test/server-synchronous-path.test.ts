@@ -215,6 +215,7 @@ function synchronousOrderCases(): void {
     register(
       "thenable-handler",
       { mode: "handler", method: "GET", location: "/async" },
+      // @ts-expect-error off-contract result: a null-prototype thenable typed `object`; the test asserts its value is answered and its `then` read once
       () => {
         order.push("handler");
         return handlerResult.value;
@@ -223,6 +224,7 @@ function synchronousOrderCases(): void {
     register(
       "thenable-postfix",
       { mode: "postfix", method: "GET", location: "/async" },
+      // @ts-expect-error off-contract result: a null-prototype thenable typed `object`; the test asserts the postfix waits for it before the monitor runs
       () => {
         order.push("postfix");
         return immediateThenable();
@@ -322,6 +324,7 @@ function priorityAndErrorCases(): void {
     register(
       "thenable-reject",
       { mode: "handler", method: "GET", location: "/thenable-reject" },
+      // @ts-expect-error off-contract result: a null-prototype thenable typed `object` that rejects; the test asserts a 500 with the rejection message
       () => rejectedThenable(new Error("thenable failure")),
     );
 
