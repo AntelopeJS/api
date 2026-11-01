@@ -2,7 +2,7 @@
 @antelopejs/interface-api	playground/package.json	dependencies	>=0.0.15 <1.0.0
 @antelopejs/interface-api	package.json	pnpm.overrides	
 @antelopejs/interface-api	pnpm-workspace.yaml	overrides	
-@antelopejs/interface-api-util	package.json	dependencies	>=0.2.0 <0.3.0
+@antelopejs/interface-api-util	package.json	dependencies	>=0.2.0 <1.0.0
 @antelopejs/interface-api-util	playground/package.json	dependencies	>=0.2.0 <1.0.0
 @antelopejs/interface-api-util	package.json	pnpm.overrides	
 @antelopejs/interface-api-util	pnpm-workspace.yaml	overrides	
