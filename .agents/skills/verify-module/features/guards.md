@@ -17,7 +17,7 @@ journeys:
 ## Sub-features
 
 - `assert-guards`: a falsy condition (`0`, `""`, `null`, `undefined`, `NaN`, `false`) throws its status and message, truthy ones (`"0"`, `[]`, `{}`, `1`) pass, the docs' greeting, 404 and 403 cases.
-- `assert-validations`: a valid body, `{}`, 400 with the stringified error by default (a number, `null`, a syntax error), a given status, `errorFunc` with 422, and an asynchronous validator that is not converted.
+- `assert-validations`: a valid body, `{}`, 400 with the stringified error by default (a number, `null`, a syntax error), a given status, `errorFunc` with 422, an `errorFunc` returning `undefined` (400, empty body), and an asynchronous validator that is not converted.
 - `rate-limiting`: three requests then 429 with `Retry-After`, `X-RateLimit-*` headers on allowed and rejected requests, `Reset` as UNIX seconds, a second handler with its own counter, a custom key with its message, headers kept on a replaced response, a falsy key falling back to the client IP, a forged `X-Forwarded-For` not opening a new bucket, the handler not run for a rejected request, a new window after `windowMs`.
 - `rate-limit-ordering`: `@RateLimit` above `@Get` ends the project with the explanation.
 

@@ -3,7 +3,7 @@ import type { App, JourneyContext, StopResult } from "@antelopejs/tooling-config
 import { APP_SOURCE } from "./app-source.ts";
 import { holds, same } from "./checks.ts";
 import { send, type Reply, type RequestSpec } from "./client.ts";
-import { alive, killedOutside, ownPort, readinessOutage } from "./environment.ts";
+import { alive, endedOutside, ownPort, readinessOutage } from "./environment.ts";
 import { isNumber, parseJson, pick, text, type Json } from "./json.ts";
 
 export { numberAt, pick, type Json, type JsonRecord } from "./json.ts";
@@ -150,7 +150,7 @@ export async function open(context: JourneyContext, options: Options = {}): Prom
     if (!alive(app.pid)) {
       stopping = true;
       const ended = await context.stop("the project ended by itself", app);
-      killedOutside(context, ended.signal);
+      endedOutside(context, ended);
       return;
     }
     await ownPort(context, port, app.pid);
@@ -181,7 +181,7 @@ export async function open(context: JourneyContext, options: Options = {}): Prom
       const gone = !stopping && !alive(app.pid);
       stopping = true;
       const stopped = await context.stop("SIGINT", app);
-      if (gone) killedOutside(context, stopped.signal);
+      if (gone) endedOutside(context, stopped);
       return stopped;
     },
     recheck,

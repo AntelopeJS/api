@@ -40,7 +40,7 @@ export const assertGuards: Journey = {
 };
 
 export const assertValidations: Journey = {
-  title: "assertValidation returns the validated value, answers 400 with the stringified error by default, takes the status and body from its code and errorFunc, and does not convert an asynchronous rejection",
+  title: "assertValidation returns the validated value, answers 400 with the stringified error by default, takes the status and body from its code and errorFunc (an errorFunc returning undefined answers no body), and does not convert an asynchronous rejection",
   entryPoint: "`assertValidation(body, validator, errorFunc?, code?)` in POST handlers, called over HTTP; the controllers are declared with relative locations (`\"import\"`, `\"auth\"`)",
   async run(context) {
     const session = await open(context, { controllers: UTIL_SOURCE });
@@ -60,6 +60,8 @@ export const assertValidations: Journey = {
     context.expect(custom.folder, [status("a valid body", custom, 200), same("validated", custom.json, { age: 30 })]);
     const underage = await session.get("POST /import/custom with a minor", "/import/custom", { method: "POST", body: '{"age":12}' });
     context.expect(underage.folder, [status("a given status and errorFunc", underage, 422), same("the errorFunc body", underage.json, { errors: ["age must be at least 18"] })]);
+    const silent = await session.get("POST /import/silent with a number", "/import/silent", { method: "POST", body: "7" });
+    context.expect(silent.folder, [status("an errorFunc that returns undefined still rejects with the default status", silent, 400), bodyIs("undefined is no body, not the stringified error", silent, "")]);
     const late = await session.get("POST /import/late", "/import/late", { method: "POST", body: "{}" });
     context.expect(late.folder, [holds("an asynchronous rejection is not converted to 400", late.status === 500, `status ${String(late.status)}, body ${late.text}`)]);
     await finish(session);

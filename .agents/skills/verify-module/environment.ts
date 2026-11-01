@@ -1,7 +1,11 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
-import type { JourneyContext } from "@antelopejs/tooling-configs/verify";
+import type { JourneyContext, StopResult } from "@antelopejs/tooling-configs/verify";
+
+const OUTSIDE_SIGNALS = new Set(["SIGKILL", "SIGTERM", "SIGHUP", "SIGINT"]);
+const CLEAN_EXITS = new Set([0, 130, 143]);
+const CLEAN_STOP = "Stopped the project";
 
 const HOLDERS = String.raw`ss -Htlnp "sport = :$PORT" | while read -r line; do
   pids=$(printf '%s' "$line" | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u)
@@ -37,9 +41,12 @@ export async function ownPort(context: JourneyContext, port: number, project: nu
   if (strangers.length > 0) context.notVerified(`port ${String(port)} is held by a process outside the project (${strangers.join("; ")}): an environment outage, not a product failure`);
 }
 
-/** Ends the journey NOT VERIFIED when the project ended on a signal the journey did not send. */
-export function killedOutside(context: JourneyContext, signal: string | null): void {
-  if (signal !== null && signal !== "SIGINT") context.notVerified(`the project was killed by ${signal} from outside the journey: an environment outage, not a product failure`);
+/**
+ * Ends the journey NOT VERIFIED when the project ended before the journey's own stop and not by a failure of its own: killed by a signal the journey did not send, or stopped cleanly. `ajs` handles SIGTERM and SIGINT sent from outside, prints `Stopped the project` and exits 0 (or 130 or 143), as a supervisor stop, a CI timeout or a terminal Ctrl+C make it do. No product break stops a ready project cleanly on purpose, so a clean stop is an environment outage, never a catch.
+ */
+export function endedOutside(context: JourneyContext, ended: Pick<StopResult, "exitCode" | "signal" | "stdout">): void {
+  if (ended.signal !== null && OUTSIDE_SIGNALS.has(ended.signal)) context.notVerified(`the project was killed by ${ended.signal} from outside the journey: an environment outage, not a product failure`);
+  if ((ended.exitCode !== null && CLEAN_EXITS.has(ended.exitCode)) || ended.stdout.includes(CLEAN_STOP)) context.notVerified(`the project stopped cleanly (exit ${String(ended.exitCode)}) before the journey stopped it: a signal or stop from outside, an environment outage, not a product failure`);
 }
 
 /**

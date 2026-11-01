@@ -54,6 +54,11 @@ export class ImportController extends Controller("import") {
     );
   }
 
+  @Post("silent")
+  silent(@RawBody() body: Buffer) {
+    return assertValidation(body, parseJsonObject, () => undefined);
+  }
+
   @Post("coded")
   coded(@RawBody() body: Buffer) {
     return assertValidation(body, parseJsonObject, undefined, 409);
