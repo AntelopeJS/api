@@ -66,7 +66,7 @@ function statefulThenable(value: string): StatefulThenable {
 }
 
 function createHandler(
-  Controller: ControllerConstructor,
+  Controller: RouteHandler["controller"],
   callback: RouteHandler["callback"],
   location: string,
   parameters: RouteHandler["parameters"] = [],
@@ -234,6 +234,31 @@ function controllerInstanceCases(): void {
 
     assert.deepEqual(await get(port, location), { status: 200, body: "2" });
     assert.deepEqual(await get(port, location), { status: 200, body: "2" });
+  });
+}
+
+function legacyControllerCases(): void {
+  it("serves a route whose registrant named only an empty proto", async () => {
+    const location = "/controller-resolution/legacy-proto";
+    register({
+      ...createHandler(
+        Object,
+        function () {
+          return "legacy webhook";
+        },
+        location,
+      ),
+      proto: {},
+    });
+
+    assert.deepEqual(await get(port, location), {
+      status: 200,
+      body: "legacy webhook",
+    });
+    assert.deepEqual(await get(port, location), {
+      status: 200,
+      body: "legacy webhook",
+    });
   });
 }
 
@@ -515,6 +540,7 @@ describe("Controller resolution", () => {
   });
 
   controllerInstanceCases();
+  legacyControllerCases();
   computedMetadataCases();
   computedValueCases();
   requestErrorCases();
