@@ -50,7 +50,7 @@
   },
   "dependencies": {
     "@antelopejs/interface-api": "file:.campaign/tgz/antelopejs-interface-api-f2a99b5.tgz",
-    "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-b53e38a.tgz",
+    "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz",
     "@antelopejs/interface-core": ">=0.2.6 <1.0.0",
     "reflect-metadata": "^0.2.2",
     "ws": "^8.20.0"
@@ -86,7 +86,7 @@
   "pnpm": {
     "overrides": {
       "@antelopejs/interface-api": "file:.campaign/tgz/antelopejs-interface-api-f2a99b5.tgz",
-      "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-b53e38a.tgz"
+      "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz"
     }
   },
   "antelopeJs": {
