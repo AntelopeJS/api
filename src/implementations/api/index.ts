@@ -2,7 +2,6 @@ import { GetMetadata } from "@antelopejs/interface-core";
 import {
   type ComputedParameter,
   type ControllerClass,
-  type LegacyController,
   ControllerMeta,
   type CorsConfig,
   HTTPResult,
@@ -22,7 +21,6 @@ import { type Awaitable, pendingOf } from "../../thenable";
 type ComputedValue = ReturnType<ParameterModifier>;
 
 type Controller = ControllerClass<object> & { prototype: object };
-type RegisteredController = Controller | LegacyController;
 
 type ControllerInstance = InstanceType<Controller>;
 
@@ -37,7 +35,7 @@ interface ComputedPropertyResolver {
 }
 
 interface ControllerPlan {
-  controllerClass: RegisteredController;
+  controllerClass: Controller;
   cacheKey: object;
   computedProperties: ComputedPropertyResolver[];
 }
@@ -55,7 +53,7 @@ const MALFORMED_REQUEST_PREFIX = "Malformed request";
 
 const classCacheSymbol = Symbol();
 const registeredRoutes = new Map<string, RouteHandler>();
-const controllerPlans = new WeakMap<RegisteredController, ControllerPlan>();
+const controllerPlans = new WeakMap<Controller, ControllerPlan>();
 
 interface RequestContextDev extends RequestContext {
   [classCacheSymbol]?: Map<object, ControllerInstance>;
@@ -152,7 +150,7 @@ function ownEntries(
 }
 
 function compileController(
-  controllerClass: RegisteredController,
+  controllerClass: Controller,
   properties: Record<PropertyKey, ComputedParameter>,
 ): ControllerPlan {
   const computedProperties = ownEntries(properties).map(([key, parameter]) => ({
@@ -320,7 +318,7 @@ function invokeHandler(
 }
 
 function compileHandler(handler: RouteHandler): HandlerPlan {
-  const controllerClass: RegisteredController = handler.controller;
+  const controllerClass: Controller = handler.controller;
   return {
     callback: handler.callback,
     controller: compileController(controllerClass, handler.properties),
@@ -330,6 +328,11 @@ function compileHandler(handler: RouteHandler): HandlerPlan {
 
 export const routesProxy = {
   register: (id: string, handler: RouteHandler): void => {
+    if (!handler.controller) {
+      throw new TypeError(
+        `Cannot register ${handler.method.toUpperCase()} ${handler.location}: RouteHandler.controller is required`,
+      );
+    }
     registeredRoutes.set(id, handler);
     let plan: HandlerPlan | undefined;
     registerHandler(
