@@ -2,7 +2,7 @@ import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, same } from "./checks.ts";
 import { bodyIs, status } from "./client.ts";
-import { CUSTOM_DECORATOR_SCENARIO, LEGACY_SCENARIOS, REGISTRATION_SCENARIOS, ROUTE_PRIORITY_SOURCE, TWIN_SCENARIOS } from "./sources-registration.ts";
+import { CONTROLLER_REQUIRED_SCENARIO, CUSTOM_DECORATOR_SCENARIO, REGISTRATION_SCENARIOS, ROUTE_PRIORITY_SOURCE, TWIN_SCENARIOS } from "./sources-registration.ts";
 import { open, pick, type Json, type JsonRecord, type Session } from "./session.ts";
 
 async function finish(session: Session): Promise<void> {
@@ -31,11 +31,11 @@ export const routeRegistration: Journey = {
         routeRow("/dynamic/guarded", "get", "guardedCallback", 0),
         routeRow("/dynamic/health", "get", "healthCallback", 0),
       ]),
-      same("getRegisteredRouteHandlers lists them with the controller and the deprecated proto", pick(registered.value, "handlers"), [
-        { idIsString: true, mode: "handler", method: "post", location: "/dynamic/echo", controller: true, proto: true, callback: "function" },
-        { idIsString: true, mode: "handler", method: "get", location: "/dynamic/guarded", controller: true, proto: true, callback: "function" },
-        { idIsString: true, mode: "prefix", method: "get", location: "/dynamic/guarded", controller: true, proto: true, callback: "function" },
-        { idIsString: true, mode: "handler", method: "get", location: "/dynamic/health", controller: true, proto: true, callback: "function" },
+      same("getRegisteredRouteHandlers lists them with the controller they were registered under", pick(registered.value, "handlers"), [
+        { idIsString: true, mode: "handler", method: "post", location: "/dynamic/echo", controller: true, callback: "function" },
+        { idIsString: true, mode: "handler", method: "get", location: "/dynamic/guarded", controller: true, callback: "function" },
+        { idIsString: true, mode: "prefix", method: "get", location: "/dynamic/guarded", controller: true, callback: "function" },
+        { idIsString: true, mode: "handler", method: "get", location: "/dynamic/health", controller: true, callback: "function" },
       ]),
     ]);
     const health = await session.get("GET /dynamic/health", "/dynamic/health");
@@ -99,52 +99,29 @@ export const customDecorators: Journey = {
   },
 };
 
-export const legacyProto: Journey = {
-  title: "a handler registered the interface-api 0.2 way, with only its proto, takes its controller from proto.constructor: a class, a plain class and an empty object are served, injected properties are filled, and a proto with no usable constructor is refused with a TypeError",
-  entryPoint: "`RegisterRoute({ ..., proto })` without `controller`, as a module built against interface-api 0.2 calls it",
+export const controllerRequired: Journey = {
+  title: "RegisterRoute needs the controller class that declares the route: a handler with no controller, or with only the removed proto field, is refused with a TypeError and registers nothing, while the same handler with its controller is registered, listed and removable",
+  entryPoint: "`RegisterRoute({ ..., controller })` and `RegisterRoute({ ..., proto })` called from a module while the project runs",
   async run(context) {
     const session = await open(context);
-    const registered = await session.run("register four legacy routes", LEGACY_SCENARIOS.register);
-    context.expect(registered.folder, [holds("the scenario ran", registered.ok, JSON.stringify(registered.error))], { critical: true });
-    context.expect(registered.folder, [
-      same("every route is registered and its controller is proto.constructor", registered.value, {
-        idTypes: ["number", "number", "number", "number"],
-        handlers: [
-          { location: "/legacy/class", controllerIsProtoConstructor: true, protoIsTheGivenOne: true },
-          { location: "/legacy/empty", controllerIsProtoConstructor: true, protoIsTheGivenOne: true },
-          { location: "/legacy/plain", controllerIsProtoConstructor: true, protoIsTheGivenOne: true },
-          { location: "/legacy/props", controllerIsProtoConstructor: true, protoIsTheGivenOne: true },
-        ],
-        routes: 4,
-      }),
-    ]);
-    const viaClass = await session.get("GET /legacy/class", "/legacy/class");
-    context.expect(viaClass.folder, [status("a legacy controller built by Controller()", viaClass, 200), same("its methods are on the instance the callback gets", viaClass.json, { shout: "LEGACY", location: "/legacy" })]);
-    const plain = await session.get("GET /legacy/plain", "/legacy/plain");
-    context.expect(plain.folder, [status("a plain class", plain, 200), same("is constructed for the request", plain.json, { made: true, instance: true })]);
-    for (const call of [1, 2]) {
-      const empty = await session.get(`GET /legacy/empty, call ${String(call)}`, "/legacy/empty");
-      context.expect(empty.folder, [status("a proto that is an empty object", empty, 200), bodyIs("is served again on the next request", empty, "legacy webhook")]);
-    }
-    const props = await session.get("GET /legacy/props?tag=blue", "/legacy/props?tag=blue");
-    context.expect(props.folder, [status("computed properties", props, 200), same("fill the instance and the argument", props.json, { prop: "blue", arg: "blue" })]);
-    const refused = await session.run("register protos without a usable constructor", LEGACY_SCENARIOS.refused);
-    context.expect(refused.folder, [
-      same("each is refused with a TypeError and nothing is registered", refused.value, {
+    const attempted = await session.run("register handlers with and without a controller", CONTROLLER_REQUIRED_SCENARIO);
+    context.expect(attempted.folder, [holds("the scenario ran", attempted.ok, JSON.stringify(attempted.error))], { critical: true });
+    context.expect(attempted.folder, [
+      same("each handler without a controller is refused with a TypeError, the one with a controller is listed under it", attempted.value, {
         out: [
-          { label: "no constructor", refused: true, type: "TypeError" },
-          { label: "constructor is a number", refused: true, type: "TypeError" },
-          { label: "constructor without a prototype", refused: true, type: "TypeError" },
+          { label: "no controller and no proto", refused: true, type: "TypeError" },
+          { label: "only a proto built by Controller", refused: true, type: "TypeError" },
+          { label: "only a proto of a plain class", refused: true, type: "TypeError" },
+          { label: "only an empty proto", refused: true, type: "TypeError" },
         ],
-        registered: 0,
+        handlers: [{ location: "/needs-controller/ok", controllerIsDeclared: true }],
+        routes: ["/needs-controller/ok"],
       }),
     ]);
-    const nothing = await session.get("GET /legacy-refused/0", "/legacy-refused/0");
-    context.expect(nothing.folder, [holds("a refused route is not served", nothing.status === 404, String(nothing.status))]);
-    const left = await session.run("unregister the class route", LEGACY_SCENARIOS.unregister);
-    context.expect(left.folder, [same("UnregisterRoute removes a legacy route and keeps the others", left.value, ["/legacy/empty", "/legacy/plain", "/legacy/props"])]);
-    const gone = await session.get("GET /legacy/class after unregistering", "/legacy/class");
-    context.expect(gone.folder, [holds("the unregistered legacy route is not served", gone.status === 404, String(gone.status))]);
+    const refused = await session.get("GET /needs-controller/1", "/needs-controller/1");
+    context.expect(refused.folder, [holds("a refused route is not served", refused.status === 404, String(refused.status))]);
+    const served = await session.get("GET /needs-controller/ok", "/needs-controller/ok");
+    context.expect(served.folder, [status("the handler with its controller", served, 200), bodyIs("answers from its callback", served, "with a controller")]);
     await finish(session);
   },
 };

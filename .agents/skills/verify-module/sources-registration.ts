@@ -49,41 +49,29 @@ const named = ProcessCallback(ProcController.prototype, "named", { value: functi
 const rows = getRegisteredRoutes().filter((route) => route.location.startsWith("/proc")).map((route) => ({ location: route.location, method: route.method, callbackName: route.callbackName, priority: route.priority })).sort((a, b) => a.location.localeCompare(b.location));
 return { helloKeys: Object.keys(hello), helloId: typeof hello.id, namedId: typeof named.id, distinct: hello.id !== named.id, rows, priorities: [HandlerPriority.HIGHEST, HandlerPriority.HIGH, HandlerPriority.NORMAL, HandlerPriority.LOW, HandlerPriority.LOWEST] };`;
 
-export const LEGACY_SCENARIOS = {
-  register: String.raw`const { Controller, RegisterRoute, getRegisteredRouteHandlers, getRegisteredRoutes } = api;
-class Legacy extends Controller("/legacy") {
-  shout() { return "LEGACY"; }
-}
-class Plain {
-  constructor() { this.made = true; }
-}
-const emptyProto = {};
-globalThis.legacy = { Legacy, Plain, emptyProto };
-const tag = { provider: (context) => context.url.searchParams.get("tag"), modifiers: [] };
+export const CONTROLLER_REQUIRED_SCENARIO = String.raw`const { Controller, RegisterRoute, getRegisteredRoutes, getRegisteredRouteHandlers } = api;
+class Declared extends Controller("/declared") {}
+class Plain {}
 const base = { mode: "handler", method: "get", parameters: [], properties: {} };
-const ids = {
-  viaClass: RegisterRoute({ ...base, location: "/legacy/class", callback: function viaClass() { return { shout: this.shout(), location: this.constructor.location }; }, proto: Legacy.prototype }),
-  plain: RegisterRoute({ ...base, location: "/legacy/plain", callback: function viaPlain() { return { made: this.made === true, instance: this instanceof Plain }; }, proto: Plain.prototype }),
-  empty: RegisterRoute({ ...base, location: "/legacy/empty", callback: function viaEmpty() { return "legacy webhook"; }, proto: emptyProto }),
-  props: RegisterRoute({ ...base, location: "/legacy/props", callback: function viaProps(arg) { return { prop: this.tag, arg }; }, parameters: [tag], properties: { tag }, proto: Plain.prototype }),
-};
-globalThis.legacy.ids = ids;
-const handlers = getRegisteredRouteHandlers().filter((entry) => entry.handler.location.startsWith("/legacy")).map((entry) => ({ location: entry.handler.location, controllerIsProtoConstructor: entry.handler.controller === entry.handler.proto.constructor, protoIsTheGivenOne: entry.handler.proto === (entry.handler.location === "/legacy/empty" ? emptyProto : entry.handler.location === "/legacy/class" ? Legacy.prototype : Plain.prototype) })).sort((a, b) => a.location.localeCompare(b.location));
-return { idTypes: Object.values(ids).map((id) => typeof id), handlers, routes: getRegisteredRoutes().filter((route) => route.location.startsWith("/legacy")).length };`,
-  refused: String.raw`const { RegisterRoute, getRegisteredRoutes } = api;
-const cases = [["no constructor", Object.create(null)], ["constructor is a number", { constructor: 42 }], ["constructor without a prototype", { constructor: () => 1 }]];
+const attempts = [
+  ["no controller and no proto", {}],
+  ["only a proto built by Controller", { proto: Declared.prototype }],
+  ["only a proto of a plain class", { proto: Plain.prototype }],
+  ["only an empty proto", { proto: {} }],
+];
 const out = [];
-for (const [label, proto] of cases) {
+for (const [label, extra] of attempts) {
   try {
-    RegisterRoute({ mode: "handler", method: "get", location: "/legacy-refused/" + out.length, callback: function refused() { return "never"; }, parameters: [], properties: {}, proto });
+    RegisterRoute({ ...base, location: "/needs-controller/" + out.length, callback: function refused() { return "never"; }, ...extra });
     out.push({ label, refused: false });
   } catch (error) {
     out.push({ label, refused: true, type: error.constructor.name });
   }
 }
-return { out, registered: getRegisteredRoutes().filter((route) => route.location.startsWith("/legacy-refused")).length };`,
-  unregister: String.raw`api.UnregisterRoute(globalThis.legacy.ids.viaClass); return api.getRegisteredRoutes().filter((route) => route.location.startsWith("/legacy/")).map((route) => route.location).sort();`,
-};
+RegisterRoute({ ...base, location: "/needs-controller/ok", callback: function accepted() { return "with a controller"; }, controller: Declared });
+const handlers = getRegisteredRouteHandlers().filter((entry) => entry.handler.location.startsWith("/needs-controller")).map((entry) => ({ location: entry.handler.location, controllerIsDeclared: entry.handler.controller === Declared }));
+const routes = getRegisteredRoutes().filter((route) => route.location.startsWith("/needs-controller")).map((route) => route.location);
+return { out, handlers, routes };`;
 
 /** Two prefixes and a handler at one location, a route claiming another owner, and the removal of one prefix. */
 export const TWIN_SCENARIOS = {

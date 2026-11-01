@@ -9,7 +9,7 @@ import { handlerModes, handlerPriority, postfixChain } from "./journeys-handlers
 import { controllerInstances } from "./journeys-instances.ts";
 import { multiParameters, parameterSources, propertyParameters } from "./journeys-params.ts";
 import { parameterModifiers, parameterProviders, parameterTransform } from "./journeys-modifiers.ts";
-import { customDecorators, legacyProto, routeRegistration } from "./journeys-registration.ts";
+import { controllerRequired, customDecorators, routeRegistration } from "./journeys-registration.ts";
 import { resultBodies, resultErrors, resultHeaders, responseStreaming } from "./journeys-results.ts";
 import { controllerTree, quickStart, routeForms } from "./journeys-routes.ts";
 import { devRegistry, listenOnDemand, portFallback, productionBoot, serverOptions, serverPorts, serverProtocols } from "./journeys-servers.ts";
@@ -59,7 +59,7 @@ const config: VerifyConfig = {
     "controller-instances": controllerInstances,
     "route-registration": routeRegistration,
     "custom-decorators": customDecorators,
-    "legacy-proto": legacyProto,
+    "controller-required": controllerRequired,
     "body-reading": bodyReading,
     "body-limits": bodyLimits,
     "body-streaming": bodyStreaming,
