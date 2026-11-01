@@ -139,10 +139,10 @@ Run the project with `ajs project dev`, then call `GET http://localhost:8080/hel
 
 | Package                          | Supported                                                      | Tested with                                                    |
 | -------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------- |
-| `@antelopejs/core`               | `>=1.17.0 <2`                                                  | `1.17.0`                                                       |
-| `@antelopejs/interface-api`      | `file:.campaign/tgz/antelopejs-interface-api-f2a99b5.tgz`      | `file:.campaign/tgz/antelopejs-interface-api-f2a99b5.tgz`      |
+| `@antelopejs/core`               | `>=1.17.0 <2`                                                  | `file:.campaign/tgz/antelopejs-core-68d5ce0.tgz`               |
+| `@antelopejs/interface-api`      | `file:.campaign/tgz/antelopejs-interface-api-2d1cc37.tgz`      | `file:.campaign/tgz/antelopejs-interface-api-2d1cc37.tgz`      |
 | `@antelopejs/interface-api-util` | `file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz` | `file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz` |
-| `@antelopejs/interface-core`     | `>=0.2.6 <1.0.0`                                               | `0.2.6`                                                        |
+| `@antelopejs/interface-core`     | `file:.campaign/tgz/antelopejs-interface-core-6a8b526.tgz`     | `file:.campaign/tgz/antelopejs-interface-core-6a8b526.tgz`     |
 
 <!-- antelopejs-docs-compat:end -->
 
