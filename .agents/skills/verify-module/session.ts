@@ -3,6 +3,7 @@ import type { App, JourneyContext, StopResult } from "@antelopejs/tooling-config
 import { APP_SOURCE } from "./app-source.ts";
 import { holds, same } from "./checks.ts";
 import { send, type Reply, type RequestSpec } from "./client.ts";
+import { alive, killedOutside, ownPort, readinessOutage } from "./environment.ts";
 import { isNumber, parseJson, pick, text, type Json } from "./json.ts";
 
 export { numberAt, pick, type Json, type JsonRecord } from "./json.ts";
@@ -29,6 +30,12 @@ export interface Options {
   stopDelayMs?: number;
   /** A Node module the compiled controllers need, given as extra files of the consumer folder. */
   files?: Record<string, string>;
+  /** Makes the consumer module's `start` throw. */
+  startFails?: boolean;
+  /** `dependencies` of the consumer module's package.json, the ranges core checks against the shared interface copies. */
+  dependencies?: Record<string, string>;
+  /** CommonJS source of a second module, `verify-extra`, loaded beside the consumer. */
+  extra?: string;
 }
 
 const APP_TSCONFIG = `${JSON.stringify(
@@ -84,12 +91,17 @@ export interface Session {
   /** Runs a scenario body inside the consumer module, with `api`, `util`, `load`, `waitFor` and the compiled `controllers` in scope. */
   run(name: string, body: string): Promise<Answer>;
   stop(): Promise<StopResult>;
+  /** Re-probes the environment after a request to `port` failed: NOT VERIFIED when the project was killed from outside or another process holds the port. */
+  recheck(port: number): Promise<void>;
 }
 
 function consumerFiles(context: JourneyContext, project: string, options: Options): void {
-  context.edit("consumer package.json", path(project, "app", "package.json"), `${JSON.stringify({ name: "verify-app", version: "1.0.0", main: "index.js", antelopeJs: {} }, null, 2)}\n`);
+  context.edit("consumer package.json", path(project, "app", "package.json"), `${JSON.stringify({ name: "verify-app", version: "1.0.0", main: "index.js", antelopeJs: {}, dependencies: options.dependencies ?? {} }, null, 2)}\n`);
   context.edit("consumer source", path(project, "app", "index.js"), APP_SOURCE);
   for (const [file, content] of Object.entries(options.files ?? {})) context.edit(`consumer file ${file}`, path(project, "app", file), content);
+  if (options.extra === undefined) return;
+  context.edit("second module package.json", path(project, "extra", "package.json"), `${JSON.stringify({ name: "verify-extra", version: "1.0.0", main: "index.js", antelopeJs: {} }, null, 2)}\n`);
+  context.edit("second module source", path(project, "extra", "index.js"), options.extra);
 }
 
 async function compile(context: JourneyContext, project: string, controllers: string): Promise<void> {
@@ -114,29 +126,49 @@ async function prepare(context: JourneyContext, options: Options, withDriver = t
   const project = context.fixture({ moduleConfig });
   consumerFiles(context, project, options);
   const driver = withDriver ? { "verify-driver": { source: { type: "local", path: "./driver" } } } : {};
-  const config = { name: "verify-api", modules: { api: { source: { type: "local", path: context.repo }, config: moduleConfig }, ...driver, "verify-app": { source: { type: "local", path: "./app" }, config: options.appConfig ?? {} } } };
+  const extra = options.extra === undefined ? {} : { "verify-extra": { source: { type: "local", path: "./extra" } } };
+  const config = { name: "verify-api", modules: { api: { source: { type: "local", path: context.repo }, config: moduleConfig }, ...driver, "verify-app": { source: { type: "local", path: "./app" }, config: options.appConfig ?? {} }, ...extra } };
   context.edit("project config", path(project, "antelope.config.ts"), `export default ${JSON.stringify(config, null, 2)};\n`);
   const link = await context.command("link the repository's packages", "ln", ["-s", path(context.repo, "node_modules"), path(project, "app", "node_modules")]);
   context.expect(link.folder, [holds("the consumer resolves the repository's packages", link.exitCode === 0, link.stderr)], { critical: true });
   if (options.controllers !== undefined) await compile(context, project, options.controllers);
-  const env = { VERIFY_APP_PORT: String(appPort), VERIFY_APP_START_DELAY: String(options.startDelayMs ?? 0), VERIFY_APP_STOP_DELAY: String(options.stopDelayMs ?? 0), ...options.env };
+  const env = { VERIFY_APP_PORT: String(appPort), VERIFY_APP_START_DELAY: String(options.startDelayMs ?? 0), VERIFY_APP_STOP_DELAY: String(options.stopDelayMs ?? 0), VERIFY_APP_START_FAILS: options.startFails === true ? "1" : "", ...options.env };
   return { project, apiPort, appPort, env };
 }
 
 /** Starts `ajs project dev` with the module configured as the journey asks and a consumer module beside it. */
 export async function open(context: JourneyContext, options: Options = {}): Promise<Session> {
   const { project, apiPort, appPort, env } = await prepare(context, options);
-  const app = await context.dev("ajs project dev", project, { env });
+  const app = await context.dev("ajs project dev", project, { env }).catch(async (error: unknown) => {
+    await readinessOutage(context, "ajs-project-dev");
+    throw error;
+  });
   const base = `http://127.0.0.1:${apiPort}`;
+  let stopping = false;
+  async function recheck(port: number): Promise<void> {
+    if (stopping) return;
+    if (!alive(app.pid)) {
+      stopping = true;
+      const ended = await context.stop("the project ended by itself", app);
+      killedOutside(context, ended.signal);
+      return;
+    }
+    await ownPort(context, port, app.pid);
+  }
+  async function checked(reply: Reply, port: number): Promise<Reply> {
+    if (reply.status === null) await recheck(port);
+    return reply;
+  }
   return {
     context,
     app,
     base,
     port: apiPort,
-    get: (name, route, spec = {}) => send(context, name, { ...spec, url: `${base}${route}` }),
-    fetch: (name, url, spec = {}) => send(context, name, { ...spec, url }),
+    get: async (name, route, spec = {}) => checked(await send(context, name, { ...spec, url: `${base}${route}` }), apiPort),
+    fetch: async (name, url, spec = {}) => checked(await send(context, name, { ...spec, url }), Number(new URL(url).port)),
     async run(name, body) {
       const result = await context.http(name, `http://127.0.0.1:${appPort}/`, { method: "POST", body });
+      if (result.status === null) await recheck(appPort);
       const error = pick(result.json, "error");
       return {
         folder: result.folder,
@@ -145,7 +177,14 @@ export async function open(context: JourneyContext, options: Options = {}): Prom
         error: error === undefined ? null : { name: text(pick(error, "name")), message: text(pick(error, "message")) },
       };
     },
-    stop: () => context.stop("SIGINT", app),
+    async stop() {
+      const gone = !stopping && !alive(app.pid);
+      stopping = true;
+      const stopped = await context.stop("SIGINT", app);
+      if (gone) killedOutside(context, stopped.signal);
+      return stopped;
+    },
+    recheck,
   };
 }
 
@@ -206,6 +245,9 @@ export async function attempt(context: JourneyContext, mode: "dev" | "start", op
   const watchEnv = { ...env, CLI: cli, MODE: mode, OUT: path(project, "project.log"), PORT: String(apiPort), APP_PORT: String(appPort), PROBE: probe };
   const ran = await context.command(`ajs project ${mode}`, "bash", ["-c", WATCH], { cwd: project, env: watchEnv, timeoutMs: 90_000 });
   const exit = /^exit=(.*)$/m.exec(ran.stdout);
+  const code = Number(exit?.[1]);
+  if (code > 128 && code !== 130) context.notVerified(`the project was killed by signal ${String(code - 128)} from outside the journey: an environment outage, not a product failure`);
+  if (!ran.stdout.includes("ready=1")) for (const port of [apiPort, appPort]) await ownPort(context, port, 0);
   return { folder: ran.folder, exitCode: ran.exitCode, stdout: ran.stdout, stderr: ran.stderr, projectExit: exit?.[1], ready: ran.stdout.includes("ready=1"), ended: ran.stdout.includes("ended=1") };
 }
 

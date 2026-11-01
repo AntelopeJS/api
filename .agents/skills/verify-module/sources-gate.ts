@@ -32,3 +32,15 @@ export class SocketController extends Controller("/socket") {
   }
 }
 `;
+
+/** A second module that registers a route of its own while it constructs. */
+export const OWNED_MODULE = String.raw`"use strict";
+const api = require("@antelopejs/interface-api");
+class Owned extends api.Controller("/owned") {}
+exports.construct = function construct() {
+  api.RegisterRoute({ mode: "handler", method: "get", location: "/owned/route", callback: () => ({ owned: true }), parameters: [], properties: {}, controller: Owned });
+};
+exports.start = function start() {};
+exports.stop = function stop() {};
+exports.destroy = function destroy() {};
+`;

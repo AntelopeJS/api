@@ -37,7 +37,7 @@ export const parameterSources: Journey = {
 };
 
 export const multiParameters: Journey = {
-  title: "@MultiParameter returns every query value as a list, keeps empty strings, and is an empty list when nothing is sent",
+  title: "@MultiParameter returns every query value as a list, keeps empty strings, is an empty list when nothing is sent, and takes a header as Node.js parsed it, without splitting commas",
   entryPoint: "`@MultiParameter(name, \"query\" | \"header\")` on a handler argument, called over HTTP",
   async run(context) {
     const session = await open(context, { controllers: PARAMS_SOURCE });
@@ -49,6 +49,8 @@ export const multiParameters: Journey = {
     await seen(session, "other query names are not collected", "/products/search?tags=x&tag=y", { tags: ["y"] });
     await seen(session, "a header value", "/products/headers", { tags: ["one"], token: "t" }, { "X-Tag": "one", "X-Token": "t" });
     await seen(session, "a missing header is an empty list", "/products/headers", { tags: [] });
+    await seen(session, "a comma-separated header value is not split", "/products/headers", { tags: ["a, b"] }, { "X-Tag": "a, b" });
+    await seen(session, "a repeated header keeps Node.js's joined value", "/products/headers", { tags: ["a, b"] }, { "X-Tag": ["a", "b"] });
     await finish(session);
   },
 };

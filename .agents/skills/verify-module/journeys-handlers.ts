@@ -17,7 +17,7 @@ async function drainLog(session: Session, name: string) {
 }
 
 export const handlerModes: Journey = {
-  title: "a prefix that returns a value supplies the response and skips the main handler, a postfix adjusts the result, and a monitor observes success and failure with its return value ignored",
+  title: "a prefix that returns a value, a plain string included, supplies the response and skips the main handler, a prefix that throws an HTTPResult answers it, a postfix adjusts the result, and a monitor observes success and failure, a thrown HTTPResult as ctx.error, with its return value ignored",
   entryPoint: "`@Prefix`, `@Get`, `@Postfix` and `@Monitor` on one controller, called over HTTP",
   async run(context) {
     const session = await open(context, { controllers: HANDLERS_SOURCE });
@@ -33,12 +33,19 @@ export const handlerModes: Journey = {
     const afterFailure = await drainLog(session, "read the monitor log after the failure");
     context.expect(failed.folder, [same("a monitor observes the error", afterFailure, ["500:Error: boom 7"])]);
     context.expect(ok.folder, [holds("the monitor's HTTPResult(418) was ignored", ok.status === 200)]);
+    const plain = await session.get("GET /pp/plain", "/pp/plain");
+    context.expect(plain.folder, [status("a prefix that returns a plain string", plain, 200), bodyIs("its value becomes the response", plain, "from the prefix")]);
+    const guarded = await session.get("GET /pp/guarded", "/pp/guarded");
+    context.expect(guarded.folder, [status("a prefix that throws an HTTPResult answers its status", guarded, 401), bodyIs("and its body", guarded, "no token")]);
+    const teapot = await session.get("GET /pp/teapot", "/pp/teapot");
+    context.expect(teapot.folder, [status("a handler that throws an HTTPResult", teapot, 418)]);
+    context.expect(teapot.folder, [same("neither main handler ran behind its prefix, and the monitor's ctx.error is the thrown HTTPResult", await drainLog(session, "read the log after the prefixes and the thrown HTTPResult"), ["monitor:418:HTTPResult 418"])]);
     await finish(session);
   },
 };
 
 export const handlerPriority: Journey = {
-  title: "prefix handlers run from HIGHEST to LOWEST whatever their declaration order, and the first one that returns a value ends the chain",
+  title: "prefix handlers run from HIGHEST to LOWEST whatever their declaration order, the first one that returns a value ends the chain, and a prefix, postfix or monitor without a priority runs at NORMAL",
   entryPoint: "five `@Prefix(\"get\", \"data\", HandlerPriority.X)` handlers on one route, called over HTTP",
   async run(context) {
     const session = await open(context, { controllers: HANDLERS_SOURCE });
@@ -51,6 +58,10 @@ export const handlerPriority: Journey = {
     const guest = await session.get("GET /api/data as guest", "/api/data", { headers: { "x-token": "t", "x-role": "guest" } });
     context.expect(guest.folder, [status("HIGH refuses", guest, 403), same("its body", guest.json, { error: "Forbidden" })]);
     context.expect(guest.folder, [same("only the handlers up to the refusal ran", await drainLog(session, "read the order after 403"), ["highest", "high"])]);
+    const order = await session.get("GET /prio/order", "/prio/order");
+    context.expect(order.folder, [status("handlers without a priority", order, 200)]);
+    await session.run("wait for the monitors", "await waitFor(200); return null;");
+    context.expect(order.folder, [same("a handler without a priority runs at NORMAL, between HIGH and LOW, in every mode", await drainLog(session, "read the default-priority order"), ["prefix-high", "prefix-default", "prefix-low", "main", "postfix-high", "postfix-default", "postfix-low", "monitor-high", "monitor-default", "monitor-low"])]);
     await finish(session);
   },
 };

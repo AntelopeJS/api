@@ -67,7 +67,7 @@ export const assertValidations: Journey = {
 };
 
 export const rateLimiting: Journey = {
-  title: "RateLimit allows the limit within a window and then answers 429 with Retry-After before the handler runs, counts each handler and key separately, and starts a new window after windowMs",
+  title: "RateLimit allows the limit within a window and then answers 429 with Retry-After before the handler runs, counts each handler and key separately, keys on the socket IP rather than X-Forwarded-For, and starts a new window after windowMs",
   entryPoint: "`@RateLimit(limit, windowMs, options)` under `@Get` and `@Post`, called over HTTP",
   async run(context) {
     const session = await open(context, { controllers: UTIL_SOURCE });
@@ -82,6 +82,10 @@ export const rateLimiting: Journey = {
     context.expect(firstWindow[0].folder, [holds("Reset is a UNIX timestamp in seconds, at most the window away", reset >= nowSeconds && reset <= nowSeconds + 4, `reset ${String(reset)}, now ${String(nowSeconds)}`)]);
     const rejected = await session.get("GET /limited over the limit", "/limited");
     context.expect(rejected.folder, [status("over the limit", rejected, 429), bodyIs("the default message", rejected, "Too many requests"), holds("Retry-After is a delay in seconds", /^[12]$/.test(header(rejected, "retry-after") ?? ""), String(header(rejected, "retry-after"))), headerIs("limit on a rejection", rejected, "x-ratelimit-limit", "3"), headerIs("remaining on a rejection", rejected, "x-ratelimit-remaining", "0"), holds("reset on a rejection", Number(header(rejected, "x-ratelimit-reset")) >= nowSeconds, String(header(rejected, "x-ratelimit-reset")))]);
+    const spoofed = await session.get("GET /limited over the limit with a forged X-Forwarded-For", "/limited", { headers: { "x-forwarded-for": "203.0.113.9" } });
+    context.expect(spoofed.folder, [status("the default key is the socket IP, not a client-supplied X-Forwarded-For", spoofed, 429)]);
+    const runs = await session.run("count the handler runs", "return controllers.limitedRuns.length;");
+    context.expect(runs.folder, [same("a rejected request never reaches the handler", runs.value, 3)]);
     const other = await session.get("GET /limited/other, another decorated handler", "/limited/other");
     context.expect(other.folder, [status("a separate counter", other, 200), headerIs("remaining", other, "x-ratelimit-remaining", "4"), headerIs("limit", other, "x-ratelimit-limit", "5")]);
     for (let call = 1; call <= 3; call += 1) {

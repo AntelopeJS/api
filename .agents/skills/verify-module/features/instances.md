@@ -13,7 +13,7 @@ journeys:
 
 ## Sub-features
 
-- `controller-instances`: two requests get two instances, another controller reads the instance of the current request with its header-injected property, a second call in the same request returns the same instance, classes built by `extend` and `PartialController` give instances.
+- `controller-instances`: two requests get two instances, another controller reads the instance of the current request with its header-injected property, a second call in the same request returns the same instance, classes built by `extend` and `PartialController` give instances, two calls for a class with a `@JSONBody` property (filled asynchronously) give one instance with the body.
 
 ## How to get to it (user POV)
 

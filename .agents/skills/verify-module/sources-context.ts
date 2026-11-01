@@ -1,4 +1,4 @@
-export const CONTEXT_SOURCE = String.raw`import { Context, Controller, HTTPResult, Post, RequestContext } from "@antelopejs/interface-api";
+export const CONTEXT_SOURCE = String.raw`import { Context, Controller, Get, HTTPResult, Post, RawBody, ReadBody, RequestContext } from "@antelopejs/interface-api";
 
 export class InfoController extends Controller("/info") {
   @Post(":id")
@@ -18,6 +18,20 @@ export class InfoController extends Controller("/info") {
       headersSent: ctx.rawResponse.headersSent,
       remote: ctx.rawRequest.socket.remoteAddress,
     };
+  }
+
+  @Get("url")
+  url(@Context() ctx: RequestContext) {
+    return { host: ctx.url.host, href: ctx.url.href };
+  }
+
+  @Post("body")
+  async body(@Context() ctx: RequestContext, @RawBody() raw: Buffer) {
+    const pending = ctx.body;
+    void ReadBody(ctx);
+    const kept = ctx.body === pending;
+    const resolved = await pending;
+    return { isPromise: pending instanceof Promise, kept, buffer: Buffer.isBuffer(resolved), text: Buffer.isBuffer(resolved) ? resolved.toString() : null, raw: raw.toString() };
   }
 }
 `;

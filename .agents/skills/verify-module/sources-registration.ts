@@ -84,3 +84,47 @@ for (const [label, proto] of cases) {
 return { out, registered: getRegisteredRoutes().filter((route) => route.location.startsWith("/legacy-refused")).length };`,
   unregister: String.raw`api.UnregisterRoute(globalThis.legacy.ids.viaClass); return api.getRegisteredRoutes().filter((route) => route.location.startsWith("/legacy/")).map((route) => route.location).sort();`,
 };
+
+/** Two prefixes and a handler at one location, a route claiming another owner, and the removal of one prefix. */
+export const TWIN_SCENARIOS = {
+  register: String.raw`const { Controller, RegisterRoute } = api;
+class Twin extends Controller("/twin") {}
+const base = { method: "get", parameters: [], properties: {}, controller: Twin };
+globalThis.twinLog = [];
+globalThis.twin = {
+  a: RegisterRoute({ ...base, mode: "prefix", location: "/twin/x", callback: function tagA() { globalThis.twinLog.push("a"); } }),
+  b: RegisterRoute({ ...base, mode: "prefix", location: "/twin/x", callback: function tagB() { globalThis.twinLog.push("b"); } }),
+  h: RegisterRoute({ ...base, mode: "handler", location: "/twin/x", callback: function main() { return globalThis.twinLog.splice(0); } }),
+  claimed: RegisterRoute({ ...base, mode: "handler", location: "/twin/claimed", callback: function claimed() { return 1; }, module: "intruder" }),
+};
+return api.getRegisteredRoutes().filter((r) => r.location === "/twin/claimed").map((r) => r.module);`,
+  dropA: String.raw`api.UnregisterRoute(globalThis.twin.a); return true;`,
+};
+
+/** Prefixes registered by \`@Route\` with and without a priority. */
+export const ROUTE_PRIORITY_SOURCE = String.raw`import { Controller, Get, HandlerPriority, Route } from "@antelopejs/interface-api";
+
+export const log: string[] = [];
+
+export class RoutePriorityController extends Controller("/route-priority") {
+  @Route("prefix", "get", "order", HandlerPriority.LOW)
+  low() {
+    log.push("low");
+  }
+
+  @Route("prefix", "get", "order")
+  byDefault() {
+    log.push("default");
+  }
+
+  @Route("prefix", "get", "order", HandlerPriority.HIGH)
+  high() {
+    log.push("high");
+  }
+
+  @Get("order")
+  order() {
+    return log.splice(0);
+  }
+}
+`;

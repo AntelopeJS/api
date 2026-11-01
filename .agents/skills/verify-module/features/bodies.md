@@ -20,7 +20,7 @@ Request bodies and the request context of [Request bodies and responses](https:/
 - `body-reading`: `@RawBody` is a Buffer (multi-byte text counts bytes, an empty body is empty), `@JSONBody` parses an object, a list, a string, a number, a boolean and `null`, is `undefined` for an empty body, malformed JSON is 400, `ReadBody` reuses one read, `StreamBody` yields the body.
 - `body-limits`: exactly 1 MiB passes and one byte more is 413, with and without a `Content-Length`, a custom limit on `@RawBody`, `@JSONBody` and `ReadBody` replaces the default in both directions, and 10 MiB+1 still ends.
 - `body-streaming`: `@BodyStream` takes 3 MiB with no limit in several chunks, leaving the loop early still answers, an empty stream, and the server keeps serving.
-- `request-context`: `@Context` exposes the raw request and response, the parsed URL, the route parameters, no body before a read, the response, and no error or connection.
+- `request-context`: `@Context` exposes the raw request and response, the parsed URL, the route parameters, no body before a read, the response, and no error or connection; `ctx.url` takes its host from the Host header; after a read `context.body` is the pending `Promise<Buffer>` and a second read keeps it.
 
 ## How to get to it (user POV)
 

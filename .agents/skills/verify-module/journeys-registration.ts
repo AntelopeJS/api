@@ -2,7 +2,7 @@ import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, same } from "./checks.ts";
 import { bodyIs, status } from "./client.ts";
-import { CUSTOM_DECORATOR_SCENARIO, LEGACY_SCENARIOS, REGISTRATION_SCENARIOS } from "./sources-registration.ts";
+import { CUSTOM_DECORATOR_SCENARIO, LEGACY_SCENARIOS, REGISTRATION_SCENARIOS, ROUTE_PRIORITY_SOURCE, TWIN_SCENARIOS } from "./sources-registration.ts";
 import { open, pick, type Json, type JsonRecord, type Session } from "./session.ts";
 
 async function finish(session: Session): Promise<void> {
@@ -11,7 +11,7 @@ async function finish(session: Session): Promise<void> {
 }
 
 export const routeRegistration: Journey = {
-  title: "RegisterRoute adds a handler, prefix or parameterised route at run time under its controller, introspection lists it, and UnregisterRoute removes only that route",
+  title: "RegisterRoute adds a handler, prefix or parameterised route at run time under its controller, introspection lists it with the registering module as owner, and UnregisterRoute removes only that route, also beside another handler at the same location",
   entryPoint: "`RegisterRoute(handler)` and `UnregisterRoute(id)` called from a module while the project runs",
   async run(context) {
     const session = await open(context);
@@ -59,15 +59,22 @@ export const routeRegistration: Journey = {
     context.expect(left.folder, [same("nothing of the dynamic routes is left", left.value, 0)]);
     const last = await session.get("GET /dynamic/guarded after removing every route", "/dynamic/guarded");
     context.expect(last.folder, [holds("the last route is gone", last.status === 404, String(last.status))]);
+    const twins = await session.run("register two prefixes and a handler at one location, and a route claiming another owner", TWIN_SCENARIOS.register);
+    context.expect(twins.folder, [holds("the scenario ran", twins.ok, JSON.stringify(twins.error)), same("RegisterRoute takes the owner from the registering module, not the handler's module field", twins.value, ["verify-app"])], { critical: true });
+    const both = await session.get("GET /twin/x", "/twin/x");
+    context.expect(both.folder, [status("the handler", both, 200), same("both prefixes ran", both.json, ["a", "b"])]);
+    await session.run("unregister the first prefix", TWIN_SCENARIOS.dropA);
+    const one = await session.get("GET /twin/x after unregistering the first prefix", "/twin/x");
+    context.expect(one.folder, [status("the handler", one, 200), same("UnregisterRoute removes that route only: the other prefix at the same location still runs", one.json, ["b"])]);
     await finish(session);
   },
 };
 
 export const customDecorators: Journey = {
-  title: "ProcessCallback builds the full path from the controller, registers the handler and returns its id, a location is optional, and the priority levels are 0 to 4",
+  title: "ProcessCallback builds the full path from the controller, registers the handler and returns its id, a location is optional, the priority levels are 0 to 4, and @Route orders handlers by its priority argument",
   entryPoint: "`ProcessCallback(target, key, descriptor, mode, method, location?, priority?)` called by a custom method decorator",
   async run(context) {
-    const session = await open(context);
+    const session = await open(context, { controllers: ROUTE_PRIORITY_SOURCE });
     const built = await session.run("register through ProcessCallback", CUSTOM_DECORATOR_SCENARIO);
     context.expect(built.folder, [
       same("it returns { id } and registers both routes under the controller", built.value, {
@@ -86,6 +93,8 @@ export const customDecorators: Journey = {
     context.expect(hello.folder, [status("an omitted location is the key", hello, 200), same("answers from its callback", hello.json, { hello: true })]);
     const named = await session.get("POST /proc/custom/path", "/proc/custom/path", { method: "POST" });
     context.expect(named.folder, [status("a given location", named, 200), same("answers from its callback", named.json, { named: true })]);
+    const order = await session.get("GET /route-priority/order", "/route-priority/order");
+    context.expect(order.folder, [status("@Route prefixes", order, 200), same("@Route takes a priority, and one without runs at NORMAL", order.json, ["high", "default", "low"])]);
     await finish(session);
   },
 };

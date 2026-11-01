@@ -3,7 +3,7 @@ import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 import { holds, same } from "./checks.ts";
 import { bodyIs, status, type Reply } from "./client.ts";
 import { open, type Json, type Session } from "./session.ts";
-import { ROUTES_SOURCE } from "./sources-routes.ts";
+import { QUICK_START_SOURCE, ROUTES_SOURCE } from "./sources-routes.ts";
 
 async function finish(session: Session): Promise<void> {
   const stopped = await session.stop();
@@ -17,11 +17,12 @@ interface Call {
   route: string;
   code: number;
   expected: Json;
+  headers?: Record<string, string>;
 }
 
 async function expectJson(session: Session, call: Call): Promise<Reply> {
-  const { label, method, route, code, expected } = call;
-  const reply = await session.get(`${method} ${route}`, route, { method });
+  const { label, method, route, code, expected, headers } = call;
+  const reply = await session.get(`${method} ${route}`, route, { method, headers });
   session.context.expect(reply.folder, [status(label, reply, code), same(`${label}: JSON body`, reply.json, expected)]);
   return reply;
 }
@@ -60,7 +61,7 @@ export const routeForms: Journey = {
 };
 
 export const controllerTree: Journey = {
-  title: "extend nests a sub-controller under its parent's path at any depth, PartialController adds routes at the same location, and Controller(location, Base) gives handlers a Base instance",
+  title: "extend nests a sub-controller under its parent's path at any depth, PartialController adds routes at the same location and shares its computed properties, and Controller(location, Base) gives handlers a Base instance",
   entryPoint: "`ApiController.extend(\"users\")`, `PartialController(UsersController)` and `Controller(location, Base)` declared in a module",
   async run(context) {
     const session = await open(context, { controllers: ROUTES_SOURCE });
@@ -71,8 +72,20 @@ export const controllerTree: Journey = {
     context.expect(statics.folder, [same("a sub-controller has its full location and its parent's static members", statics.value, { location: "/api/users/admin", parent: "/api", version: "v1" })]);
     await expectJson(session, { label: "the original controller's route", method: "GET", route: "/reports/daily", code: 200, expected: { report: "daily" } });
     await expectJson(session, { label: "a partial controller's route shares the location", method: "GET", route: "/reports/admin", code: 200, expected: { report: "admin" } });
+    await expectJson(session, { label: "a partial controller's handler gets the computed properties of the controller it extends", method: "GET", route: "/reports/team", code: 200, expected: { team: "core" }, headers: { "x-team": "core" } });
     await expectJson(session, { label: "instances of Controller(location, Base) are Base instances", method: "GET", route: "/typed", code: 200, expected: { said: "hi from the base class" } });
     await finish(session);
   },
 };
 
+
+export const quickStart: Journey = {
+  title: "the README quick start: the controller answers Hello world without a name and Hello Ada with ?name=Ada, at the path its @Get() gives it",
+  entryPoint: "the README's `HelloController`, loaded by a module and called over HTTP",
+  async run(context) {
+    const session = await open(context, { controllers: QUICK_START_SOURCE });
+    await expectJson(session, { label: "the parameter default applies when the query has no name", method: "GET", route: "/hello/hello", code: 200, expected: { message: "Hello world" } });
+    await expectJson(session, { label: "the query value reaches the handler", method: "GET", route: "/hello/hello?name=Ada", code: 200, expected: { message: "Hello Ada" } });
+    await finish(session);
+  },
+};

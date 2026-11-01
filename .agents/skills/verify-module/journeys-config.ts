@@ -1,7 +1,9 @@
 import { type Journey } from "@antelopejs/tooling-configs/verify";
 
-import { holds, same } from "./checks.ts";
-import { isString, parseJson, pick } from "./json.ts";
+import { holds, matches, same } from "./checks.ts";
+import { isString, parseJson, pick, recordOf } from "./json.ts";
+import { attempt, path } from "./session.ts";
+import { CORS_SOURCE } from "./sources-cors.ts";
 
 const VARIABLES_SCRIPT = String.raw`const { configVars } = require(process.cwd() + "/dist/config-vars.js");
 const cases = JSON.parse(process.argv[1]);
@@ -82,5 +84,37 @@ export const manifest: Journey = {
     context.expect(read.folder, [same("the entry point is dist/index.js", pick(manifestJson, "main"), "dist/index.js"), same("only dist is published", pick(manifestJson, "files"), ["dist"])]);
     const targets = await context.command("the files the manifest names exist", "ls", ["dist/config-vars.js", "dist/index.js"], { cwd: context.repo });
     context.expect(targets.folder, [holds("the built config variables file and the entry point exist", targets.exitCode === 0, targets.stderr)]);
+  },
+};
+
+const READ_PROJECT = String.raw`const text = require("node:fs").readFileSync("antelope.config.ts", "utf8").replace(/^export default/m, "return");
+console.log(JSON.stringify(new Function(text)()));`;
+
+export const modulesAdd: Journey = {
+  title: "ajs project modules add writes the module's default configuration into antelope.config.ts: one HTTP server on localhost:8080",
+  entryPoint: "`ajs project modules add --mode local <repo>` in an empty project",
+  async run(context) {
+    const project = path(context.work, "added");
+    context.edit("empty project config", path(project, "antelope.config.ts"), 'export default { name: "added", modules: {} };\n');
+    context.edit("empty project package.json", path(project, "package.json"), '{ "name": "added", "private": true }\n');
+    const added = await context.command("ajs project modules add", "node", [path(context.repo, "node_modules/@antelopejs/core/dist/core/cli/index.js"), "project", "modules", "add", "--mode", "local", context.repo], { cwd: project });
+    context.expect(added.folder, [holds("the module is added", added.exitCode === 0, added.stderr.slice(0, 300))], { critical: true });
+    const read = await context.command("read antelope.config.ts", "node", ["-e", READ_PROJECT], { cwd: project });
+    const modules = pick(parseJson(read.stdout.trim()), "modules");
+    const entry = Object.values(recordOf(modules))[0];
+    context.expect(read.folder, [same("its config is the default: one HTTP server on localhost:8080", pick(entry, "config"), { servers: [{ protocol: "http", host: "localhost", port: 8080 }] })]);
+  },
+};
+
+export const interfaceRanges: Journey = {
+  title: "a loaded module that declares an interface-api range excluding the shared copy stops the project with Incompatible interface package resolution, naming the module and its range",
+  entryPoint: "a consumer module whose package.json depends on `@antelopejs/interface-api@^9.0.0`, started with `ajs project dev`",
+  async run(context) {
+    const refused = await attempt(context, "dev", { controllers: CORS_SOURCE, dependencies: { "@antelopejs/interface-api": "^9.0.0" } });
+    context.expect(refused.folder, [
+      holds("the project does not come up", !refused.ready && refused.ended, `ready ${String(refused.ready)}, ended ${String(refused.ended)}`),
+      matches("core reports the refusal", refused.stdout, /Incompatible interface package resolution/),
+      matches("naming the module and its range", refused.stdout, /verify-app requires @antelopejs\/interface-api@\^9\.0\.0/),
+    ]);
   },
 };

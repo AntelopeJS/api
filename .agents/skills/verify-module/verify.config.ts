@@ -1,17 +1,17 @@
 import type { VerifyConfig } from "@antelopejs/tooling-configs/verify";
 
 import { bodyLimits, bodyReading, bodyStreaming } from "./journeys-bodies.ts";
-import { configVariables, manifest } from "./journeys-config.ts";
+import { configVariables, interfaceRanges, manifest, modulesAdd } from "./journeys-config.ts";
 import { requestContext } from "./journeys-context.ts";
-import { corsConfig, corsDefaults, corsRuntime } from "./journeys-cors.ts";
-import { startupGate } from "./journeys-gate.ts";
+import { corsConfig, corsDefaults, corsRuntime, corsUnconfigured } from "./journeys-cors.ts";
+import { failedStart, moduleLifecycle, startupGate } from "./journeys-gate.ts";
 import { handlerModes, handlerPriority, postfixChain } from "./journeys-handlers.ts";
 import { controllerInstances } from "./journeys-instances.ts";
 import { multiParameters, parameterSources, propertyParameters } from "./journeys-params.ts";
 import { parameterModifiers, parameterProviders, parameterTransform } from "./journeys-modifiers.ts";
 import { customDecorators, legacyProto, routeRegistration } from "./journeys-registration.ts";
 import { resultBodies, resultErrors, resultHeaders, responseStreaming } from "./journeys-results.ts";
-import { controllerTree, routeForms } from "./journeys-routes.ts";
+import { controllerTree, quickStart, routeForms } from "./journeys-routes.ts";
 import { devRegistry, listenOnDemand, portFallback, productionBoot, serverOptions, serverPorts, serverProtocols } from "./journeys-servers.ts";
 import { assertGuards, assertValidations, rateLimitOrdering, rateLimiting } from "./journeys-util.ts";
 import { websocketHandlers } from "./journeys-websocket.ts";
@@ -46,6 +46,7 @@ const config: VerifyConfig = {
   journeys: {
     "route-forms": routeForms,
     "controller-tree": controllerTree,
+    "quick-start": quickStart,
     "handler-modes": handlerModes,
     "handler-priority": handlerPriority,
     "postfix-chain": postfixChain,
@@ -70,6 +71,7 @@ const config: VerifyConfig = {
     "cors-config": corsConfig,
     "cors-defaults": corsDefaults,
     "cors-runtime": corsRuntime,
+    "cors-unconfigured": corsUnconfigured,
     "assert-guards": assertGuards,
     "assert-validations": assertValidations,
     "rate-limiting": rateLimiting,
@@ -83,8 +85,12 @@ const config: VerifyConfig = {
     "listen-on-demand": listenOnDemand,
     "production-boot": productionBoot,
     "startup-gate": startupGate,
+    "failed-start": failedStart,
+    "module-lifecycle": moduleLifecycle,
     "config-variables": configVariables,
     manifest,
+    "modules-add": modulesAdd,
+    "interface-ranges": interfaceRanges,
   },
 };
 

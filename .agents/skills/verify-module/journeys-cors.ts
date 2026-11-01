@@ -74,14 +74,16 @@ export const corsDefaults: Journey = {
 };
 
 export const corsRuntime: Journey = {
-  title: "SetCorsConfig replaces the policy for later requests without a restart, accepts a RegExp and a mixed list, credentials false drops the header, and GetCorsConfig returns what was set",
+  title: "SetCorsConfig replaces the policy for later requests without a restart, accepts a RegExp and a mixed list, credentials false drops the header, and GetCorsConfig returns a promise of the module config's policy, then of what was set",
   entryPoint: "`SetCorsConfig(config)` and `GetCorsConfig()` called from a module while the project runs",
   async run(context) {
     const session = await open(context, { controllers: CORS_SOURCE, config: { cors: { allowedOrigins: APP, maxAge: 100 } } });
+    const initial = await session.run("GetCorsConfig before any SetCorsConfig", "const pending = api.GetCorsConfig(); return { promise: pending instanceof Promise, config: await pending };");
+    context.expect(initial.folder, [same("GetCorsConfig returns a promise of the module config's policy", initial.value, { promise: true, config: { allowedOrigins: APP, maxAge: 100 } })]);
     const before = await preflight(session, "the configured origin", APP);
     context.expect(before.folder, [allows("before the change", before, APP), headerIs("max age", before, "access-control-max-age", "100")]);
-    const set = await session.run("replace the policy with a RegExp and a string", `await api.SetCorsConfig({ allowedOrigins: [/^https:\\/\\/preview-\\d+\\.example\\.com$/, "${ADMIN}"], allowedMethods: ["GET", "POST"], allowedHeaders: ["Content-Type", "x-antelopejs-auth"], credentials: true, maxAge: 600 }); return null;`);
-    context.expect(set.folder, [holds("the scenario ran", set.ok, JSON.stringify(set.error))]);
+    const set = await session.run("replace the policy with a RegExp and a string", `const pending = api.SetCorsConfig({ allowedOrigins: [/^https:\\/\\/preview-\\d+\\.example\\.com$/, "${ADMIN}"], allowedMethods: ["GET", "POST"], allowedHeaders: ["Content-Type", "x-antelopejs-auth"], credentials: true, maxAge: 600 }); const promise = pending instanceof Promise; await pending; return promise;`);
+    context.expect(set.folder, [holds("the scenario ran", set.ok, JSON.stringify(set.error)), same("SetCorsConfig returns a promise", set.value, true)]);
     const dropped = await preflight(session, "the origin the old policy allowed", APP);
     context.expect(dropped.folder, [refuses("the new policy replaces the old one", dropped, APP), headerIs("the old max age is gone", dropped, "access-control-max-age", "600")]);
     const preview = await preflight(session, "an origin the RegExp matches", "https://preview-42.example.com");
@@ -104,6 +106,23 @@ export const corsRuntime: Journey = {
     context.expect(omitted.folder, [same("the policy is the one set", omitted.value, { maxAge: 5 })]);
     const closed = await preflight(session, "an origin when allowedOrigins is omitted", ADMIN);
     context.expect(closed.folder, [refuses("omitting allowedOrigins disables CORS", closed, ADMIN)]);
+    await finish(session);
+  },
+};
+
+export const corsUnconfigured: Journey = {
+  title: "in development without a cors config, loopback origins on any port pass CORS and every other origin is refused",
+  entryPoint: "a project in development whose api module has no `cors` key, called over HTTP with Origin headers",
+  async run(context) {
+    const session = await open(context, { controllers: CORS_SOURCE });
+    for (const loopback of ["http://localhost:3000", "http://127.0.0.1:8081", "http://[::1]:4200"]) {
+      const reply = await preflight(session, "a loopback origin without configuration", loopback);
+      context.expect(reply.folder, [allows("development without configuration", reply, loopback)]);
+    }
+    const plain = await session.get("GET /ping from a loopback origin", "/ping", { headers: { origin: "http://localhost:3000" } });
+    context.expect(plain.folder, [status("an ordinary request", plain, 200), allows("an ordinary request", plain, "http://localhost:3000")]);
+    const stranger = await preflight(session, "an origin that is not loopback", APP);
+    context.expect(stranger.folder, [refuses("every other origin must be listed", stranger, APP)]);
     await finish(session);
   },
 };

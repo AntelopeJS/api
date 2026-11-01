@@ -32,7 +32,7 @@ journeys:
 - `server-options`: keys other than protocol, host and port reach the Node.js server: `maxHeaderSize` on one server refuses 4 KiB of headers with 431 while the other accepts them.
 - `dev-registry`: the servers are recorded in `.antelope/dev.json` with a wildcard host as loopback, the protocol and the bound port, and the file is removed when the project stops.
 - `listen-on-demand`: `autoListen: false` serves nothing until `Listen()`.
-- `production-boot`: `ajs project build` then `start`: the boot fails without `publicBaseUrl` and says so, binds the exact port (a busy one is a failure, not a fallback), publishes `publicBaseUrl` without its slash, and sends no CORS header without a `cors` config.
+- `production-boot`: `ajs project build` then `start`: the boot fails without `publicBaseUrl` and says so, binds the exact port (a busy one is a failure, not a fallback), publishes `publicBaseUrl` without its slash, and sends no CORS header without a `cors` config; with a `cors` config the listed origin is allowed and `localhost` and `127.0.0.1` are not.
 
 ## How to get to it (user POV)
 
@@ -48,4 +48,4 @@ pnpm exec antelopejs-verify journey "$RUN" servers
 
 - A busy port is held by the journey itself with `node:net`, then released. The fallback warning is the module's own message (`Port N in use, listening on ... instead`); the docs say only that the module falls back.
 - Production runs without the pack's driver module, which needs `ajs project dev`'s environment; the consumer module reads the variables.
-- Not reached: the default port 80 (needs privileges; `config-variables` covers the default as a value), `ajs project modules add` writing the default configuration, and a stop that closes the sockets.
+- Not reached: the default port 80, because binding it needs privileges (`ip_unprivileged_port_start` is 1024). `config-variables` covers the default as a value. `ajs project modules add` writing the default configuration is in [config-vars](config-vars.md).

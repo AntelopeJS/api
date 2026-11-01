@@ -6,6 +6,8 @@ docs:
 journeys:
   - config-variables
   - manifest
+  - modules-add
+  - interface-ranges
 ---
 
 # Config vars
@@ -16,6 +18,8 @@ The three config variables and the manifest of README.md: `configVars` in `dist/
 
 - `config-variables`: sixteen configurations: wildcard hosts become loopback, an absent host and port, an explicit host, IPv6 bare and bracketed, https, `publicBaseUrl` with trailing slashes, surrounding spaces, blank and empty, only the first server counts, no server and an empty `servers` throw.
 - `manifest`: `implements`, `configVars`, `configVarsFile`, `defaultConfig` (one HTTP server on localhost:8080, as README.md says), `main` and `files`, and that the files they name are built.
+- `modules-add`: `ajs project modules add --mode local` writes `servers: [{ protocol: "http", host: "localhost", port: 8080 }]` into an empty project.
+- `interface-ranges`: a consumer depending on `@antelopejs/interface-api@^9.0.0` stops the project with `Incompatible interface package resolution`, naming the module and the range.
 
 ## How to get to it (user POV)
 
@@ -29,4 +33,5 @@ pnpm exec antelopejs-verify journey "$RUN" config-vars
 
 ## Gotchas
 
+- `ajs project modules install` adding the module when nothing implements the interface is not reached. It resolves the implementation from the npm registry, so it would test the published package, not this tree.
 - `API_PORT` is the configured port here and the bound port when the project runs: [servers](servers.md) covers the second.

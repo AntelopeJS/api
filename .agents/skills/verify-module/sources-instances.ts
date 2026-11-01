@@ -1,4 +1,4 @@
-export const INSTANCES_SOURCE = String.raw`import { Context, Controller, Get, GetControllerInstance, Parameter, PartialController, RequestContext } from "@antelopejs/interface-api";
+export const INSTANCES_SOURCE = String.raw`import { Context, Controller, Get, GetControllerInstance, JSONBody, Parameter, PartialController, Post, RequestContext } from "@antelopejs/interface-api";
 
 export const built: string[] = [];
 
@@ -42,6 +42,24 @@ export class OrderController extends Controller("/orders") {
     const second = await GetControllerInstance(UserController, context);
     first.count();
     return { same: first === second, hits: second.count() };
+  }
+}
+
+export class BodyHolder extends Controller("/holder") {
+  @JSONBody()
+  private payload!: unknown;
+
+  read() {
+    return this.payload;
+  }
+}
+
+export class AsyncInstanceController extends Controller("/async") {
+  @Post("twice")
+  async twice(@Context() context: RequestContext) {
+    const first = await GetControllerInstance(BodyHolder, context);
+    const second = await GetControllerInstance(BodyHolder, context);
+    return { same: first === second, payload: first.read() };
   }
 }
 

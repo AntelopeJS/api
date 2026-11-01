@@ -67,10 +67,13 @@ export class ImportController extends Controller("import") {
   }
 }
 
+export const limitedRuns: string[] = [];
+
 export class LimitedController extends Controller("/limited") {
   @Get("")
   @RateLimit(3, 1500)
   list(@Context() context: RequestContext) {
+    limitedRuns.push("list");
     context.response.setBody({ users: [] });
     return context.response;
   }

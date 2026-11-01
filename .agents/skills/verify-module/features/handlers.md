@@ -15,8 +15,8 @@ The four handler modes of [Controllers and routes](https://interfaces.antelopejs
 
 ## Sub-features
 
-- `handler-modes`: prefix, main, postfix and monitor on one route, a prefix refusal, a monitor that sees the finished response, the error of a failing handler and a status 500, and a monitor whose HTTPResult is ignored.
-- `handler-priority`: five prefixes declared out of order run HIGHEST to LOWEST, the first that returns a value ends the chain.
+- `handler-modes`: prefix, main, postfix and monitor on one route, a prefix refusal, a monitor that sees the finished response, the error of a failing handler and a status 500, and a monitor whose HTTPResult is ignored; a prefix returning a plain string becomes the body, a prefix throwing `HTTPResult(401)` answers it and the main handler never runs, a monitor sees a thrown `HTTPResult` as `ctx.error`.
+- `handler-priority`: five prefixes declared out of order run HIGHEST to LOWEST, the first that returns a value ends the chain; a prefix, postfix and monitor without a priority each run between HIGH and LOW.
 - `postfix-chain`: postfixes at three priorities all run, a returning one skips the later ones, a throwing monitor changes neither the response nor the other monitors.
 
 ## How to get to it (user POV)

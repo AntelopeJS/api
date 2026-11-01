@@ -11,7 +11,7 @@ async function finish(session: Session): Promise<void> {
 }
 
 export const controllerInstances: Journey = {
-  title: "each request builds a new controller instance, GetControllerInstance returns the instance of the current request with its injected properties filled, and asking twice returns the same one",
+  title: "each request builds a new controller instance, GetControllerInstance returns the instance of the current request with its injected properties filled, and asking twice returns the same one, also for a class with an asynchronous @JSONBody property",
   entryPoint: "`GetControllerInstance(Controller, context)` called from another controller's handler, over HTTP",
   async run(context) {
     const session = await open(context, { controllers: INSTANCES_SOURCE });
@@ -24,6 +24,8 @@ export const controllerInstances: Journey = {
     context.expect(anonymous.folder, [same("the next request does not keep the previous viewer", anonymous.json, { order: { id: "o-2", user: { id: "user-123", name: "Example User" } } })]);
     const twice = await session.get("GET /orders/twice/o-3", "/orders/twice/o-3");
     context.expect(twice.folder, [same("two calls in one request give one instance", twice.json, { same: true, hits: 2 })]);
+    const asyncBuilt = await session.get("POST /async/twice", "/async/twice", { method: "POST", headers: { "content-type": "application/json" }, body: '{"k":1}' });
+    context.expect(asyncBuilt.folder, [same("one instance per class within a request, also when an injected property is read asynchronously", asyncBuilt.json, { same: true, payload: { k: 1 } })]);
     const built = await session.run("count the constructed instances", "return controllers.built.length;");
     context.expect(built.folder, [holds("an instance is built per request that needs it", built.value === 5, JSON.stringify(built.value))]);
     const reach = await session.get("GET /reach/extended", "/reach/extended");

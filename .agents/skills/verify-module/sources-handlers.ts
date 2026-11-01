@@ -79,6 +79,93 @@ export class SecuredController extends Controller("/api") {
   }
 }
 
+export class PlainPrefixController extends Controller("/pp") {
+  @Prefix("get", "plain")
+  early() {
+    return "from the prefix";
+  }
+
+  @Get("plain")
+  main() {
+    log.push("main-ran");
+    return "from the main handler";
+  }
+
+  @Prefix("get", "guarded")
+  refuse() {
+    throw new HTTPResult(401, "no token");
+  }
+
+  @Get("guarded")
+  guarded() {
+    log.push("guarded-ran");
+    return "guarded";
+  }
+
+  @Get("teapot")
+  teapot() {
+    throw new HTTPResult(418, "short and stout");
+  }
+
+  @Monitor("get", "teapot")
+  watch(@Context() ctx: RequestContext) {
+    log.push("monitor:" + ctx.response.getStatus() + ":" + (ctx.error instanceof HTTPResult ? "HTTPResult " + ctx.error.getStatus() : String(ctx.error)));
+  }
+}
+
+export class DefaultPriorityController extends Controller("/prio") {
+  @Prefix("get", "order", HandlerPriority.LOW)
+  low() {
+    log.push("prefix-low");
+  }
+
+  @Prefix("get", "order")
+  byDefault() {
+    log.push("prefix-default");
+  }
+
+  @Prefix("get", "order", HandlerPriority.HIGH)
+  high() {
+    log.push("prefix-high");
+  }
+
+  @Get("order")
+  order() {
+    log.push("main");
+    return { ok: true };
+  }
+
+  @Postfix("get", "order", HandlerPriority.LOW)
+  postLow() {
+    log.push("postfix-low");
+  }
+
+  @Postfix("get", "order")
+  postDefault() {
+    log.push("postfix-default");
+  }
+
+  @Postfix("get", "order", HandlerPriority.HIGH)
+  postHigh() {
+    log.push("postfix-high");
+  }
+
+  @Monitor("get", "order", HandlerPriority.LOW)
+  monitorLow() {
+    log.push("monitor-low");
+  }
+
+  @Monitor("get", "order")
+  monitorDefault() {
+    log.push("monitor-default");
+  }
+
+  @Monitor("get", "order", HandlerPriority.HIGH)
+  monitorHigh() {
+    log.push("monitor-high");
+  }
+}
+
 export class ChainController extends Controller("/chain") {
   @Get("stop")
   stopMain() {

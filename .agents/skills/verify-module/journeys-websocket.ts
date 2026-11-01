@@ -1,7 +1,7 @@
 import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, same } from "./checks.ts";
-import { parseJson } from "./json.ts";
+import { parseJson, pick } from "./json.ts";
 import { open, type Json, type Session } from "./session.ts";
 import { WEBSOCKET_SOURCE } from "./sources-ws.ts";
 
@@ -40,6 +40,7 @@ export async function talk(session: Session, label: string, spec: SocketSpec): P
   const ran = await session.context.command(label, "node", ["-e", SCRIPT, JSON.stringify({ ...spec, url: `ws://127.0.0.1:${session.port}${spec.route}` })], { cwd: session.context.repo });
   const parsed = parseJson(ran.stdout.trim().split("\n").pop() ?? "");
   if (parsed === undefined || parsed === null) session.context.notVerified(`the WebSocket client printed no result: ${ran.stderr.slice(0, 200)}`);
+  if (pick(parsed, "opened") !== true) await session.recheck(session.port);
   return { folder: ran.folder, parsed };
 }
 

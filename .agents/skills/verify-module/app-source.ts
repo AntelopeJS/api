@@ -33,6 +33,12 @@ async function answer(request) {
 
 exports.construct = function construct(config) {
   received = config || {};
+  if (received.connectAtConstruct) {
+    received.constructProbe = "pending";
+    const socket = require("node:net").connect(Number(received.connectAtConstruct), "127.0.0.1");
+    socket.on("connect", () => { received.constructProbe = "connected"; socket.destroy(); });
+    socket.on("error", (error) => { received.constructProbe = error.code; });
+  }
   const file = path.join(__dirname, "controllers.js");
   if (fs.existsSync(file)) controllers = require(file);
   server = http.createServer((request, response) => {
@@ -45,6 +51,7 @@ exports.construct = function construct(config) {
 };
 exports.start = async function start() {
   await sleep(Number(process.env.VERIFY_APP_START_DELAY || 0));
+  if (process.env.VERIFY_APP_START_FAILS) throw new Error("the consumer module failed to start");
 };
 exports.stop = async function stop() {
   await sleep(Number(process.env.VERIFY_APP_STOP_DELAY || 0));

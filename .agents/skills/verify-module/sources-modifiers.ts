@@ -1,4 +1,4 @@
-export const MODIFIERS_SOURCE = String.raw`import { AddParameterModifier, Context, Controller, Get, HTTPResult, Parameter, Post, ReadBody, RequestContext, SetParameterProvider, Transform } from "@antelopejs/interface-api";
+export const MODIFIERS_SOURCE = String.raw`import { AddParameterModifier, Context, Controller, Get, HTTPResult, Parameter, type ParameterModifier, type ParameterProvider, Post, ReadBody, RequestContext, SetParameterProvider, Transform } from "@antelopejs/interface-api";
 import { MakeParameterDecorator } from "@antelopejs/interface-core/decorators";
 
 export const ran: string[] = [];
@@ -37,9 +37,13 @@ const Seen = MakeParameterDecorator((target, key, param) =>
   }),
 );
 
+const authorization: ParameterProvider<string | undefined> = (context) => context.rawRequest.headers.authorization;
+
+const bearerToken: ParameterModifier<string | undefined> = (_context, header) => (typeof header === "string" ? header.replace(/^Bearer /, "") : undefined);
+
 const BearerToken = MakeParameterDecorator((target, key, param) => {
-  SetParameterProvider(target, key, param, (context: RequestContext) => context.rawRequest.headers.authorization);
-  AddParameterModifier(target, key, param, (_context: RequestContext, header: unknown) => (typeof header === "string" ? header.replace(/^Bearer /, "") : undefined));
+  SetParameterProvider(target, key, param, authorization);
+  AddParameterModifier(target, key, param, bearerToken);
 });
 
 const BodyText = MakeParameterDecorator((target, key, param) =>

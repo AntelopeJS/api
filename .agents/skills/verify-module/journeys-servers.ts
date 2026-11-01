@@ -173,14 +173,27 @@ curl -s -o /dev/null -D "$PWD/headers.txt" -H 'Origin: http://localhost:3000' "h
 echo "origin-header=$(grep -ic '^access-control-allow-origin' "$PWD/headers.txt")"
 echo "vars=$(curl -s -X POST -d 'return config;' "http://127.0.0.1:$APP_PORT/")"`;
 
+const PRODUCTION_CORS_PROBE = String.raw`wait_ping "$PORT"
+for origin in http://localhost:3000 http://127.0.0.1:3000 https://app.example.com; do
+  curl -s -o /dev/null -D "$PWD/h.txt" -H "Origin: $origin" "http://127.0.0.1:$PORT/ping"
+  echo "acao $origin=[$(grep -i '^access-control-allow-origin' "$PWD/h.txt" | tr -d '\r' | cut -d' ' -f2)]"
+done`;
+
 export const productionBoot: Journey = {
-  title: "outside development the boot fails without publicBaseUrl, binds exactly the configured port, publishes publicBaseUrl without its trailing slash and does not let a loopback origin through CORS",
+  title: "outside development the boot fails without publicBaseUrl, binds exactly the configured port, publishes publicBaseUrl without its trailing slash and does not let a loopback origin through CORS, with or without a cors config",
   entryPoint: "`ajs project build` and `ajs project start` with and without `publicBaseUrl`, on a free and on a busy port",
   async run(context) {
     const missing = await attempt(context, "start", { controllers: CORS_SOURCE });
     context.expect(missing.folder, [holds("no publicBaseUrl ends the boot with a failure", missing.ended && missing.projectExit !== "0", `ended ${String(missing.ended)}, exit ${String(missing.projectExit)}`), matches("it names the missing key", missing.stdout, /Missing required configuration key "publicBaseUrl"/)]);
     const running = await attempt(context, "start", { controllers: CORS_SOURCE, config: { publicBaseUrl: "https://api.example.com/" }, appConfig: VARIABLES }, PRODUCTION_PROBE);
     context.expect(running.folder, [holds("the project came up", running.ready, running.stdout.slice(0, 400)), matches("the routes are served", running.stdout, /started=200/), matches("CORS is off without a cors config", running.stdout, /origin-header=0/), matches("publicBaseUrl is published without its trailing slash", running.stdout, /"publicUrl":"https:\/\/api\.example\.com"/)]);
+    const listed = await attempt(context, "start", { controllers: CORS_SOURCE, config: { publicBaseUrl: "https://api.example.com", cors: { allowedOrigins: "https://app.example.com" } } }, PRODUCTION_CORS_PROBE);
+    context.expect(listed.folder, [
+      holds("the project came up with a cors config", listed.ready, listed.stdout.slice(0, 400)),
+      matches("the listed origin is allowed", listed.stdout, /acao https:\/\/app\.example\.com=\[https:\/\/app\.example\.com\]/),
+      matches("localhost is not let through the cors config outside development", listed.stdout, /acao http:\/\/localhost:3000=\[(?!http:\/\/localhost:3000\])/),
+      matches("127.0.0.1 is not let through either", listed.stdout, /acao http:\/\/127\.0\.0\.1:3000=\[(?!http:\/\/127\.0\.0\.1:3000\])/),
+    ]);
     const [busy] = await pickPorts(context, 1);
     const blocker = await occupy(context, busy);
     try {

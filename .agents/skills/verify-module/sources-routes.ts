@@ -88,6 +88,9 @@ export class ApiUsersAdminController extends ApiUsersController.extend("admin") 
 }
 
 export class ReportsController extends Controller("/reports") {
+  @Parameter("x-team", "header")
+  team!: string | undefined;
+
   @Get()
   daily() {
     return { report: "daily" };
@@ -98,6 +101,11 @@ export class ReportsAdminController extends PartialController(ReportsController)
   @Get("admin")
   admin() {
     return { report: "admin" };
+  }
+
+  @Get("team")
+  teamOf() {
+    return { team: this.team ?? null };
   }
 }
 
@@ -113,4 +121,20 @@ export class TypedController extends Controller("/typed", Greeter) {
     return { said: this.greeting() };
   }
 }
+`;
+
+/** The quick start of README.md, verbatim. */
+export const QUICK_START_SOURCE = String.raw`import { Controller, Get, Parameter } from "@antelopejs/interface-api";
+
+export class HelloController extends Controller("/hello") {
+  @Get()
+  hello(@Parameter("name", "query") name = "world") {
+    return { message: ` + "`Hello ${name}`" + String.raw` };
+  }
+}
+
+export function construct(): void {}
+export function destroy(): void {}
+export function start(): void {}
+export function stop(): void {}
 `;
