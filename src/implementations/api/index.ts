@@ -318,7 +318,7 @@ function invokeHandler(
 }
 
 function compileHandler(handler: RouteHandler): HandlerPlan {
-  const controllerClass: Controller = handler.proto.constructor;
+  const controllerClass: Controller = handler.controller;
   return {
     callback: handler.callback,
     controller: compileController(controllerClass, handler.properties),

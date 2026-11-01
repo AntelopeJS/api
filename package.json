@@ -42,16 +42,14 @@
     "prepare": "if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && command -v lefthook >/dev/null 2>&1; then lefthook install; fi",
     "checks": "antelopejs-checks",
     "size": "antelopejs-check-size",
-    "ratchet": "antelopejs-ratchet",
     "sync": "antelopejs-sync",
-    "ratchet:update": "antelopejs-ratchet --update",
     "sync:check": "antelopejs-sync --check",
     "typecheck": "tsc --noEmit",
     "suppressions": "antelopejs-suppressions",
     "suppressions:update": "antelopejs-suppressions --update"
   },
   "dependencies": {
-    "@antelopejs/interface-api": "file:.campaign/tgz/antelopejs-interface-api-f206be7.tgz",
+    "@antelopejs/interface-api": "file:.campaign/tgz/antelopejs-interface-api-11c035a.tgz",
     "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-b53e38a.tgz",
     "@antelopejs/interface-core": ">=0.2.6 <1.0.0",
     "reflect-metadata": "^0.2.2",
@@ -87,7 +85,7 @@
   "packageManager": "pnpm@10.6.5",
   "pnpm": {
     "overrides": {
-      "@antelopejs/interface-api": "file:.campaign/tgz/antelopejs-interface-api-f206be7.tgz",
+      "@antelopejs/interface-api": "file:.campaign/tgz/antelopejs-interface-api-11c035a.tgz",
       "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-b53e38a.tgz"
     }
   },

@@ -5,6 +5,8 @@ import { createServer, type Server } from "node:http";
 import { GetMetadata } from "@antelopejs/interface-core";
 import {
   type ComputedParameter,
+  type ControllerClass,
+  Controller as ControllerBase,
   ControllerMeta,
   JSONBody,
   type RouteHandler,
@@ -34,10 +36,7 @@ interface StatefulThenable {
   value: object;
 }
 
-type ControllerConstructor = (new () => TestController) & {
-  location: string;
-  prototype: TestController;
-};
+type ControllerConstructor = ControllerClass<TestController>;
 
 function computedParameter(
   provider: ComputedParameter["provider"],
@@ -47,8 +46,7 @@ function computedParameter(
 }
 
 function createController(): ControllerConstructor {
-  return class {
-    static location = "";
+  return class extends ControllerBase("") {
     sequence = 0;
   };
 }
@@ -81,7 +79,7 @@ function createHandler(
     callback,
     parameters,
     properties,
-    proto: Controller.prototype,
+    controller: Controller,
   };
 }
 
