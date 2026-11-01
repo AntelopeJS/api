@@ -328,6 +328,11 @@ function compileHandler(handler: RouteHandler): HandlerPlan {
 
 export const routesProxy = {
   register: (id: string, handler: RouteHandler): void => {
+    if (!handler.controller) {
+      throw new TypeError(
+        `Cannot register ${handler.method.toUpperCase()} ${handler.location}: RouteHandler.controller is required`,
+      );
+    }
     registeredRoutes.set(id, handler);
     let plan: HandlerPlan | undefined;
     registerHandler(
