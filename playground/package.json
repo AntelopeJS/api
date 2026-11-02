@@ -6,9 +6,9 @@
     "dev": "ajs project run -w"
   },
   "dependencies": {
-    "@antelopejs/interface-api": "file:../.campaign/tgz/antelopejs-interface-api-f2a99b5.tgz",
+    "@antelopejs/interface-api": "file:../.campaign/tgz/antelopejs-interface-api-015a93a.tgz",
     "@antelopejs/interface-api-util": "file:../.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz",
-    "@antelopejs/interface-core": ">=0.2.6 <1.0.0"
+    "@antelopejs/interface-core": "file:../.campaign/tgz/antelopejs-interface-core-f7df541.tgz"
   },
   "devDependencies": {
     "@types/node": "^20.5.7",
