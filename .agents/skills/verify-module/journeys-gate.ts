@@ -77,7 +77,7 @@ const LIFECYCLE = {
 };
 
 export const moduleLifecycle: Journey = {
-  title: "with core 1.17.0, stopping a single module at runtime closes the gate and starting it reopens it, and destroying the module releases the routes it owns, unlisted and no longer served, while the other modules' routes stay",
+  title: "stopping a single module at runtime leaves the gate open, starting it again changes nothing, and destroying the module releases the routes it owns, unlisted and no longer served, while the other modules' routes stay",
   entryPoint: "`StopModule`, `StartModule` and `DestroyModule` of `@antelopejs/interface-core/modules` on a second module that registered a route",
   async run(context) {
     const session = await open(context, { controllers: GATE_SOURCE, extra: OWNED_MODULE });
@@ -87,15 +87,15 @@ export const moduleLifecycle: Journey = {
     context.expect(owners.folder, [same("each route is owned by the module that registered it", owners.value, ["/owned/route verify-extra", "/ping verify-app", "/ping verify-app"])]);
     const stopped = await session.run("stop the second module", LIFECYCLE.stop);
     context.expect(stopped.folder, [holds("the scenario ran", stopped.ok, JSON.stringify(stopped.error))], { critical: true });
-    const closed = await session.get("GET /ping after StopModule", "/ping");
-    context.expect(closed.folder, [status("the core release that introduced the gate closes it when a single module stops", closed, 503), bodyIs("with the gate's body", closed, "error.server_starting")]);
+    const stillOpen = await session.get("GET /ping after StopModule", "/ping");
+    context.expect(stillOpen.folder, [status("stopping a single module leaves the gate open", stillOpen, 200), same("the route answers", stillOpen.json, { ok: true })]);
     const started = await session.run("start the second module again", LIFECYCLE.start);
     context.expect(started.folder, [holds("the scenario ran", started.ok, JSON.stringify(started.error))], { critical: true });
     const reopened = await session.get("GET /ping after StartModule", "/ping");
-    context.expect(reopened.folder, [status("starting it again reopens the gate", reopened, 200), same("the route answers", reopened.json, { ok: true })]);
+    context.expect(reopened.folder, [status("starting it again leaves the gate open", reopened, 200), same("the route answers", reopened.json, { ok: true })]);
     const destroyed = await session.run("stop and destroy the second module", LIFECYCLE.destroy);
     context.expect(destroyed.folder, [same("module cleanup removes the routes it owns and keeps the others", destroyed.value, ["/ping verify-app", "/ping verify-app"])]);
-    const cycled = await session.run("restart another module, which reopens the gate", LIFECYCLE.reopen);
+    const cycled = await session.run("restart another module", LIFECYCLE.reopen);
     context.expect(cycled.folder, [holds("the scenario ran", cycled.ok, JSON.stringify(cycled.error))], { critical: true });
     const released = await session.get("GET /owned/route after DestroyModule", "/owned/route");
     context.expect(released.folder, [status("the released route is no longer served", released, 404)]);
