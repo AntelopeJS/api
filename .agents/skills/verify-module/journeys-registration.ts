@@ -107,7 +107,7 @@ export const controllerRequired: Journey = {
     const attempted = await session.run("register handlers with and without a controller", CONTROLLER_REQUIRED_SCENARIO);
     context.expect(attempted.folder, [holds("the scenario ran", attempted.ok, JSON.stringify(attempted.error))], { critical: true });
     context.expect(attempted.folder, [
-      same("each handler without a controller is refused with a TypeError, the one with a controller is listed under it", attempted.value, {
+      same("each handler without a controller is refused with a TypeError, the one with a controller is listed under it, and RegisterRoute leaves the handler object it was given unmodified (no module field added)", attempted.value, {
         out: [
           { label: "no controller and no proto", refused: true, type: "TypeError" },
           { label: "only a proto built by Controller", refused: true, type: "TypeError" },
@@ -116,6 +116,7 @@ export const controllerRequired: Journey = {
         ],
         handlers: [{ location: "/needs-controller/ok", controllerIsDeclared: true }],
         routes: ["/needs-controller/ok"],
+        givenUnchanged: true,
       }),
     ]);
     const refused = await session.get("GET /needs-controller/1", "/needs-controller/1");

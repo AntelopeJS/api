@@ -37,6 +37,8 @@ export const resultBodies: Journey = {
       const reply = await session.get(`GET /examples/to-json/${kind}`, `/examples/to-json/${kind}`);
       context.expect(reply.folder, [status(`a ${kind} body`, reply, 200), contentType(`a ${kind} body is JSON`, reply, /^application\/json/), bodyIs(`a ${kind} body is written through its toJSON`, reply, expected)]);
     }
+    const vendor = await session.get("GET /examples/vendor-json", "/examples/vendor-json");
+    context.expect(vendor.folder, [status("an object with a custom content type", vendor, 200), contentType("the custom type is kept for an object body", vendor, /^application\/vnd\.verify\+json/), bodyIs("the object is written as JSON", vendor, '{"id":7,"tags":["a","b"]}')]);
     const plainNumber = await session.get("GET /examples/plain-number", "/examples/plain-number");
     context.expect(plainNumber.folder, [status("a returned number", plainNumber, 200), contentType("a returned number is JSON", plainNumber, /^application\/json/), bodyIs("a returned number is its JSON text", plainNumber, "7")]);
     const emptyList = await session.get("GET /examples/empty-list", "/examples/empty-list");

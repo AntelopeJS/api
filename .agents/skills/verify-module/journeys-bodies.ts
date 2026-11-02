@@ -9,6 +9,15 @@ import { BODIES_SOURCE } from "./sources-bodies.ts";
 
 const MIB = 1024 * 1024;
 
+function sha256Of(data: Buffer): string {
+  return createHash("sha256").update(data).digest("hex");
+}
+
+/** The body `pattern: true` sends: byte `index % 251`. */
+function counterPattern(length: number): Buffer {
+  return Buffer.from(Array.from({ length }, (_, index) => index % 251));
+}
+
 async function finish(session: Session): Promise<void> {
   const stopped = await session.stop();
   session.context.expect(stopped.folder, [interrupted(stopped)]);
@@ -36,13 +45,14 @@ export const bodyReading: Journey = {
     await posted(session, { label: "a raw body", route: "/body/raw", body: "hello", expected: { isBuffer: true, bytes: 5, text: "hello" } });
     for (const [label, chunked] of [["one chunk", undefined], ["several chunks", 65_536]] as const) {
       const bytes = 300_000;
-      const expected = createHash("sha256").update(Buffer.from(Array.from({ length: bytes }, (_, index) => index % 251))).digest("hex");
+      const expected = sha256Of(counterPattern(bytes));
       const digest = await session.get(`a ${label} body of distinct bytes`, "/body/digest", { method: "POST", bodyBytes: bytes, chunked, pattern: true });
       context.expect(digest.folder, [status(label, digest, 200), same(`${label} arrive in order, byte for byte`, digest.json, { bytes, sha256: expected })]);
     }
     await posted(session, { label: "a multi-byte raw body counts bytes", route: "/body/raw", body: "héllo €", expected: { isBuffer: true, bytes: 10, text: "héllo €" } });
     await posted(session, { label: "an empty raw body is an empty buffer", route: "/body/raw", body: "", expected: { isBuffer: true, bytes: 0, text: "" } });
     await posted(session, { label: "a JSON object", route: "/body/json", body: '{"name":"Ada","tags":["a","b"],"n":null}', expected: { kind: "object", value: { name: "Ada", tags: ["a", "b"], n: null } }, headers: { "content-type": "application/json" } });
+    await posted(session, { label: "a JSON object with non-ASCII UTF-8 text", route: "/body/json", body: '{"name":"Ada é €","emoji":"😀"}', expected: { kind: "object", value: { name: "Ada é €", emoji: "😀" } } });
     await posted(session, { label: "a JSON array", route: "/body/json", body: "[1,2,3]", expected: { kind: "array", value: [1, 2, 3] } });
     await posted(session, { label: "a JSON string", route: "/body/json", body: '"text"', expected: { kind: "string", value: "text" } });
     await posted(session, { label: "a JSON number", route: "/body/json", body: "42.5", expected: { kind: "number", value: 42.5 } });
@@ -52,7 +62,7 @@ export const bodyReading: Journey = {
     const malformed = await session.get("POST malformed JSON", "/body/json", { method: "POST", body: "{not json" });
     context.expect(malformed.folder, [status("JSON syntax is checked", malformed, 400)]);
     await posted(session, { label: "ReadBody reuses one read", route: "/body/read", body: "again", expected: { unreadBefore: true, pendingAfter: true, sameBuffer: true, text: "again" } });
-    await posted(session, { label: "StreamBody yields the body", route: "/body/stream-body", body: "twelve bytes", expected: { bytes: 12 } });
+    await posted(session, { label: "StreamBody yields the body", route: "/body/stream-body", body: "twelve bytes", expected: { bytes: 12, sha256: sha256Of(Buffer.from("twelve bytes")) } });
     await finish(session);
   },
 };
@@ -103,12 +113,12 @@ export const bodyStreaming: Journey = {
   entryPoint: "`@BodyStream()` and `StreamBody(context)` in PUT and POST handlers, called over HTTP with multi-megabyte bodies",
   async run(context) {
     const session = await open(context, { controllers: BODIES_SOURCE });
-    const big = await session.get("PUT 3 MiB, over the buffered limit", "/body/stream", { method: "PUT", bodyBytes: 3 * MIB, chunked: 65_536 });
-    context.expect(big.folder, [status("no limit applies to a streamed body", big, 200), same("every byte arrived, in several chunks", big.json, { bytes: 3 * MIB, chunked: true })]);
+    const big = await session.get("PUT 3 MiB, over the buffered limit", "/body/stream", { method: "PUT", bodyBytes: 3 * MIB, chunked: 65_536, pattern: true });
+    context.expect(big.folder, [status("no limit applies to a streamed body", big, 200), same("every byte arrived, in order, in several chunks", big.json, { bytes: 3 * MIB, chunked: true, sha256: sha256Of(counterPattern(3 * MIB)) })]);
     const early = await session.get("PUT 3 MiB and stop reading after the first chunk", "/body/early", { method: "PUT", bodyBytes: 3 * MIB, chunked: 65_536, thenGet: "/body/ping" });
     context.expect(early.folder, [status("the client still gets its response", early, 200), same("the handler left the loop", early.json, { left: true }), same("the rest of the body is discarded, so the same connection serves the next request", early.followUp, { status: 200, sameConnection: true })]);
     const empty = await session.get("PUT an empty body", "/body/stream", { method: "PUT", body: "" });
-    context.expect(empty.folder, [status("an empty stream", empty, 200), same("zero bytes", empty.json, { bytes: 0, chunked: false })]);
+    context.expect(empty.folder, [status("an empty stream", empty, 200), same("zero bytes", empty.json, { bytes: 0, chunked: false, sha256: sha256Of(Buffer.alloc(0)) })]);
     const again = await session.get("POST after the early exit", "/body/raw", { method: "POST", body: "still fine" });
     context.expect(again.folder, [status("the server keeps serving", again, 200), holds("with the new body", JSON.stringify(again.json).includes("still fine"), again.text)]);
     await finish(session);

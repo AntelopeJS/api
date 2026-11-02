@@ -45,11 +45,13 @@ export class BodyController extends Controller("/body") {
   async stream(@BodyStream() body: AsyncIterable<Uint8Array>) {
     let bytes = 0;
     let chunks = 0;
+    const hash = createHash("sha256");
     for await (const chunk of body) {
       bytes += chunk.byteLength;
       chunks += 1;
+      hash.update(chunk);
     }
-    return { bytes, chunked: chunks > 1 };
+    return { bytes, chunked: chunks > 1, sha256: hash.digest("hex") };
   }
 
   @Get("ping")
@@ -84,10 +86,12 @@ export class BodyController extends Controller("/body") {
   @Post("stream-body")
   async streamBody(@Context() context: RequestContext) {
     let bytes = 0;
+    const hash = createHash("sha256");
     for await (const chunk of StreamBody(context)) {
       bytes += chunk.byteLength;
+      hash.update(chunk);
     }
-    return { bytes };
+    return { bytes, sha256: hash.digest("hex") };
   }
 }
 `;

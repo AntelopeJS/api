@@ -41,6 +41,11 @@ export class ExampleController extends Controller("/examples") {
     return new HTTPResult(200, kind === "date" ? bodies.date : kind === "buffer" ? bodies.buffer : bodies.custom);
   }
 
+  @Get("vendor-json")
+  vendorJson() {
+    return new HTTPResult(200, { id: 7, tags: ["a", "b"] }, "application/vnd.verify+json");
+  }
+
   @Get("plain-number")
   plainNumber() {
     return 7;

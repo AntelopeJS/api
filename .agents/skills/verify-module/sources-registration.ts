@@ -68,10 +68,13 @@ for (const [label, extra] of attempts) {
     out.push({ label, refused: true, type: error.constructor.name });
   }
 }
-RegisterRoute({ ...base, location: "/needs-controller/ok", callback: function accepted() { return "with a controller"; }, controller: Declared });
+const given = { ...base, location: "/needs-controller/ok", callback: function accepted() { return "with a controller"; }, controller: Declared };
+const before = Object.keys(given).sort().join(",");
+RegisterRoute(given);
+const givenUnchanged = Object.keys(given).sort().join(",") === before && !("module" in given);
 const handlers = getRegisteredRouteHandlers().filter((entry) => entry.handler.location.startsWith("/needs-controller")).map((entry) => ({ location: entry.handler.location, controllerIsDeclared: entry.handler.controller === Declared }));
 const routes = getRegisteredRoutes().filter((route) => route.location.startsWith("/needs-controller")).map((route) => route.location);
-return { out, handlers, routes };`;
+return { out, handlers, routes, givenUnchanged };`;
 
 /** Two prefixes and a handler at one location, a route claiming another owner, and the removal of one prefix. */
 export const TWIN_SCENARIOS = {
