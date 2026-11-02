@@ -1,4 +1,5 @@
-export const BODIES_SOURCE = String.raw`import { BodyStream, Context, Controller, Get, JSONBody, Post, Put, RawBody, ReadBody, RequestContext, StreamBody } from "@antelopejs/interface-api";
+export const BODIES_SOURCE = String.raw`import { createHash } from "node:crypto";
+import { BodyStream, Context, Controller, Get, JSONBody, Post, Put, RawBody, ReadBody, RequestContext, StreamBody } from "@antelopejs/interface-api";
 
 const TEN_MIBIBYTES = 10 * 1024 * 1024;
 
@@ -13,6 +14,11 @@ export class BodyController extends Controller("/body") {
   @Post("raw")
   raw(@RawBody() body: Buffer) {
     return { isBuffer: Buffer.isBuffer(body), bytes: body.length, text: body.length < 100 ? body.toString("utf8") : undefined };
+  }
+
+  @Post("digest")
+  digest(@RawBody() body: Buffer) {
+    return { bytes: body.length, sha256: createHash("sha256").update(body).digest("hex") };
   }
 
   @Post("json")

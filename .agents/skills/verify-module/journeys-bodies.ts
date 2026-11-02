@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, same } from "./checks.ts";
@@ -32,6 +34,12 @@ export const bodyReading: Journey = {
   async run(context) {
     const session = await open(context, { controllers: BODIES_SOURCE });
     await posted(session, { label: "a raw body", route: "/body/raw", body: "hello", expected: { isBuffer: true, bytes: 5, text: "hello" } });
+    for (const [label, chunked] of [["one chunk", undefined], ["several chunks", 65_536]] as const) {
+      const bytes = 300_000;
+      const expected = createHash("sha256").update(Buffer.from(Array.from({ length: bytes }, (_, index) => index % 251))).digest("hex");
+      const digest = await session.get(`a ${label} body of distinct bytes`, "/body/digest", { method: "POST", bodyBytes: bytes, chunked, pattern: true });
+      context.expect(digest.folder, [status(label, digest, 200), same(`${label} arrive in order, byte for byte`, digest.json, { bytes, sha256: expected })]);
+    }
     await posted(session, { label: "a multi-byte raw body counts bytes", route: "/body/raw", body: "héllo €", expected: { isBuffer: true, bytes: 10, text: "héllo €" } });
     await posted(session, { label: "an empty raw body is an empty buffer", route: "/body/raw", body: "", expected: { isBuffer: true, bytes: 0, text: "" } });
     await posted(session, { label: "a JSON object", route: "/body/json", body: '{"name":"Ada","tags":["a","b"],"n":null}', expected: { kind: "object", value: { name: "Ada", tags: ["a", "b"], n: null } }, headers: { "content-type": "application/json" } });

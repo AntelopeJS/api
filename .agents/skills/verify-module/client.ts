@@ -12,6 +12,8 @@ export interface RequestSpec {
   bodyBytes?: number;
   /** Sends the body in `bodyBytes` as chunks of this size without a Content-Length. */
   chunked?: number;
+  /** Fills the body with the counter pattern `index % 251` instead of one repeated byte, so a reordered or altered body differs. */
+  pattern?: boolean;
   /** Aborts the request after this many milliseconds, once the response head arrived. */
   abortAfterMs?: number;
   timeoutMs?: number;
@@ -93,6 +95,7 @@ if (spec.bodyBytes !== undefined) {
   const pump = () => {
     while (sent < total) {
       const piece = Buffer.alloc(Math.min(size, total - sent), 97);
+      if (spec.pattern) for (let i = 0; i < piece.length; i++) piece[i] = (sent + i) % 251;
       sent += piece.length;
       if (!request.write(piece)) { request.once("drain", pump); return; }
     }
