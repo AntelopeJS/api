@@ -126,8 +126,11 @@ async function post(
 }
 
 function jsonBodyParameter(): ComputedParameter {
-  const Controller = createController();
-  JSONBody()(Controller.prototype, "handle", 0);
+  class Controller extends ControllerBase("") {
+    handle(@JSONBody() body: unknown) {
+      return body;
+    }
+  }
   const metadata = GetMetadata(Controller, ControllerMeta);
   return metadata.computed_params.handle[0];
 }
