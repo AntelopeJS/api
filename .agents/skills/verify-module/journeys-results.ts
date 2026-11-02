@@ -15,7 +15,7 @@ function contentType(label: string, reply: Reply, expected: RegExp): ReturnType<
 }
 
 export const resultBodies: Journey = {
-  title: "a plain object or list is JSON, a string is text/plain, HTTPResult sets status, body and content type, and an empty result is an empty body",
+  title: "a plain object, list, number, boolean or null is JSON, a string is text/plain, HTTPResult sets status, body and content type, and an empty result is an empty body",
   entryPoint: "handler return values (objects, lists, strings, `HTTPResult`) of GET and POST routes, called over HTTP",
   async run(context) {
     const session = await open(context, { controllers: RESULTS_SOURCE });
@@ -27,6 +27,13 @@ export const resultBodies: Journey = {
     context.expect(custom.folder, [status("a custom content type", custom, 200), contentType("html", custom, /^text\/html/), bodyIs("html", custom, "<h1>Hello World</h1>"), headerIs("a custom header", custom, "x-custom-header", "Custom Value")]);
     const mixed = await session.get("GET /examples/mixed", "/examples/mixed");
     context.expect(mixed.folder, [status("a list of mixed values", mixed, 200), contentType("a list", mixed, /^application\/json/), same("a list keeps every value, including null, false-like ones and nesting", mixed.json, [1, "two", { three: 3 }, null, [4], true, 0, ""])]);
+    const primitives: [string, string][] = [["integer", "42"], ["zero", "0"], ["fraction", "1.5"], ["yes", "true"], ["no", "false"], ["nothing", "null"]];
+    for (const [kind, expected] of primitives) {
+      const reply = await session.get(`GET /examples/primitive/${kind}`, `/examples/primitive/${kind}`);
+      context.expect(reply.folder, [status(`a ${kind} body`, reply, 200), contentType(`a ${kind} body is JSON`, reply, /^application\/json/), bodyIs(`a ${kind} body is its JSON text`, reply, expected)]);
+    }
+    const plainNumber = await session.get("GET /examples/plain-number", "/examples/plain-number");
+    context.expect(plainNumber.folder, [status("a returned number", plainNumber, 200), contentType("a returned number is JSON", plainNumber, /^application\/json/), bodyIs("a returned number is its JSON text", plainNumber, "7")]);
     const emptyList = await session.get("GET /examples/empty-list", "/examples/empty-list");
     context.expect(emptyList.folder, [status("an empty list", emptyList, 200), same("an empty list is JSON", emptyList.json, [])]);
     const emptyObject = await session.get("GET /examples/empty-object", "/examples/empty-object");

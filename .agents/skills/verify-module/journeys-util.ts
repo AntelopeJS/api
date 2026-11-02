@@ -69,7 +69,7 @@ export const assertValidations: Journey = {
 };
 
 export const rateLimiting: Journey = {
-  title: "RateLimit allows the limit within a window and then answers 429 with Retry-After before the handler runs, counts each handler and key separately, keys on the socket IP rather than X-Forwarded-For, and starts a new window after windowMs",
+  title: "RateLimit allows the limit within a window and then answers 429 with Retry-After before the handler runs, counts each handler and key separately, keys on the socket IP rather than X-Forwarded-For, and starts a new window after windowMs counted from the window's first request, not from the latest one",
   entryPoint: "`@RateLimit(limit, windowMs, options)` under `@Get` and `@Post`, called over HTTP",
   async run(context) {
     const session = await open(context, { controllers: UTIL_SOURCE });
@@ -102,6 +102,14 @@ export const rateLimiting: Journey = {
       const reply = await session.get(`GET /limited/keyed ${who || "without a key"}, ${label}`, who === "" ? "/limited/keyed" : `/limited/keyed?who=${who}`);
       context.expect(reply.folder, [status(`key ${who || "missing (falls back to the client IP)"}, ${label}`, reply, expected), ...(expected === 429 ? [bodyIs("the custom message", reply, "Too many from you")] : [])]);
     }
+    const windowStart = await session.get("GET /limited/fixed, first request of its window", "/limited/fixed");
+    context.expect(windowStart.folder, [status("first request", windowStart, 200), headerIs("remaining", windowStart, "x-ratelimit-remaining", "1")]);
+    await session.run("wait inside the window", "await waitFor(1500); return null;");
+    const insideWindow = await session.get("GET /limited/fixed, second request inside the window", "/limited/fixed");
+    context.expect(insideWindow.folder, [status("second request", insideWindow, 200), headerIs("remaining", insideWindow, "x-ratelimit-remaining", "0")]);
+    await session.run("wait until the first request's window is over", "await waitFor(1700); return null;");
+    const nextWindow = await session.get("GET /limited/fixed, after the first request's window", "/limited/fixed");
+    context.expect(nextWindow.folder, [status("a window starts with its first request and does not move with later ones", nextWindow, 200), headerIs("a new window", nextWindow, "x-ratelimit-remaining", "1")]);
     await session.run("wait out the window", "await waitFor(1700); return null;");
     const again = await session.get("GET /limited after the window", "/limited");
     context.expect(again.folder, [status("a new window", again, 200), headerIs("the count starts again", again, "x-ratelimit-remaining", "2")]);

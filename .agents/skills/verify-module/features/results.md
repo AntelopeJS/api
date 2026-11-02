@@ -16,7 +16,7 @@ What a handler returns and what the client receives, from [Request bodies and re
 
 ## Sub-features
 
-- `result-bodies`: an object, a list of mixed values (null, false-like values, nesting), empty list, empty object, empty string and no return value, a string is text/plain, `HTTPResult` with a status, an object, a content type, `setStatus`, 201 and 204.
+- `result-bodies`: an object, a number (integer, zero, fraction), a boolean and `null` as JSON with the exact text, per the `HTTPBody` TSDoc, a list of mixed values (null, false-like values, nesting), empty list, empty object, empty string and no return value, a string is text/plain, `HTTPResult` with a status, an object, a content type, `setStatus`, 201 and 204.
 - `result-headers`: `addHeader`, `removeHeader`, `withHeaders` on a plain body, with a status and on an existing result (same object, status kept), a postfix's `@Result` header, and the pure `HTTPResult` methods (`getHeaders`, `peekHeaders`, `setBody`, `getContentType`, `isStream`, `getWriteStream`).
 - `result-errors`: a thrown `HTTPResult` is the response, a thrown Error, a rejection and a thrown string are 500, the server keeps serving.
 - `response-streaming`: `@WriteStream()` defaults to text/plain and 200, `@WriteStream("text/event-stream")`, `getWriteStream(type, status)`, a stream written after the handler returned arrives in separate reads before it ends, an empty stream.

@@ -89,6 +89,12 @@ export class LimitedController extends Controller("/limited") {
     return { other: true };
   }
 
+  @Get("fixed")
+  @RateLimit(2, 3000)
+  fixed() {
+    return { fixed: true };
+  }
+
   @Get("keyed")
   @RateLimit(2, 60_000, { key: (context) => context.url.searchParams.get("who"), message: "Too many from you" })
   keyed() {

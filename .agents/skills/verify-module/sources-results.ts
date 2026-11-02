@@ -1,4 +1,4 @@
-export const RESULTS_SOURCE = String.raw`import { Context, Controller, Get, HTTPResult, Post, RequestContext, Result, Postfix, WriteStream } from "@antelopejs/interface-api";
+export const RESULTS_SOURCE = String.raw`import { Context, Controller, Get, HTTPResult, Parameter, Post, RequestContext, Result, Postfix, WriteStream } from "@antelopejs/interface-api";
 import { PassThrough } from "node:stream";
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -28,6 +28,17 @@ export class ExampleController extends Controller("/examples") {
 
   @Get("nothing")
   nothing() {}
+
+  @Get("primitive/:kind")
+  primitive(@Parameter("kind") kind: string) {
+    const bodies: Record<string, number | boolean | null> = { integer: 42, zero: 0, fraction: 1.5, yes: true, no: false, nothing: null };
+    return new HTTPResult(200, bodies[kind]);
+  }
+
+  @Get("plain-number")
+  plainNumber() {
+    return 7;
+  }
 
   @Get("empty-list")
   emptyList() {
