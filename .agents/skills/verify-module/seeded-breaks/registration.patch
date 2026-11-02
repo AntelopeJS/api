@@ -1,0 +1,12 @@
+diff --git a/src/implementations/api/index.ts b/src/implementations/api/index.ts
+index 29d7342..287a529 100644
+--- a/src/implementations/api/index.ts
++++ b/src/implementations/api/index.ts
+@@ -346,7 +346,6 @@ export const routesProxy = {
+   },
+   unregister: (id: string): void => {
+     registeredRoutes.delete(id);
+-    unregisterHandler(`dev/${id}`);
+   },
+   getRoutes: (): RouteInfo[] => {
+     const routes: RouteInfo[] = [];

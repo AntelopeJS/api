@@ -1,0 +1,14 @@
+diff --git a/src/server.ts b/src/server.ts
+index 613a5e7..504d5e4 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -55,7 +55,8 @@ function copyHeaders(source: HTTPResult, target: HTTPResult) {
+     return;
+   }
+   for (const [name, value] of Object.entries(source.peekHeaders() ?? {})) {
+-    target.addHeader(name, value);
++    void name;
++    void value;
+   }
+ }
+ 

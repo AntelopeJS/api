@@ -1,0 +1,13 @@
+diff --git a/src/implementations/api/index.ts b/src/implementations/api/index.ts
+index 29d7342..b51a332 100644
+--- a/src/implementations/api/index.ts
++++ b/src/implementations/api/index.ts
+@@ -77,7 +77,7 @@ function compileParameter(
+   }
+ 
+   const { provider } = parameter;
+-  const modifiers = [...parameter.modifiers];
++  const modifiers = [...parameter.modifiers].reverse();
+   if (modifiers.length === 0) {
+     return (context, controller) => callProvider(provider, controller, context);
+   }

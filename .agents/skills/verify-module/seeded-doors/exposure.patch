@@ -1,0 +1,13 @@
+diff --git a/src/middlewares/cors.ts b/src/middlewares/cors.ts
+index 7fd7bcb..7e796c1 100644
+--- a/src/middlewares/cors.ts
++++ b/src/middlewares/cors.ts
+@@ -18,7 +18,7 @@ const DEFAULT_ALLOWED_METHODS = "GET,HEAD,PUT,PATCH,POST,DELETE";
+ const FALSE_ORIGIN = "false";
+ const CREDENTIALS_ENABLED_VALUE = "true";
+ const NO_BODY_LENGTH = "0";
+-const DEFAULT_CREDENTIALS = true;
++const DEFAULT_CREDENTIALS = false;
+ const LOOPBACK_PROTOCOLS = ["http:", "https:"];
+ const LOOPBACK_HOSTNAMES = ["localhost", "127.0.0.1", "::1", "[::1]"];
+ const DEV_FALLBACK_CORS_CONFIG: CorsConfig = {};

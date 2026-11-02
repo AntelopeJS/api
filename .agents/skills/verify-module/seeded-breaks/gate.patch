@@ -1,0 +1,13 @@
+diff --git a/src/startup-gate.ts b/src/startup-gate.ts
+index 68d1c2d..7fdde73 100644
+--- a/src/startup-gate.ts
++++ b/src/startup-gate.ts
+@@ -6,7 +6,7 @@ const LIVENESS_PATH = "/_live";
+ 
+ const STARTING_STATUS = 503;
+ const STARTING_BODY = "error.server_starting";
+-const RETRY_AFTER_SECONDS = "1";
++const RETRY_AFTER_SECONDS = "5";
+ const LIVE_STATUS = 200;
+ const LIVE_BODY = "ok";
+ 
