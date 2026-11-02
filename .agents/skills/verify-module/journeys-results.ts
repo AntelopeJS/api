@@ -32,6 +32,11 @@ export const resultBodies: Journey = {
       const reply = await session.get(`GET /examples/primitive/${kind}`, `/examples/primitive/${kind}`);
       context.expect(reply.folder, [status(`a ${kind} body`, reply, 200), contentType(`a ${kind} body is JSON`, reply, /^application\/json/), bodyIs(`a ${kind} body is its JSON text`, reply, expected)]);
     }
+    const toJson: [string, string][] = [["date", '"1970-01-01T00:00:00.000Z"'], ["buffer", '{"type":"Buffer","data":[104,105]}'], ["custom", '{"wrapped":true}']];
+    for (const [kind, expected] of toJson) {
+      const reply = await session.get(`GET /examples/to-json/${kind}`, `/examples/to-json/${kind}`);
+      context.expect(reply.folder, [status(`a ${kind} body`, reply, 200), contentType(`a ${kind} body is JSON`, reply, /^application\/json/), bodyIs(`a ${kind} body is written through its toJSON`, reply, expected)]);
+    }
     const plainNumber = await session.get("GET /examples/plain-number", "/examples/plain-number");
     context.expect(plainNumber.folder, [status("a returned number", plainNumber, 200), contentType("a returned number is JSON", plainNumber, /^application\/json/), bodyIs("a returned number is its JSON text", plainNumber, "7")]);
     const emptyList = await session.get("GET /examples/empty-list", "/examples/empty-list");

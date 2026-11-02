@@ -35,6 +35,12 @@ export class ExampleController extends Controller("/examples") {
     return new HTTPResult(200, bodies[kind]);
   }
 
+  @Get("to-json/:kind")
+  toJson(@Parameter("kind") kind: string) {
+    const bodies = { date: new Date(0), buffer: Buffer.from("hi"), custom: { toJSON: () => ({ wrapped: true }) } };
+    return new HTTPResult(200, kind === "date" ? bodies.date : kind === "buffer" ? bodies.buffer : bodies.custom);
+  }
+
   @Get("plain-number")
   plainNumber() {
     return 7;
