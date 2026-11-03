@@ -31,7 +31,7 @@ journeys:
 - `server-protocols`: `RequestContext.url` carries the scheme of the server that received the request (`https:` on the https server, `http:` on the http one); an https server (a generated certificate) beside an http one, the https port refuses plain http, the variables follow the first server's protocol.
 - `server-options`: keys other than protocol, host and port reach the Node.js server: `maxHeaderSize` on one server refuses 4 KiB of headers with 431 while the other accepts them, and `joinDuplicateHeaders` joins a repeated header on the http and the https server that set it, not on the one that does not.
 - `dev-registry`: the servers are recorded in `.antelope/dev.json` with a wildcard host as loopback, the protocol and the bound port, and the file is removed when the project stops.
-- `listen-on-demand`: `autoListen: false` serves nothing until `Listen()`.
+- `listen-on-demand`: `autoListen: false` serves nothing until `Listen()`. `Listen()` returns a Promise.
 - `production-boot`: `ajs project build` then `start`: the boot fails without `publicBaseUrl` and says so, binds the exact port (a busy one is a failure, not a fallback), publishes `publicBaseUrl` without its slash, and sends no CORS header without a `cors` config; with a `cors` config the listed origin is allowed and `localhost` and `127.0.0.1` are not.
 
 ## How to get to it (user POV)

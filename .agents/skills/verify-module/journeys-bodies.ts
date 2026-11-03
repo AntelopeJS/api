@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, same } from "./checks.ts";
-import { status } from "./client.ts";
+import { bodyIs, status } from "./client.ts";
 import { open, type Json, type Session } from "./session.ts";
 import { BODIES_SOURCE } from "./sources-bodies.ts";
 
@@ -79,6 +79,9 @@ async function sized(session: Session, call: Sized): Promise<void> {
   const { label, route, bytes, code, chunked } = call;
   const reply = await session.get(`${label}: ${String(bytes)} bytes to ${route}`, route, { method: "POST", bodyBytes: bytes, chunked });
   session.context.expect(reply.folder, [status(label, reply, code)]);
+  if (code === 413) {
+    session.context.expect(reply.folder, [bodyIs(`${label}: the body of the refusal`, reply, "Payload Too Large")]);
+  }
 }
 
 export const bodyLimits: Journey = {

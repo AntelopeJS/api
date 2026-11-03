@@ -64,7 +64,25 @@ export const propertyParameters: Journey = {
     await seen(session, "the next request starts from its own values", "/config?scope", { authenticated: false, appliedTags: [], scope: true });
     const body = await session.get("POST /props with a JSON body", "/props", { method: "POST", body: '{"a":1}' });
     session.context.expect(body.folder, [status("body and context decorators on properties", body, 200), same("@JSONBody, @RawBody and @Context fill the instance", body.json, { json: { a: 1 }, rawBytes: 7, method: "POST", path: "/props" })]);
+    const streamed = await session.get("POST /props-stream with 1234 bytes", "/props-stream", { method: "POST", bodyBytes: 1234 });
+    session.context.expect(streamed.folder, [status("@BodyStream on a property", streamed, 200), same("is the request body as a stream", streamed.json, { bytes: 1234 })]);
+    await seen(session, "@Transform on a property modifies the value", "/props-transform?n=21", { doubled: 42 });
     await seen(session, "two concurrent-looking requests do not share values", "/config?tags=z", { authenticated: true, key: "k-2", appliedTags: ["z"] }, { apiKey: "k-2" });
+    await finish(session);
+  },
+};
+
+export const lastProvider: Journey = {
+  title: "a parameter keeps only the last provider set on it",
+  entryPoint: "`@Parameter` and `@JSONBody` stacked on one argument in both orders, called over HTTP",
+  async run(context) {
+    const session = await open(context, { controllers: PARAMS_SOURCE });
+    const parameterLast = await session.get("POST /last/param-last?a=q", "/last/param-last?a=q", { method: "POST", body: '{"b":1}' });
+    context.expect(parameterLast.folder, [status("two providers", parameterLast, 200), same("the one applied last, @Parameter (decorators apply from the bottom up), supplies the value", parameterLast.json, { value: "q" })]);
+    const bare = await session.get("POST /bare/json", "/bare/json", { method: "POST", body: '{"b":1}' });
+    context.expect(bare.folder, [status("a bare decorator", bare, 200), same("injects nothing: the argument is undefined", bare.json, { injected: false })]);
+    const bodyLast = await session.get("POST /last/body-last?a=q", "/last/body-last?a=q", { method: "POST", body: '{"b":1}' });
+    context.expect(bodyLast.folder, [status("two providers", bodyLast, 200), same("the one applied last, @JSONBody, supplies the value", bodyLast.json, { value: { b: 1 } })]);
     await finish(session);
   },
 };

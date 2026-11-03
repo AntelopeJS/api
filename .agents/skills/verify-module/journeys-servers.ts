@@ -205,8 +205,8 @@ export const listenOnDemand: Journey = {
     const session = await open(context, { controllers: CORS_SOURCE, config: { autoListen: false } });
     const before = await session.get("GET /ping before Listen()", "/ping", { timeoutMs: 2500 });
     context.expect(before.folder, [holds("nothing is served before Listen()", before.status !== 200, `status ${String(before.status)}, error ${String(before.error)}`)]);
-    const listened = await session.run("call Listen()", "await api.Listen(); return true;");
-    context.expect(listened.folder, [same("Listen resolves", listened.value, true)]);
+    const listened = await session.run("call Listen()", "const pending = api.Listen(); const isPromise = pending instanceof Promise; await pending; return isPromise;");
+    context.expect(listened.folder, [same("Listen returns a Promise that resolves", listened.value, true)]);
     const after = await session.get("GET /ping after Listen()", "/ping");
     context.expect(after.folder, [status("served after Listen()", after, 200), same("the routes", after.json, { ok: true })]);
     await finish(session);

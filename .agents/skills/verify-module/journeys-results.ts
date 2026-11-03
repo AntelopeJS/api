@@ -174,10 +174,13 @@ export const resultErrors: Journey = {
     context.expect(teapot.folder, [status("a thrown HTTPResult", teapot, 418), same("keeps its JSON body", teapot.json, { error: "teapot" })]);
     const conflict = await session.get("GET /failures/text-result", "/failures/text-result");
     context.expect(conflict.folder, [status("a thrown HTTPResult with text", conflict, 409), bodyIs("keeps its text", conflict, "Conflict text")]);
-    for (const route of ["error", "rejection", "string"]) {
+    const texts = [["error", "plain failure"], ["rejection", "late failure"], ["string", "just a string"], ["text-message", "inner text"], ["undefined", ""]] as const;
+    for (const [route, text] of texts) {
       const failed = await session.get(`GET /failures/${route}`, `/failures/${route}`);
-      context.expect(failed.folder, [status(`a handler failing with ${route}`, failed, 500)]);
+      context.expect(failed.folder, [status(`a handler failing with ${route}`, failed, 500), contentType("is answered as text", failed, /^text\/plain/), bodyIs("with the message, or the thrown string, as text", failed, text)]);
     }
+    const number = await session.get("GET /failures/number", "/failures/number");
+    context.expect(number.folder, [status("a thrown number", number, 500), contentType("is answered as JSON", number, /^application\/json/), bodyIs("with its JSON text", number, "42")]);
     const plainObject = await session.get("GET /failures/plain-object", "/failures/plain-object");
     context.expect(plainObject.folder, [status("a thrown plain object", plainObject, 500), contentType("is answered as JSON", plainObject, /^application\/json/), bodyIs("with its JSON text", plainObject, '{"code":7}')]);
     const nested = await session.get("GET /failures/nested-message", "/failures/nested-message");

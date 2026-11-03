@@ -1,6 +1,7 @@
 import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, same } from "./checks.ts";
+import { bodyIs, status } from "./client.ts";
 import { pem } from "./journeys-servers.ts";
 import { parseJson, pick } from "./json.ts";
 import { open, pickPorts, type Json, type Session } from "./session.ts";
@@ -64,6 +65,12 @@ export const websocketHandlers: Journey = {
     context.expect(closed.folder, [same("every closed socket reached its handler", closed.value, ["chat", "room lobby", "room other"])]);
     const plain = await talk(session, "ws to an HTTP-only route", { route: "/chat/http-only", expect: 1 });
     context.expect(plain.folder, [holds("an HTTP route is not a WebSocket route", !JSON.stringify(plain.parsed).includes('"opened":true'), JSON.stringify(plain.parsed))]);
+    for (const route of ["/chat", "/chat/rooms/lobby", "/prop-socket"]) {
+      const get = await session.get(`GET ${route} without an Upgrade header`, route);
+      context.expect(get.folder, [status(`a WebSocket route answers a plain GET with 404`, get, 404), bodyIs("Not Found", get, "Not Found")]);
+    }
+    const stillClosed = await session.run("read the close log after the plain GETs", "return controllers.closed;");
+    context.expect(stillClosed.folder, [same("no WebSocket handler ran for a plain GET", stillClosed.value, ["chat", "room lobby", "room other"])]);
     const nothing = await talk(session, "ws to an unknown path", { route: "/nowhere", expect: 1 });
     context.expect(nothing.folder, [holds("a path without a handler is not upgraded", !JSON.stringify(nothing.parsed).includes('"opened":true'), JSON.stringify(nothing.parsed))]);
     const refused = await talk(session, "ws behind a prefix that refuses", { route: "/chat/private", expect: 1 });

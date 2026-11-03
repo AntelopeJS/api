@@ -16,7 +16,7 @@ journeys:
 ## Sub-features
 
 - `secure-websocket`: an https server (beside an http one) upgrades WebSockets: a `wss://` client gets its messages echoed in order and reaches a route with its parameters, as the http server does.
-- `websocket-handlers`: echo both ways in order, `@Connection` on a class property, route and query parameters reach the handler, two rooms are two connections, a closed socket reaches its handler, an HTTP-only route, an unknown path and a route behind a refusing prefix are not upgraded.
+- `websocket-handlers`: echo both ways in order, `@Connection` on a class property, route and query parameters reach the handler, two rooms are two connections, a closed socket reaches its handler, an HTTP-only route, an unknown path and a route behind a refusing prefix are not upgraded. A plain GET (no Upgrade header) on a WebSocket route is 404 `Not Found` and runs no handler. An error thrown before an upgrade is never answered to the client (AntelopeJS/api#109), so it is not pinned.
 
 ## How to get to it (user POV)
 

@@ -3,10 +3,15 @@ import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 import { holds, same } from "./checks.ts";
 import { bodyIs, header, headerIs, status } from "./client.ts";
 import { talk } from "./journeys-websocket.ts";
-import { attempt, open } from "./session.ts";
+import { attempt, open, type Json } from "./session.ts";
 import { GATE_SOURCE, OWNED_MODULE } from "./sources-gate.ts";
 
 const APP = "https://app.example.com";
+const PING_ROUTES = ["/ping verify-app", "/ping verify-app", "/ping verify-app", "/ping verify-app", "/ping verify-app"];
+
+function names(value: Json | undefined): string[] {
+  return Array.isArray(value) ? value.map(String) : [];
+}
 
 export const startupGate: Journey = {
   title: "the API port is bound before other modules construct, and until every module has started, every request is answered 503 error.server_starting with Retry-After 1 and nothing runs, while /_live answers 200 and a CORS preflight is answered; then requests are served, and the gate closes again when the project stops while /_live still answers 200",
@@ -21,6 +26,8 @@ export const startupGate: Journey = {
     context.expect(live.folder, [status("liveness", live, 200)]);
     const headHeld = await session.get("HEAD /ping while a module starts", "/ping", { method: "HEAD" });
     context.expect(headHeld.folder, [status("a HEAD request is held back with the same status", headHeld, 503), headerIs("and the same Retry-After", headHeld, "retry-after", "1"), bodyIs("and no body", headHeld, "")]);
+    const liveQuery = await session.get("GET /_live?probe=1 while a module starts", "/_live?probe=1");
+    context.expect(liveQuery.folder, [status("a query string does not change the liveness probe", liveQuery, 200), bodyIs("and its body", liveQuery, "ok")]);
     const headLive = await session.get("HEAD /_live while a module starts", "/_live", { method: "HEAD" });
     context.expect(headLive.folder, [status("HEAD liveness", headLive, 200), bodyIs("has no body", headLive, "")]);
     for (const path of ["/_liveness", "/_live/x", "/_live2"]) {
@@ -38,21 +45,28 @@ export const startupGate: Journey = {
     const early = await session.run("read what the consumer saw from its construct", "return config.constructProbe;");
     context.expect(early.folder, [same("the API port accepts connections before any other module constructs", early.value, "connected")]);
     const nothing = await session.run("count what ran", "return controllers.hits;");
-    context.expect(nothing.folder, [same("nothing ran for the held requests", nothing.value, [])]);
+    context.expect(nothing.folder, [same("nothing ran for the held requests: no prefix, postfix, monitor, route or WebSocket handler", nothing.value, [])]);
 
     await session.run("wait for the start to settle", "await waitFor(5200); return null;");
     const served = await session.get("GET /ping after the start", "/ping");
     context.expect(served.folder, [status("served once every module started", served, 200), same("the route answers", served.json, { ok: true }), holds("without a Retry-After", header(served, "retry-after") === undefined, String(header(served, "retry-after")))]);
     const live2 = await session.get("GET /_live after the start, a route a module also declared", "/_live");
     context.expect(live2.folder, [status("the liveness path is reserved: the probe still answers", live2, 200)]);
+    await session.run("wait for the monitor", "await waitFor(300); return null;");
     const after = await session.run("count what ran after the start", "return controllers.hits;");
-    context.expect(after.folder, [same("only the served request ran, not the module's own /_live", after.value, ["get"])]);
+    context.expect(after.folder, [same("only the served request ran, with its prefix, postfix and monitor, not the module's own /_live", names(after.value).sort(), ["get", "monitor", "postfix", "prefix"])]);
+    const plainSocket = await session.get("GET /socket without an Upgrade header", "/socket");
+    context.expect(plainSocket.folder, [status("a plain GET on a WebSocket route is not served", plainSocket, 404)]);
+    const socketRan = await session.run("count what ran for the plain GET", "return controllers.hits;");
+    context.expect(socketRan.folder, [holds("the WebSocket handler did not run", !names(socketRan.value).includes("socket"), JSON.stringify(socketRan.value))]);
 
     const stopping = session.stop();
     const closing = await session.get("GET /ping while the project stops", "/ping");
     context.expect(closing.folder, [status("the gate closes when the project starts stopping", closing, 503), bodyIs("with the same body", closing, "error.server_starting"), headerIs("and Retry-After", closing, "retry-after", "1")]);
     const liveStopping = await session.get("GET /_live while the project stops", "/_live");
     context.expect(liveStopping.folder, [status("/_live always answers 200, also while the project stops", liveStopping, 200)]);
+    const liveQueryStopping = await session.get("GET /_live?probe=1 while the project stops", "/_live?probe=1");
+    context.expect(liveQueryStopping.folder, [status("with a query string too", liveQueryStopping, 200)]);
     const stopped = await stopping;
     context.expect(stopped.folder, [holds("the project stopped on SIGINT", stopped.exitCode === 130 || stopped.signal === "SIGINT", `exit ${String(stopped.exitCode)}, signal ${String(stopped.signal)}`)]);
   },
@@ -92,7 +106,7 @@ export const moduleLifecycle: Journey = {
     const owned = await session.get("GET /owned/route", "/owned/route");
     context.expect(owned.folder, [status("a route another module registered", owned, 200), same("answers", owned.json, { owned: true })]);
     const owners = await session.run("read the owners", LIFECYCLE.owners);
-    context.expect(owners.folder, [same("each route is owned by the module that registered it", owners.value, ["/owned/route verify-extra", "/ping verify-app", "/ping verify-app"])]);
+    context.expect(owners.folder, [same("each route is owned by the module that registered it", owners.value, ["/owned/route verify-extra", ...PING_ROUTES])]);
     const stopped = await session.run("stop the second module", LIFECYCLE.stop);
     context.expect(stopped.folder, [holds("the scenario ran", stopped.ok, JSON.stringify(stopped.error))], { critical: true });
     const stillOpen = await session.get("GET /ping after StopModule", "/ping");
@@ -102,7 +116,7 @@ export const moduleLifecycle: Journey = {
     const reopened = await session.get("GET /ping after StartModule", "/ping");
     context.expect(reopened.folder, [status("starting it again leaves the gate open", reopened, 200), same("the route answers", reopened.json, { ok: true })]);
     const destroyed = await session.run("stop and destroy the second module", LIFECYCLE.destroy);
-    context.expect(destroyed.folder, [same("module cleanup removes the routes it owns and keeps the others", destroyed.value, ["/ping verify-app", "/ping verify-app"])]);
+    context.expect(destroyed.folder, [same("module cleanup removes the routes it owns and keeps the others", destroyed.value, PING_ROUTES)]);
     const cycled = await session.run("restart another module", LIFECYCLE.reopen);
     context.expect(cycled.folder, [holds("the scenario ran", cycled.ok, JSON.stringify(cycled.error))], { critical: true });
     const released = await session.get("GET /owned/route after DestroyModule", "/owned/route");

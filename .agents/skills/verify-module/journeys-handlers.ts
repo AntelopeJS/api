@@ -2,7 +2,7 @@ import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, same } from "./checks.ts";
 import { bodyIs, header, headerIs, status } from "./client.ts";
-import { HANDLERS_SOURCE } from "./sources-handlers.ts";
+import { HANDLERS_SOURCE, SCOPING_SOURCE } from "./sources-handlers.ts";
 import { open, type Session } from "./session.ts";
 
 async function finish(session: Session): Promise<void> {
@@ -79,6 +79,53 @@ export const postfixChain: Journey = {
     context.expect(monitored.folder, [status("a throwing monitor", monitored, 200), same("leaves the body", monitored.json, { ok: true })]);
     await session.run("wait for the monitors", "await waitFor(200); return null;");
     context.expect(monitored.folder, [same("both monitors ran, in priority order", await drainLog(session, "read the monitor log"), ["monitor-1", "monitor-2"])]);
+    await finish(session);
+  },
+};
+
+export const methodScoping: Journey = {
+  title: "a prefix, postfix or monitor declared for one HTTP method runs only for that method",
+  entryPoint: "`@Prefix`, `@Postfix` and `@Monitor` declared with \"get\" and with \"post\" beside a `@Get` and a `@Post` on the same location, called over HTTP",
+  async run(context) {
+    const session = await open(context, { controllers: SCOPING_SOURCE });
+    const getPre = await session.get("GET /m/pre", "/m/pre");
+    context.expect(getPre.folder, [status("the GET prefix refuses a GET", getPre, 403), bodyIs("with its body", getPre, "get refused")]);
+    const postPre = await session.get("POST /m/pre", "/m/pre", { method: "POST", body: "{}" });
+    context.expect(postPre.folder, [status("the POST prefix refuses a POST, not the GET prefix", postPre, 409), bodyIs("with its own body", postPre, "post refused")]);
+    const getPost = await session.get("GET /m/post", "/m/post");
+    context.expect(getPost.folder, [status("the main handler", getPost, 200), headerIs("the GET postfix ran, the POST one did not", getPost, "x-stamp", "get")]);
+    const postPost = await session.get("POST /m/post", "/m/post", { method: "POST", body: "{}" });
+    context.expect(postPost.folder, [status("the main handler", postPost, 201), headerIs("the POST postfix ran, the GET one did not", postPost, "x-stamp", "post")]);
+    await drainLog(session, "clear the log");
+    const getMon = await session.get("GET /m/mon", "/m/mon");
+    context.expect(getMon.folder, [status("the main handler", getMon, 200)]);
+    const postMon = await session.get("POST /m/mon", "/m/mon", { method: "POST", body: "{}" });
+    context.expect(postMon.folder, [status("the main handler", postMon, 201)]);
+    await session.run("wait for the monitors", "await waitFor(300); return null;");
+    context.expect(postMon.folder, [same("each monitor ran for its own method only", await drainLog(session, "read the monitors"), ["get:200", "post:201"])]);
+    const postOnly = await session.get("POST /m/only", "/m/only", { method: "POST", body: "{}" });
+    context.expect(postOnly.folder, [status("a POST beside a GET-only prefix is served", postOnly, 201), same("its body", postOnly.json, { main: "only-post" })]);
+    context.expect(postOnly.folder, [same("the GET prefix did not run for the POST", await drainLog(session, "read the log after the POST"), [])]);
+    const getOnly = await session.get("GET /m/only", "/m/only");
+    context.expect(getOnly.folder, [status("the GET", getOnly, 200)]);
+    context.expect(getOnly.folder, [same("the GET prefix ran for the GET", await drainLog(session, "read the log after the GET"), ["prefix-get"])]);
+    await finish(session);
+  },
+};
+
+export const falsyReturns: Journey = {
+  title: "only a truthy value from a prefix is the response and only a truthy value from a postfix stops the later postfixes",
+  entryPoint: "prefixes returning 0, an empty string and false and a postfix returning 0 before another postfix, called over HTTP",
+  async run(context) {
+    const session = await open(context, { controllers: SCOPING_SOURCE });
+    for (const kind of ["zero", "empty", "no"]) {
+      const answer = await session.get(`GET /falsy/${kind}`, `/falsy/${kind}`);
+      context.expect(answer.folder, [status(`a prefix returning ${kind} does not answer`, answer, 200), same("the main handler answers", answer.json, { main: kind })]);
+      context.expect(answer.folder, [same("the prefix and then the main handler ran", await drainLog(session, `read the log after ${kind}`), ["prefix", "main"])]);
+    }
+    const post = await session.get("GET /falsy/post", "/falsy/post");
+    context.expect(post.folder, [status("the main handler", post, 200)]);
+    context.expect(post.folder, [same("a postfix returning 0 does not stop the next one", await drainLog(session, "read the postfix log"), ["first", "second"])]);
     await finish(session);
   },
 };

@@ -1,4 +1,4 @@
-export const GATE_SOURCE = String.raw`import { Connection, Controller, Get, HTTPResult, Post, WebsocketHandler } from "@antelopejs/interface-api";
+export const GATE_SOURCE = String.raw`import { Connection, Controller, Get, HTTPResult, Monitor, Post, Postfix, Prefix, WebsocketHandler } from "@antelopejs/interface-api";
 
 export const hits: string[] = [];
 
@@ -13,6 +13,21 @@ export class PingController extends Controller("/ping") {
   create() {
     hits.push("post");
     return { created: true };
+  }
+
+  @Prefix("get", "")
+  beforePing() {
+    hits.push("prefix");
+  }
+
+  @Postfix("get", "")
+  afterPing() {
+    hits.push("postfix");
+  }
+
+  @Monitor("get", "")
+  watchPing() {
+    hits.push("monitor");
   }
 }
 
@@ -29,6 +44,16 @@ export class SocketController extends Controller("/socket") {
   open(@Connection() connection: any) {
     hits.push("socket");
     connection.send("open");
+  }
+
+  @Prefix("get", "")
+  beforeSocket() {
+    hits.push("socket-prefix");
+  }
+
+  @Monitor("get", "")
+  watchSocket() {
+    hits.push("socket-monitor");
   }
 }
 `;

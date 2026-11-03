@@ -5,9 +5,9 @@ import { configVariables, interfaceRanges, manifest, modulesAdd } from "./journe
 import { requestContext } from "./journeys-context.ts";
 import { corsConfig, corsDefaults, corsRuntime, corsUnconfigured } from "./journeys-cors.ts";
 import { failedStart, moduleLifecycle, startupGate } from "./journeys-gate.ts";
-import { handlerModes, handlerPriority, postfixChain } from "./journeys-handlers.ts";
+import { falsyReturns, handlerModes, handlerPriority, methodScoping, postfixChain } from "./journeys-handlers.ts";
 import { controllerInstances } from "./journeys-instances.ts";
-import { multiParameters, parameterSources, propertyParameters } from "./journeys-params.ts";
+import { lastProvider, multiParameters, parameterSources, propertyParameters } from "./journeys-params.ts";
 import { parameterModifiers, parameterProviders, parameterTransform } from "./journeys-modifiers.ts";
 import { controllerRequired, customDecorators, routeRegistration } from "./journeys-registration.ts";
 import { resultBodies, resultErrors, resultHeaders, responseStreaming } from "./journeys-results.ts";
@@ -50,9 +50,12 @@ const config: VerifyConfig = {
     "handler-modes": handlerModes,
     "handler-priority": handlerPriority,
     "postfix-chain": postfixChain,
+    "method-scoping": methodScoping,
+    "falsy-returns": falsyReturns,
     "parameter-sources": parameterSources,
     "multi-parameters": multiParameters,
     "property-parameters": propertyParameters,
+    "last-provider": lastProvider,
     "parameter-modifiers": parameterModifiers,
     "parameter-transform": parameterTransform,
     "parameter-providers": parameterProviders,

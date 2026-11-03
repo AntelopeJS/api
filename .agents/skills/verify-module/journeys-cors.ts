@@ -52,6 +52,12 @@ export const corsConfig: Journey = {
     }
     const plain = await session.get("GET /ping from a listed origin", "/ping", { headers: { origin: APP } });
     context.expect(plain.folder, [status("an ordinary request", plain, 200), same("body", plain.json, { ok: true }), allows("ordinary request", plain, APP), headerIs("credentials", plain, "access-control-allow-credentials", "true")]);
+    for (const [route, code] of [["created", 201], ["refused", 403], ["broken", 500]] as const) {
+      const answer = await session.get(`GET /ping/${route} from a listed origin`, `/ping/${route}`, { headers: { origin: APP } });
+      context.expect(answer.folder, [status(`/ping/${route}`, answer, code), allows(`a returned or thrown HTTPResult and a thrown error (${route})`, answer, APP), headerIs(`credentials on ${route}`, answer, "access-control-allow-credentials", "true")]);
+      const foreign = await session.get(`GET /ping/${route} from an unlisted origin`, `/ping/${route}`, { headers: { origin: "https://evil.example.net" } });
+      context.expect(foreign.folder, [refuses(`${route}`, foreign, "https://evil.example.net")]);
+    }
     const rejected = await session.get("GET /ping from an unlisted origin", "/ping", { headers: { origin: "https://evil.example.net" } });
     context.expect(rejected.folder, [refuses("an ordinary request", rejected, "https://evil.example.net")]);
     await finish(session);

@@ -8,6 +8,7 @@ journeys:
   - parameter-sources
   - multi-parameters
   - property-parameters
+  - last-provider
   - parameter-modifiers
   - parameter-transform
   - parameter-providers
@@ -21,7 +22,8 @@ The parameter decorators of [Read and transform request data](https://interfaces
 
 - `parameter-sources`: route segment (default and explicit), query, header in any case, `?page` and `?page=` are `true`, a repeated query value is its first, a missing value is `undefined`, an escaped value is decoded, everything mixed in one handler.
 - `multi-parameters`: `@MultiParameter` returns every query value, keeps empty strings, is `[]` when nothing is sent, ignores other names, reads a header, and does not split a comma-separated or repeated header (Node.js joins it).
-- `property-parameters`: decorators on class properties (`@Parameter`, `@MultiParameter`, `@JSONBody`, `@RawBody`, `@Context`) fill the instance for each request and never keep the previous request's values.
+- `property-parameters`: decorators on class properties (`@Parameter`, `@MultiParameter`, `@JSONBody`, `@RawBody`, `@Context`, `@BodyStream`, and `@Transform` over a `@Parameter`) fill the instance for each request and never keep the previous request's values.
+- `last-provider`: `@Parameter` and `@JSONBody` stacked on one argument, in both orders: the provider applied last (the upper decorator) supplies the value.
 - `parameter-modifiers`: the docs' `EnsureNumber`, stacked modifiers apply bottom to top, an asynchronous modifier is awaited, a throwing modifier stops the chain before the handler (a 500 with its message).
 - `parameter-transform`: the docs' `parseId` with `@Transform`: a positive id, the largest safe integer, `12abc`, `0`, `-1`, `007`, `1e3` and `1.5` are 400, an unsafe integer is 400 with its own message.
 - `parameter-providers`: the docs' typed `BearerToken` (`ParameterProvider<string | undefined>` and `ParameterModifier<string | undefined>`) provider plus modifier, a provider that reads the request context, custom and built-in decorators together, two arguments that read the body share one read.

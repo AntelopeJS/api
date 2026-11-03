@@ -227,3 +227,140 @@ export class ChainController extends Controller("/chain") {
   }
 }
 `;
+
+export const SCOPING_SOURCE = String.raw`import { Context, Controller, Get, HTTPResult, Monitor, Post, Postfix, Prefix, RequestContext, Result } from "@antelopejs/interface-api";
+
+export const log: string[] = [];
+
+export class ScopedController extends Controller("/m") {
+  @Get("pre")
+  getPre() {
+    return { main: "get" };
+  }
+
+  @Post("pre")
+  postPre() {
+    return new HTTPResult(201, { main: "post" });
+  }
+
+  @Prefix("get", "pre")
+  refuseGet() {
+    return new HTTPResult(403, "get refused");
+  }
+
+  @Prefix("post", "pre")
+  refusePost() {
+    return new HTTPResult(409, "post refused");
+  }
+
+  @Get("post")
+  getPost() {
+    return { main: "get" };
+  }
+
+  @Post("post")
+  postPost() {
+    return new HTTPResult(201, { main: "post" });
+  }
+
+  @Postfix("get", "post")
+  stampGet(@Result() result: HTTPResult) {
+    result.addHeader("X-Stamp", "get");
+  }
+
+  @Postfix("post", "post")
+  stampPost(@Result() result: HTTPResult) {
+    result.addHeader("X-Stamp", "post");
+  }
+
+  @Get("mon")
+  getMon() {
+    return { main: "get" };
+  }
+
+  @Post("mon")
+  postMon() {
+    return new HTTPResult(201, { main: "post" });
+  }
+
+  @Monitor("get", "mon")
+  watchGet(@Context() ctx: RequestContext) {
+    log.push("get:" + ctx.response.getStatus());
+  }
+
+  @Monitor("post", "mon")
+  watchPost(@Context() ctx: RequestContext) {
+    log.push("post:" + ctx.response.getStatus());
+  }
+
+  @Get("only")
+  onlyGet() {
+    return { main: "only-get" };
+  }
+
+  @Post("only")
+  onlyPost() {
+    return new HTTPResult(201, { main: "only-post" });
+  }
+
+  @Prefix("get", "only")
+  seen() {
+    log.push("prefix-get");
+  }
+
+}
+
+export class FalsyController extends Controller("/falsy") {
+  @Prefix("get", "zero")
+  zero() {
+    log.push("prefix");
+    return 0;
+  }
+
+  @Get("zero")
+  getZero() {
+    log.push("main");
+    return { main: "zero" };
+  }
+
+  @Prefix("get", "empty")
+  empty() {
+    log.push("prefix");
+    return "";
+  }
+
+  @Get("empty")
+  getEmpty() {
+    log.push("main");
+    return { main: "empty" };
+  }
+
+  @Prefix("get", "no")
+  no() {
+    log.push("prefix");
+    return false;
+  }
+
+  @Get("no")
+  getNo() {
+    log.push("main");
+    return { main: "no" };
+  }
+
+  @Get("post")
+  getPost() {
+    return { main: "post" };
+  }
+
+  @Postfix("get", "post", 1)
+  first() {
+    log.push("first");
+    return 0;
+  }
+
+  @Postfix("get", "post", 2)
+  second() {
+    log.push("second");
+  }
+}
+`;

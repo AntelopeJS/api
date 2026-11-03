@@ -183,6 +183,21 @@ export class FailureController extends Controller("/failures") {
     throw { message: { a: 1 } };
   }
 
+  @Get("text-message")
+  thrownTextMessage() {
+    throw { message: "inner text" };
+  }
+
+  @Get("undefined")
+  thrownUndefined() {
+    throw undefined;
+  }
+
+  @Get("number")
+  thrownNumber() {
+    throw 42;
+  }
+
   @Get("ok")
   ok() {
     return { ok: true };

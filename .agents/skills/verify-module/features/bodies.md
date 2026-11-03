@@ -18,7 +18,7 @@ Request bodies and the request context of [Request bodies and responses](https:/
 ## Sub-features
 
 - `body-reading`: `@RawBody` is a Buffer (multi-byte text counts bytes, an empty body is empty, and a 300000-byte body of distinct bytes sent in one chunk and in several chunks arrives in order with the same sha256), `@JSONBody` decodes UTF-8 (accents, `€`, an emoji) and parses an object, a list, a string, a number, a boolean and `null`, is `undefined` for an empty body, malformed JSON is 400, `ReadBody` reuses one read, `StreamBody` and `@BodyStream` yield the body, byte for byte (length and sha256).
-- `body-limits`: exactly 1 MiB passes and one byte more is 413, with and without a `Content-Length`, a custom limit on `@RawBody`, `@JSONBody` and `ReadBody` replaces the default in both directions, and 10 MiB+1 still ends.
+- `body-limits`: exactly 1 MiB passes and one byte more is 413, with and without a `Content-Length`, a custom limit on `@RawBody`, `@JSONBody` and `ReadBody` replaces the default in both directions, and 10 MiB+1 still ends. The 413 answers carry the body `Payload Too Large`.
 - `body-streaming`: `@BodyStream` takes 3 MiB with no limit in several chunks, leaving the loop early still answers, an empty stream, and the server keeps serving.
 - `request-context`: `@Context` exposes the raw request and response, the parsed URL, the route parameters, no body before a read, the response, and no error or connection; `ctx.url` takes its host from the Host header; after a read `context.body` is the pending `Promise<Buffer>` and a second read keeps it.
 
