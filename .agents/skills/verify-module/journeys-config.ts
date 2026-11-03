@@ -1,7 +1,7 @@
 import { type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, matches, same } from "./checks.ts";
-import { isString, parseJson, pick, recordOf } from "./json.ts";
+import { parseJson, pick, recordOf } from "./json.ts";
 import { attempt, path } from "./session.ts";
 import { CORS_SOURCE } from "./sources-cors.ts";
 
@@ -31,15 +31,13 @@ const CASES = [
   { servers: [{ protocol: "http", port: 9008 }], publicBaseUrl: "   " },
   { servers: [{ protocol: "http", port: 9009 }], publicBaseUrl: "" },
   { servers: [{ protocol: "http", host: "127.0.0.1", port: 9010 }, { protocol: "https", host: "other.example", port: 9011 }], publicBaseUrl: "https://first.example" },
-  {},
-  { servers: [] },
 ];
 
 export const configVariables: Journey = {
   title: "the config variables file computes API_PORT, API_LOCAL_BASE_URL and API_PUBLIC_BASE_URL from the first server alone: wildcard hosts become loopback, explicit hosts stay, IPv6 is bracketed, publicBaseUrl loses its trailing slashes and falls back to the local origin",
   entryPoint: "`configVars` in `dist/config-vars.js`, named by `antelopeJs.configVarsFile`, read by tools that do not start the project",
   async run(context) {
-    const ran = await context.command("compute the variables of sixteen configurations", "node", ["-e", VARIABLES_SCRIPT, JSON.stringify(CASES)], { cwd: context.repo });
+    const ran = await context.command("compute the variables of fourteen configurations", "node", ["-e", VARIABLES_SCRIPT, JSON.stringify(CASES)], { cwd: context.repo });
     const out = parseJson(ran.stdout.trim());
     const row = (port: number, local: string, publicUrl: string) => ({ API_PORT: port, API_LOCAL_BASE_URL: local, API_PUBLIC_BASE_URL: publicUrl });
     const expected = [
@@ -60,10 +58,6 @@ export const configVariables: Journey = {
     ];
     for (const [index, want] of expected.entries()) {
       context.expect(ran.folder, [same(`configuration ${String(index + 1)}`, pick(out, index), want)]);
-    }
-    for (const index of [14, 15]) {
-      const message = pick(out, index, "error");
-      context.expect(ran.folder, [holds(`configuration ${String(index + 1)} has no server and says so`, isString(message) && /no server is configured/.test(message), JSON.stringify(message))]);
     }
   },
 };

@@ -1,6 +1,7 @@
-export const INSTANCES_SOURCE = String.raw`import { Context, Controller, Get, GetControllerInstance, JSONBody, Parameter, PartialController, Post, RequestContext } from "@antelopejs/interface-api";
+export const INSTANCES_SOURCE = String.raw`import { Context, Controller, Get, GetControllerInstance, HTTPResult, JSONBody, Monitor, Parameter, PartialController, Post, Postfix, Prefix, RequestContext, Result } from "@antelopejs/interface-api";
 
 export const built: string[] = [];
+export const seen: string[] = [];
 
 export class UserController extends Controller("/users") {
   @Parameter("x-user", "header")
@@ -42,6 +43,31 @@ export class OrderController extends Controller("/orders") {
     const second = await GetControllerInstance(UserController, context);
     first.count();
     return { same: first === second, hits: second.count() };
+  }
+}
+
+export class OwnController extends Controller("/own") {
+  private user: string | undefined;
+
+  @Prefix("get", "who")
+  remember(@Parameter("x-user", "header") user: string | undefined) {
+    this.user = user;
+  }
+
+  @Get("who")
+  async who(@Context() context: RequestContext) {
+    const own = await GetControllerInstance(OwnController, context);
+    return { user: this.user, same: own === this };
+  }
+
+  @Postfix("get", "who")
+  stamp(@Result() result: HTTPResult) {
+    result.addHeader("X-Postfix-User", String(this.user));
+  }
+
+  @Monitor("get", "who")
+  watch() {
+    seen.push(String(this.user));
   }
 }
 

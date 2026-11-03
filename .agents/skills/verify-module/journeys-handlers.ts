@@ -2,7 +2,7 @@ import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, same } from "./checks.ts";
 import { bodyIs, header, headerIs, status } from "./client.ts";
-import { HANDLERS_SOURCE, SCOPING_SOURCE } from "./sources-handlers.ts";
+import { HANDLERS_SOURCE, MODES_SOURCE, SCOPING_SOURCE } from "./sources-handlers.ts";
 import { open, type Session } from "./session.ts";
 
 async function finish(session: Session): Promise<void> {
@@ -126,6 +126,28 @@ export const falsyReturns: Journey = {
     const post = await session.get("GET /falsy/post", "/falsy/post");
     context.expect(post.folder, [status("the main handler", post, 200)]);
     context.expect(post.folder, [same("a postfix returning 0 does not stop the next one", await drainLog(session, "read the postfix log"), ["first", "second"])]);
+    await finish(session);
+  },
+};
+
+export const routeModes: Journey = {
+  title: "the mode argument of @Get, @Post, @Put and @Delete decides when the method runs: a prefix mode answers before the main handler, a postfix mode adjusts the result, a monitor mode observes",
+  entryPoint: "`@Get(location, \"prefix\")`, `@Post`, `@Put` and `@Delete` with a mode beside the same location's main handler, called over HTTP",
+  async run(context) {
+    const session = await open(context, { controllers: MODES_SOURCE });
+    const cases = [["GET", 403, "get refused"], ["POST", 409, "post refused"], ["PUT", 422, "put refused"], ["DELETE", 410, "delete refused"]] as const;
+    for (const [method, code, text] of cases) {
+      const answer = await session.get(`${method} /modes/data`, "/modes/data", { method, body: method === "GET" || method === "DELETE" ? undefined : "{}" });
+      context.expect(answer.folder, [status(`a ${method} prefix-mode method answers before the main handler`, answer, code), bodyIs("with its body", answer, text)]);
+    }
+    const afterPrefixes = await session.run("read the log after the prefixes", "return controllers.log;");
+    context.expect(afterPrefixes.folder, [same("no main handler ran", afterPrefixes.value, [])]);
+    const stamped = await session.get("GET /modes/stamped", "/modes/stamped");
+    context.expect(stamped.folder, [status("the main handler answers", stamped, 200), headerIs("a postfix-mode method adjusts the result", stamped, "x-mode", "postfix")]);
+    const watched = await session.get("GET /modes/watched", "/modes/watched");
+    context.expect(watched.folder, [status("the main handler answers", watched, 200)]);
+    await session.run("wait for the monitor", "await waitFor(300); return null;");
+    context.expect(watched.folder, [same("a monitor-mode method observes the request", await drainLog(session, "read the monitor log"), ["monitor"])]);
     await finish(session);
   },
 };

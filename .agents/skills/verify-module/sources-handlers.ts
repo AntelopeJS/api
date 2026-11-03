@@ -364,3 +364,75 @@ export class FalsyController extends Controller("/falsy") {
   }
 }
 `;
+
+export const MODES_SOURCE = String.raw`import { Controller, Delete, Get, HTTPResult, Post, Put, Result } from "@antelopejs/interface-api";
+
+export const log: string[] = [];
+
+export class ModeController extends Controller("/modes") {
+  @Get("data", "prefix")
+  refuseGet() {
+    return new HTTPResult(403, "get refused");
+  }
+
+  @Get("data")
+  getData() {
+    log.push("get");
+    return { main: "get" };
+  }
+
+  @Post("data", "prefix")
+  refusePost() {
+    return new HTTPResult(409, "post refused");
+  }
+
+  @Post("data")
+  postData() {
+    log.push("post");
+    return { main: "post" };
+  }
+
+  @Put("data", "prefix")
+  refusePut() {
+    return new HTTPResult(422, "put refused");
+  }
+
+  @Put("data")
+  putData() {
+    log.push("put");
+    return { main: "put" };
+  }
+
+  @Delete("data", "prefix")
+  refuseDelete() {
+    return new HTTPResult(410, "delete refused");
+  }
+
+  @Delete("data")
+  deleteData() {
+    log.push("delete");
+    return { main: "delete" };
+  }
+
+  @Get("stamped")
+  getStamped() {
+    return { main: "stamped" };
+  }
+
+  @Get("stamped", "postfix")
+  stamp(@Result() result: HTTPResult) {
+    result.addHeader("X-Mode", "postfix");
+  }
+
+  @Get("watched")
+  getWatched() {
+    return { main: "watched" };
+  }
+
+  @Get("watched", "monitor")
+  watch() {
+    log.push("monitor");
+  }
+}
+`;
+

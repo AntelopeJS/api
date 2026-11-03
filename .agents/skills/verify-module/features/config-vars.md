@@ -16,7 +16,7 @@ The three config variables and the manifest of README.md: `configVars` in `dist/
 
 ## Sub-features
 
-- `config-variables`: sixteen configurations: wildcard hosts become loopback, an absent host and port, an explicit host, IPv6 bare and bracketed, https, `publicBaseUrl` with trailing slashes, surrounding spaces, blank and empty, only the first server counts, no server and an empty `servers` throw.
+- `config-variables`: fourteen configurations: wildcard hosts become loopback, an absent host and port, an explicit host, IPv6 bare and bracketed, https, `publicBaseUrl` with trailing slashes, surrounding spaces, blank and empty, only the first server counts. A config without `servers`, or with an empty list, is not pinned: `configVars` throws while the running module serves the default port 80 (AntelopeJS/api#112).
 - `manifest`: `implements`, `configVars`, `configVarsFile`, `defaultConfig` (one HTTP server on localhost:8080, as README.md says), `main` and `files`, and that the files they name are built.
 - `modules-add`: `ajs project modules add --mode local` writes `servers: [{ protocol: "http", host: "localhost", port: 8080 }]` into an empty project.
 - `interface-ranges`: a consumer depending on `@antelopejs/interface-api@^9.0.0` stops the project with `Incompatible interface package resolution`, naming the module and the range.

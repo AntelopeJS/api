@@ -1,7 +1,7 @@
 import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
-import { same } from "./checks.ts";
-import { status } from "./client.ts";
+import { holds, same } from "./checks.ts";
+import { bodyIs, status } from "./client.ts";
 import { open, type Json, type Session } from "./session.ts";
 import { PARAMS_SOURCE } from "./sources-params.ts";
 
@@ -48,6 +48,7 @@ export const multiParameters: Journey = {
     await seen(session, "a name without a value is an empty string", "/products/search?tag", { tags: [""] });
     await seen(session, "other query names are not collected", "/products/search?tags=x&tag=y", { tags: ["y"] });
     await seen(session, "a header value", "/products/headers", { tags: ["one"], token: "t" }, { "X-Tag": "one", "X-Token": "t" });
+    await seen(session, "a header name in capitals reads the lower-cased header", "/products/header-case", { tags: ["one"], token: "t" }, { "x-tag": "one", "x-token": "t" });
     await seen(session, "a missing header is an empty list", "/products/headers", { tags: [] });
     await seen(session, "a comma-separated header value is not split", "/products/headers", { tags: ["a, b"] }, { "X-Tag": "a, b" });
     await seen(session, "a repeated header keeps Node.js's joined value", "/products/headers", { tags: ["a, b"] }, { "X-Tag": ["a", "b"] });
@@ -67,6 +68,16 @@ export const propertyParameters: Journey = {
     const streamed = await session.get("POST /props-stream with 1234 bytes", "/props-stream", { method: "POST", bodyBytes: 1234 });
     session.context.expect(streamed.folder, [status("@BodyStream on a property", streamed, 200), same("is the request body as a stream", streamed.json, { bytes: 1234 })]);
     await seen(session, "@Transform on a property modifies the value", "/props-transform?n=21", { doubled: 42 });
+    const refusedTransform = await session.get("GET /props-transform?n=abc", "/props-transform?n=abc");
+    session.context.expect(refusedTransform.folder, [status("a property whose transform throws an HTTPResult", refusedTransform, 400), bodyIs("answers it", refusedTransform, "Expected a number")]);
+    const malformed = await session.get("POST /props-json with malformed JSON", "/props-json", { method: "POST", body: "{not json" });
+    session.context.expect(malformed.folder, [status("malformed JSON into a @JSONBody property", malformed, 400), holds("is a malformed request", malformed.text.startsWith("Malformed request"), malformed.text)]);
+    const oversized = await session.get("POST /props-limit with 5 bytes", "/props-limit", { method: "POST", body: "12345" });
+    session.context.expect(oversized.folder, [status("a @RawBody(4) property over its limit", oversized, 413), bodyIs("answers 413", oversized, "Payload Too Large")]);
+    const fits = await session.get("POST /props-limit with 4 bytes", "/props-limit", { method: "POST", body: "1234" });
+    session.context.expect(fits.folder, [status("a @RawBody(4) property at its limit", fits, 200), same("is filled", fits.json, { bytes: 4 })]);
+    const ran = await session.run("read what ran", "return controllers.ran;");
+    session.context.expect(ran.folder, [same("no handler ran for a refused property, the others ran", ran.value, ["transform", "limit"])]);
     await seen(session, "two concurrent-looking requests do not share values", "/config?tags=z", { authenticated: true, key: "k-2", appliedTags: ["z"] }, { apiKey: "k-2" });
     await finish(session);
   },

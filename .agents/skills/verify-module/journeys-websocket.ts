@@ -55,6 +55,8 @@ export const websocketHandlers: Journey = {
     const session = await open(context, { controllers: WEBSOCKET_SOURCE });
     const echo = await talk(session, "echo over ws", { route: "/chat", send: ["hello", "second"], expect: 2, closeAfter: true });
     context.expect(echo.folder, [same("the handler echoes each message in order", echo.parsed, { opened: true, messages: ["Echo: hello", "Echo: second"], closeCode: 1000, error: null })]);
+    const watched = await session.run("read what the monitor saw", "await waitFor(300); return controllers.monitored;");
+    context.expect(watched.folder, [same("a monitor on a WebSocket route runs once the connection is upgraded, with the connection in its context", watched.value, ["monitor:true"])]);
     const room = await talk(session, "join a room", { route: "/chat/rooms/lobby?token=t1", expect: 1, closeAfter: true });
     context.expect(room.folder, [same("route and query parameters reach the handler", room.parsed, { opened: true, messages: ["joined lobby as t1"], closeCode: 1000, error: null })]);
     const second = await talk(session, "join another room", { route: "/chat/rooms/other", expect: 1, closeAfter: true });

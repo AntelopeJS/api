@@ -1,7 +1,7 @@
 import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, same } from "./checks.ts";
-import { status } from "./client.ts";
+import { headerIs, status } from "./client.ts";
 import { open, type Session } from "./session.ts";
 import { INSTANCES_SOURCE } from "./sources-instances.ts";
 
@@ -28,6 +28,11 @@ export const controllerInstances: Journey = {
     context.expect(asyncBuilt.folder, [same("one instance per class within a request, also when an injected property is read asynchronously", asyncBuilt.json, { same: true, payload: { k: 1 } })]);
     const built = await session.run("count the constructed instances", "return controllers.built.length;");
     context.expect(built.folder, [holds("an instance is built per request that needs it", built.value === 5, JSON.stringify(built.value))]);
+    const own = await session.get("GET /own/who with a viewer header", "/own/who", { headers: { "x-user": "ada" } });
+    context.expect(own.folder, [status("a prefix and the main handler of one controller", own, 200), same("share one instance in a request", own.json, { user: "ada", same: true }), headerIs("the postfix sees the same instance", own, "x-postfix-user", "ada")]);
+    await session.run("wait for the monitor", "await waitFor(300); return null;");
+    const seen = await session.run("read what the monitor saw", "return controllers.seen;");
+    context.expect(seen.folder, [same("the monitor sees the same instance", seen.value, ["ada"])]);
     const reach = await session.get("GET /reach/extended", "/reach/extended");
     context.expect(reach.folder, [status("classes built by extend and PartialController", reach, 200), same("both give an instance", reach.json, { extended: "api users", partial: true })]);
     await finish(session);

@@ -1,6 +1,7 @@
-export const WEBSOCKET_SOURCE = String.raw`import { Connection, Controller, Get, HTTPResult, Parameter, Prefix, WebsocketHandler } from "@antelopejs/interface-api";
+export const WEBSOCKET_SOURCE = String.raw`import { Connection, Context, Controller, Get, HTTPResult, Monitor, Parameter, Prefix, RequestContext, WebsocketHandler } from "@antelopejs/interface-api";
 
 export const closed: string[] = [];
+export const monitored: string[] = [];
 
 export class PropertySocketController extends Controller("/prop-socket") {
   @Connection()
@@ -30,6 +31,11 @@ export class ChatController extends Controller("/chat") {
     connection.on("close", () => {
       closed.push("room " + room);
     });
+  }
+
+  @Monitor("get", "")
+  watchChat(@Context() context: RequestContext) {
+    monitored.push("monitor:" + String(Boolean(context.connection)));
   }
 
   @Get("http-only")

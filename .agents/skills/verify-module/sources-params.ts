@@ -1,4 +1,4 @@
-export const PARAMS_SOURCE = String.raw`import { BodyStream, Context, Controller, Get, JSONBody, MultiParameter, Parameter, Post, RawBody, RequestContext, Transform } from "@antelopejs/interface-api";
+export const PARAMS_SOURCE = String.raw`import { BodyStream, Context, Controller, Get, HTTPResult, JSONBody, MultiParameter, Parameter, Post, RawBody, RequestContext, Transform } from "@antelopejs/interface-api";
 
 export class UsersController extends Controller("/users") {
   @Get(":id")
@@ -22,6 +22,8 @@ export class UsersController extends Controller("/users") {
   }
 }
 
+export const ran: string[] = [];
+
 export class ProductsController extends Controller("/products") {
   @Get("search")
   searchProducts(@MultiParameter("tag") tags: string[]) {
@@ -31,6 +33,11 @@ export class ProductsController extends Controller("/products") {
   @Get("headers")
   headers(@MultiParameter("x-tag", "header") tags: string[], @Parameter("Authorization", "header") authorization: string | undefined, @Parameter("x-token", "header") token: string | undefined) {
     return { tags, authorization, token };
+  }
+
+  @Get("header-case")
+  headerCase(@MultiParameter("X-Tag", "header") tags: string[], @Parameter("X-Token", "header") token: string | undefined) {
+    return { tags, token };
   }
 
   @Get("mixed/:id")
@@ -83,7 +90,12 @@ export class StreamPropertyController extends Controller("/props-stream") {
   }
 }
 
-const double = (_context: RequestContext, value: unknown) => Number(value) * 2;
+const double = (_context: RequestContext, value: unknown) => {
+  if (Number.isNaN(Number(value))) {
+    throw new HTTPResult(400, "Expected a number");
+  }
+  return Number(value) * 2;
+};
 
 export class TransformPropertyController extends Controller("/props-transform") {
   @Parameter("n", "query")
@@ -92,7 +104,30 @@ export class TransformPropertyController extends Controller("/props-transform") 
 
   @Get("")
   read() {
+    ran.push("transform");
     return { doubled: this.doubled };
+  }
+}
+
+export class JsonPropertyController extends Controller("/props-json") {
+  @JSONBody()
+  private payload!: unknown;
+
+  @Post("")
+  read() {
+    ran.push("json");
+    return { payload: this.payload };
+  }
+}
+
+export class LimitPropertyController extends Controller("/props-limit") {
+  @RawBody(4)
+  private raw!: Buffer;
+
+  @Post("")
+  read() {
+    ran.push("limit");
+    return { bytes: this.raw.length };
   }
 }
 
