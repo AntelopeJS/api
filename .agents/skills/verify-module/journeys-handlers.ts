@@ -2,7 +2,7 @@ import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 
 import { holds, same } from "./checks.ts";
 import { bodyIs, header, headerIs, status } from "./client.ts";
-import { HANDLERS_SOURCE, MODES_SOURCE, SCOPING_SOURCE } from "./sources-handlers.ts";
+import { ASYNC_SOURCE, HANDLERS_SOURCE, MODES_SOURCE, SCOPING_SOURCE } from "./sources-handlers.ts";
 import { open, type Session } from "./session.ts";
 
 async function finish(session: Session): Promise<void> {
@@ -153,6 +153,37 @@ export const routeModes: Journey = {
     context.expect(watched.folder, [status("the main handler answers", watched, 200)]);
     await session.run("wait for the monitor", "await waitFor(300); return null;");
     context.expect(watched.folder, [same("a monitor-mode method observes the request", await drainLog(session, "read the monitor log"), ["monitor"])]);
+    await finish(session);
+  },
+};
+
+export const asyncHandlers: Journey = {
+  title: "asynchronous prefixes, postfixes, main handlers and monitors behave like synchronous ones: a resolved or thrown HTTPResult answers, a returning postfix skips the later ones, a rejecting monitor stops no other monitor, and a monitor sees the error of a rejecting handler",
+  entryPoint: "`async` `@Prefix`, `@Postfix`, `@Get` and `@Monitor` handlers on one controller, called over HTTP",
+  async run(context) {
+    const session = await open(context, { controllers: ASYNC_SOURCE });
+    const refused = await session.get("GET /a/refuse", "/a/refuse");
+    context.expect(refused.folder, [status("an async prefix resolving an HTTPResult answers it", refused, 403), bodyIs("with its body", refused, "async refused")]);
+    const thrown = await session.get("GET /a/throw", "/a/throw");
+    context.expect(thrown.folder, [status("an async prefix rejecting with an HTTPResult answers it", thrown, 401), bodyIs("with its body", thrown, "async thrown")]);
+    const passed = await session.get("GET /a/pass", "/a/pass");
+    context.expect(passed.folder, [status("async prefixes returning nothing continue", passed, 200), same("to the main handler", passed.json, { main: "pass" })]);
+    const late = await session.get("GET /a/late", "/a/late");
+    context.expect(late.folder, [status("an async main handler", late, 200), same("answers", late.json, { late: true }), headerIs("and the postfix header reaches the client", late, "x-post", "1")]);
+    const post = await session.get("GET /a/post", "/a/post");
+    context.expect(post.folder, [status("an async postfix resolving an HTTPResult replaces the response", post, 201), bodyIs("with its body", post, "p1"), headerIs("and the later postfix is skipped", post, "x-low", undefined)]);
+    const quiet = await session.get("GET /a/quiet", "/a/quiet");
+    context.expect(quiet.folder, [headerIs("an async postfix returning nothing keeps the response", quiet, "x-high", "ran"), headerIs("and the next postfix runs", quiet, "x-low", "ran")]);
+    const afterPrefixes = await session.run("read the log after the requests", "return controllers.log.splice(0);");
+    context.expect(afterPrefixes.folder, [same("refusing prefixes skipped their main handler, passing ones ran in order, the skipped postfix did not run", afterPrefixes.value, ["pass-1", "pass-2", "main-pass"])]);
+    const monitored = await session.get("GET /a/mon", "/a/mon");
+    context.expect(monitored.folder, [status("a rejecting async monitor", monitored, 200), same("changes nothing", monitored.json, { ok: true })]);
+    await session.run("wait for the monitors", "await waitFor(300); return null;");
+    context.expect(monitored.folder, [same("every monitor ran, in priority order, after the rejection", await drainLog(session, "read the monitor log"), ["mon-1", "mon-2", "mon-3"])]);
+    const failed = await session.get("GET /a/fail", "/a/fail");
+    context.expect(failed.folder, [status("an async main handler rejecting", failed, 500), bodyIs("answers the message", failed, "async main failed")]);
+    await session.run("wait for the monitor", "await waitFor(300); return null;");
+    context.expect(failed.folder, [same("the monitor sees the 500 and the error", await drainLog(session, "read the failure log"), ["fail:500:Error: async main failed"])]);
     await finish(session);
   },
 };

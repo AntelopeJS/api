@@ -8,6 +8,7 @@ journeys:
   - cors-config
   - cors-defaults
   - cors-runtime
+  - cors-credentials
   - cors-unconfigured
 ---
 
@@ -20,6 +21,7 @@ The CORS policy of README.md and of [Request bodies and responses](https://inter
 - `cors-config`: listed origins (two of them), methods, static headers that win over the requested ones, credentials, max age, an unlisted origin, a longer look-alike, another scheme, four loopback origins allowed in development and three look-alikes refused, ordinary requests. An ordinary request that returns an `HTTPResult`, throws one or throws an error carries the allowed origin and credentials of a listed origin and not of an unlisted one.
 - `cors-defaults`: only `allowedOrigins` as a string: default methods `GET,HEAD,PUT,PATCH,POST,DELETE`, credentials on, requested headers reflected, no max age.
 - `cors-runtime`: `SetCorsConfig` replaces the policy without a restart, a `RegExp` and a mixed list of string and `RegExp`, credentials false drops the header, a max age of 0 is sent, `GetCorsConfig` returns what was set, a spread keeps the other settings, omitting `allowedOrigins` disables CORS; before any `SetCorsConfig`, `GetCorsConfig` returns a promise of the module config's policy, and `SetCorsConfig` returns a promise.
+- `cors-credentials`: `credentials: false` sends no `Access-Control-Allow-Credentials` on a plain, a returned (201), a thrown (403) and a failing (500) response while the listed origin is still allowed; a `RegExp` `allowedOrigins` set at run time allows a matching origin on an ordinary request with credentials and refuses a non-matching one.
 - `cors-unconfigured`: in development with no `cors` key, three loopback origins on any port pass on a preflight and an ordinary request, and another origin is refused.
 
 ## How to get to it (user POV)

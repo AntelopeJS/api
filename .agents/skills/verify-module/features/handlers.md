@@ -10,6 +10,7 @@ journeys:
   - method-scoping
   - falsy-returns
   - route-modes
+  - async-handlers
 ---
 
 # Handlers
@@ -24,6 +25,7 @@ The four handler modes of [Controllers and routes](https://interfaces.antelopejs
 - `method-scoping`: a prefix, postfix and monitor declared with `"get"` run for a GET and not for a POST at the same location, and the ones declared with `"post"` run for the POST only (the prefixes answer 403 and 409, the postfixes stamp `X-Stamp`, the monitors log their method).
 - `falsy-returns`: a prefix returning `0`, an empty string or `false` does not answer, and the main handler runs; a postfix returning `0` does not stop the next postfix.
 - `route-modes`: the `mode` argument of `@Get`, `@Post`, `@Put` and `@Delete`: with `"prefix"` the method answers (403, 409, 422, 410) before the main handler of the same location, which never runs; with `"postfix"` it adds a header to the result; with `"monitor"` it observes the request.
+- `async-handlers`: the asynchronous variants of the chain: an async prefix resolving or rejecting with an `HTTPResult` answers it and skips the main handler, async prefixes returning nothing continue, an async main handler followed by a postfix header, an async postfix resolving an `HTTPResult` skips the later postfix and one returning nothing does not, an async monitor that rejects stops no later monitor, and a monitor sees the status and `ctx.error` of an async handler that rejects.
 
 ## How to get to it (user POV)
 

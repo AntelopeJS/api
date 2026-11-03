@@ -3,9 +3,9 @@ import type { VerifyConfig } from "@antelopejs/tooling-configs/verify";
 import { bodyLimits, bodyReading, bodyStreaming } from "./journeys-bodies.ts";
 import { configVariables, interfaceRanges, manifest, modulesAdd } from "./journeys-config.ts";
 import { requestContext } from "./journeys-context.ts";
-import { corsConfig, corsDefaults, corsRuntime, corsUnconfigured } from "./journeys-cors.ts";
+import { corsConfig, corsCredentials, corsDefaults, corsRuntime, corsUnconfigured } from "./journeys-cors.ts";
 import { failedStart, moduleLifecycle, startupGate } from "./journeys-gate.ts";
-import { falsyReturns, handlerModes, handlerPriority, methodScoping, postfixChain, routeModes } from "./journeys-handlers.ts";
+import { falsyReturns, handlerModes, handlerPriority, methodScoping, postfixChain, routeModes, asyncHandlers } from "./journeys-handlers.ts";
 import { controllerInstances } from "./journeys-instances.ts";
 import { lastProvider, multiParameters, parameterSources, propertyParameters } from "./journeys-params.ts";
 import { parameterModifiers, parameterProviders, parameterTransform } from "./journeys-modifiers.ts";
@@ -53,6 +53,7 @@ const config: VerifyConfig = {
     "method-scoping": methodScoping,
     "falsy-returns": falsyReturns,
     "route-modes": routeModes,
+    "async-handlers": asyncHandlers,
     "parameter-sources": parameterSources,
     "multi-parameters": multiParameters,
     "property-parameters": propertyParameters,
@@ -75,6 +76,7 @@ const config: VerifyConfig = {
     "cors-config": corsConfig,
     "cors-defaults": corsDefaults,
     "cors-runtime": corsRuntime,
+    "cors-credentials": corsCredentials,
     "cors-unconfigured": corsUnconfigured,
     "assert-guards": assertGuards,
     "assert-validations": assertValidations,

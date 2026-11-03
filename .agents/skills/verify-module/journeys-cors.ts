@@ -79,6 +79,25 @@ export const corsDefaults: Journey = {
   },
 };
 
+export const corsCredentials: Journey = {
+  title: "credentials false sends no allow-credentials header on any actual response, and a RegExp origin is allowed on an ordinary request",
+  entryPoint: "`cors: { allowedOrigins, credentials: false }` and `SetCorsConfig({ allowedOrigins: /regexp/ })`, called over HTTP with Origin headers",
+  async run(context) {
+    const session = await open(context, { controllers: CORS_SOURCE, config: { cors: { allowedOrigins: APP, credentials: false } } });
+    for (const [route, code] of [["", 200], ["created", 201], ["refused", 403], ["broken", 500]] as const) {
+      const answer = await session.get(`GET /ping/${route} from a listed origin`, `/ping/${route}`, { headers: { origin: APP } });
+      context.expect(answer.folder, [status(`/ping/${route}`, answer, code), allows(`the listed origin on /ping/${route}`, answer, APP), headerIs(`credentials false sends no header on /ping/${route}`, answer, "access-control-allow-credentials", undefined)]);
+    }
+    const set = await session.run("allow a RegExp origin with credentials", "await api.SetCorsConfig({ allowedOrigins: /^https:\\/\\/preview-\\d+\\.example\\.com$/, credentials: true }); return null;");
+    context.expect(set.folder, [holds("the scenario ran", set.ok, JSON.stringify(set.error))]);
+    const preview = await session.get("GET /ping from a RegExp origin", "/ping", { headers: { origin: "https://preview-7.example.com" } });
+    context.expect(preview.folder, [status("an ordinary request", preview, 200), allows("a RegExp origin on an ordinary request", preview, "https://preview-7.example.com"), headerIs("with credentials", preview, "access-control-allow-credentials", "true")]);
+    const other = await session.get("GET /ping from an origin the RegExp does not match", "/ping", { headers: { origin: "https://preview-x.example.com" } });
+    context.expect(other.folder, [refuses("an ordinary request", other, "https://preview-x.example.com")]);
+    await finish(session);
+  },
+};
+
 export const corsRuntime: Journey = {
   title: "SetCorsConfig replaces the policy for later requests without a restart, accepts a RegExp and a mixed list, credentials false drops the header, and GetCorsConfig returns a promise of the module config's policy, then of what was set",
   entryPoint: "`SetCorsConfig(config)` and `GetCorsConfig()` called from a module while the project runs",

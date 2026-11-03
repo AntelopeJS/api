@@ -57,6 +57,14 @@ export const websocketHandlers: Journey = {
     context.expect(echo.folder, [same("the handler echoes each message in order", echo.parsed, { opened: true, messages: ["Echo: hello", "Echo: second"], closeCode: 1000, error: null })]);
     const watched = await session.run("read what the monitor saw", "await waitFor(300); return controllers.monitored;");
     context.expect(watched.folder, [same("a monitor on a WebSocket route runs once the connection is upgraded, with the connection in its context", watched.value, ["monitor:true"])]);
+    const boom = await talk(session, "a handler that throws after send", { route: "/chat/boom", expect: 1 });
+    context.expect(boom.folder, [holds("the client receives what was sent before the failure", JSON.stringify(boom.parsed).includes("before the failure"), JSON.stringify(boom.parsed))]);
+    const lateBoom = await talk(session, "an async handler that throws after send", { route: "/chat/late-boom", expect: 1 });
+    context.expect(lateBoom.folder, [holds("the client receives what was sent before the failure", JSON.stringify(lateBoom.parsed).includes("before the async failure"), JSON.stringify(lateBoom.parsed))]);
+    const failures = await session.run("read the monitor log after the failures", "await waitFor(500); return controllers.monitored.filter((entry) => entry !== 'monitor:true');");
+    context.expect(failures.folder, [same("a monitor sees the error a WebSocket handler threw after the upgrade, also an asynchronous one", failures.value, ["boom:Error: socket boom", "late-boom:Error: late socket boom"])]);
+    const latePrivate = await talk(session, "ws behind an async prefix that refuses", { route: "/chat/late-private", expect: 1 });
+    context.expect(latePrivate.folder, [holds("an async prefix that resolves a value stops the upgrade", !JSON.stringify(latePrivate.parsed).includes('"opened":true') && !JSON.stringify(latePrivate.parsed).includes("never reached"), JSON.stringify(latePrivate.parsed))]);
     const room = await talk(session, "join a room", { route: "/chat/rooms/lobby?token=t1", expect: 1, closeAfter: true });
     context.expect(room.folder, [same("route and query parameters reach the handler", room.parsed, { opened: true, messages: ["joined lobby as t1"], closeCode: 1000, error: null })]);
     const second = await talk(session, "join another room", { route: "/chat/rooms/other", expect: 1, closeAfter: true });

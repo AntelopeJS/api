@@ -469,3 +469,133 @@ export class ModeController extends Controller("/modes") {
 }
 `;
 
+export const ASYNC_SOURCE = String.raw`import { Context, Controller, Get, HTTPResult, HandlerPriority, Monitor, Postfix, Prefix, RequestContext, Result } from "@antelopejs/interface-api";
+
+export const log: string[] = [];
+
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export class AsyncController extends Controller("/a") {
+  @Get("refuse")
+  refuseMain() {
+    log.push("main-refuse");
+    return { main: "refuse" };
+  }
+
+  @Prefix("get", "refuse")
+  async refuse() {
+    await pause(5);
+    return new HTTPResult(403, "async refused");
+  }
+
+  @Get("throw")
+  throwMain() {
+    log.push("main-throw");
+    return { main: "throw" };
+  }
+
+  @Prefix("get", "throw")
+  async refuseByThrowing() {
+    await pause(5);
+    throw new HTTPResult(401, "async thrown");
+  }
+
+  @Get("pass")
+  passMain() {
+    log.push("main-pass");
+    return { main: "pass" };
+  }
+
+  @Prefix("get", "pass", HandlerPriority.HIGHEST)
+  async passFirst() {
+    await pause(5);
+    log.push("pass-1");
+  }
+
+  @Prefix("get", "pass", HandlerPriority.LOWEST)
+  async passSecond() {
+    await pause(1);
+    log.push("pass-2");
+  }
+
+  @Get("late")
+  async late() {
+    await pause(5);
+    return { late: true };
+  }
+
+  @Postfix("get", "late")
+  stampLate(@Result() result: HTTPResult) {
+    result.addHeader("X-Post", "1");
+  }
+
+  @Get("post")
+  postMain() {
+    return { main: "post" };
+  }
+
+  @Postfix("get", "post", HandlerPriority.HIGH)
+  async postHigh() {
+    await pause(5);
+    return new HTTPResult(201, "p1");
+  }
+
+  @Postfix("get", "post", HandlerPriority.LOW)
+  postLow(@Result() result: HTTPResult) {
+    log.push("post-low");
+    result.addHeader("X-Low", "ran");
+  }
+
+  @Get("quiet")
+  quietMain() {
+    return { main: "quiet" };
+  }
+
+  @Postfix("get", "quiet", HandlerPriority.HIGH)
+  async quietHigh(@Result() result: HTTPResult) {
+    await pause(5);
+    result.addHeader("X-High", "ran");
+  }
+
+  @Postfix("get", "quiet", HandlerPriority.LOW)
+  quietLow(@Result() result: HTTPResult) {
+    result.addHeader("X-Low", "ran");
+  }
+
+  @Get("mon")
+  monMain() {
+    return { ok: true };
+  }
+
+  @Monitor("get", "mon", HandlerPriority.HIGHEST)
+  async monFirst() {
+    await pause(5);
+    log.push("mon-1");
+    throw new Error("an async monitor failed");
+  }
+
+  @Monitor("get", "mon", HandlerPriority.NORMAL)
+  async monSecond() {
+    await pause(5);
+    log.push("mon-2");
+  }
+
+  @Monitor("get", "mon", HandlerPriority.LOWEST)
+  monLast() {
+    log.push("mon-3");
+  }
+
+  @Get("fail")
+  async fail() {
+    await pause(5);
+    throw new Error("async main failed");
+  }
+
+  @Monitor("get", "fail")
+  async watchFail(@Context() ctx: RequestContext) {
+    await pause(5);
+    log.push("fail:" + ctx.response.getStatus() + ":" + String(ctx.error));
+  }
+}
+`;
+
