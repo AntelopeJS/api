@@ -142,6 +142,11 @@ export const routeModes: Journey = {
     }
     const afterPrefixes = await session.run("read the log after the prefixes", "return controllers.log;");
     context.expect(afterPrefixes.folder, [same("no main handler ran", afterPrefixes.value, [])]);
+    for (const [method, code, name] of [["POST", 201, "post"], ["PUT", 200, "put"], ["DELETE", 200, "delete"]] as const) {
+      const ordered = await session.get(`${method} /modes/order`, "/modes/order", { method, body: method === "DELETE" ? undefined : "{}" });
+      context.expect(ordered.folder, [status(`the ${method} main handler answers`, ordered, code), same("with its own body", ordered.json, { main: name })]);
+      context.expect(ordered.folder, [same(`the ${method} prefix-mode method ran first, then the main handler`, await drainLog(session, `read the ${method} order`), [`${name}-prefix`, `${name}-main`])]);
+    }
     const stamped = await session.get("GET /modes/stamped", "/modes/stamped");
     context.expect(stamped.folder, [status("the main handler answers", stamped, 200), headerIs("a postfix-mode method adjusts the result", stamped, "x-mode", "postfix")]);
     const watched = await session.get("GET /modes/watched", "/modes/watched");

@@ -414,6 +414,39 @@ export class ModeController extends Controller("/modes") {
     return { main: "delete" };
   }
 
+  @Post("order")
+  postOrder() {
+    log.push("post-main");
+    return new HTTPResult(201, { main: "post" });
+  }
+
+  @Post("order", "prefix")
+  postOrderPrefix() {
+    log.push("post-prefix");
+  }
+
+  @Put("order")
+  putOrder() {
+    log.push("put-main");
+    return { main: "put" };
+  }
+
+  @Put("order", "prefix")
+  putOrderPrefix() {
+    log.push("put-prefix");
+  }
+
+  @Delete("order")
+  deleteOrder() {
+    log.push("delete-main");
+    return { main: "delete" };
+  }
+
+  @Delete("order", "prefix")
+  deleteOrderPrefix() {
+    log.push("delete-prefix");
+  }
+
   @Get("stamped")
   getStamped() {
     return { main: "stamped" };
