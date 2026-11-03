@@ -6,6 +6,7 @@ docs:
   - README.md
 journeys:
   - websocket-handlers
+  - secure-websocket
 ---
 
 # Websocket
@@ -14,6 +15,7 @@ journeys:
 
 ## Sub-features
 
+- `secure-websocket`: an https server (beside an http one) upgrades WebSockets: a `wss://` client gets its messages echoed in order and reaches a route with its parameters, as the http server does.
 - `websocket-handlers`: echo both ways in order, `@Connection` on a class property, route and query parameters reach the handler, two rooms are two connections, a closed socket reaches its handler, an HTTP-only route, an unknown path and a route behind a refusing prefix are not upgraded.
 
 ## How to get to it (user POV)

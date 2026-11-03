@@ -193,6 +193,8 @@ export const responseStreaming: Journey = {
     context.expect(timed.folder, [status("a stream written after the handler returned", timed, 200), bodyIs("all chunks", timed, "first\nsecond\nthird\n"), holds("the first chunk is sent before the last is written", (timed.chunks[0]?.atMs ?? 99_999) + 450 < (timed.chunks.at(-1)?.atMs ?? 0), JSON.stringify(timed.chunks.map((chunk) => chunk.atMs))), holds("the chunks arrive as separate reads", timed.chunks.length >= 3, JSON.stringify(timed.chunks.map((chunk) => chunk.text)))]);
     const events = await session.get("GET /stream/sse", "/stream/sse");
     context.expect(events.folder, [status("an event stream", events, 200), contentType("a given content type", events, /^text\/event-stream/), bodyIs("both events", events, "data: Hello\n\ndata: World\n\n"), holds("the first event is not held back until the end", (events.chunks[0]?.atMs ?? 99_999) + 250 < (events.chunks.at(-1)?.atMs ?? 0), JSON.stringify(events.chunks.map((chunk) => chunk.atMs)))]);
+    const override = await session.get("GET /stream/override", "/stream/override");
+    context.expect(override.folder, [status("a returned value does not replace an open stream: status", override, 207), contentType("and its content type", override, /^x\/y/), bodyIs("and the streamed body, without the returned text", override, "streamed\n")]);
     const custom = await session.get("GET /stream/custom", "/stream/custom");
     context.expect(custom.folder, [status("getWriteStream(type, status)", custom, 207), contentType("its content type", custom, /^application\/x-ndjson/), bodyIs("its chunks", custom, '{"a":1}\n{"a":2}\n')]);
     const empty = await session.get("GET /stream/empty", "/stream/empty");

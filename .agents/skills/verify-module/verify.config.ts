@@ -14,7 +14,7 @@ import { resultBodies, resultErrors, resultHeaders, responseStreaming } from "./
 import { controllerTree, quickStart, routeForms } from "./journeys-routes.ts";
 import { devRegistry, listenOnDemand, portFallback, productionBoot, serverOptions, serverPorts, serverProtocols } from "./journeys-servers.ts";
 import { assertGuards, assertValidations, rateLimitOrdering, rateLimiting } from "./journeys-util.ts";
-import { websocketHandlers } from "./journeys-websocket.ts";
+import { secureWebsocket, websocketHandlers } from "./journeys-websocket.ts";
 
 const config: VerifyConfig = {
   doors: {
@@ -77,6 +77,7 @@ const config: VerifyConfig = {
     "rate-limiting": rateLimiting,
     "rate-limit-ordering": rateLimitOrdering,
     "websocket-handlers": websocketHandlers,
+    "secure-websocket": secureWebsocket,
     "server-ports": serverPorts,
     "port-fallback": portFallback,
     "server-protocols": serverProtocols,

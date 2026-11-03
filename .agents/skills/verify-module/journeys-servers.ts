@@ -47,7 +47,7 @@ async function consecutivePorts(context: JourneyContext, count: number): Promise
   return context.notVerified(`no ${String(count)} consecutive free loopback ports`);
 }
 
-async function pem(context: JourneyContext): Promise<{ cert: string; key: string }> {
+export async function pem(context: JourneyContext): Promise<{ cert: string; key: string }> {
   const made = await context.command("make a self-signed certificate", "bash", ["-c", 'openssl req -x509 -newkey rsa:2048 -nodes -keyout "$PWD/key.pem" -out "$PWD/cert.pem" -subj /CN=localhost -days 1 >/dev/null 2>&1 && cat cert.pem && echo @@@ && cat key.pem'], { cwd: context.work });
   const [cert = "", key = ""] = made.stdout.split("@@@\n");
   if (!cert.includes("BEGIN CERTIFICATE") || !key.includes("PRIVATE KEY")) context.notVerified(`openssl made no certificate: ${made.stderr.slice(0, 200)}`);
@@ -148,13 +148,14 @@ export const serverProtocols: Journey = {
 };
 
 export const serverOptions: Journey = {
-  title: "every key of a server entry besides protocol, host and port is handed to the Node.js http or https server, so maxHeaderSize on one server refuses a request the other accepts",
+  title: "every key of a server entry besides protocol, host and port is handed to the Node.js http or https server: maxHeaderSize on one server refuses a request the other accepts, and joinDuplicateHeaders joins a repeated header on the http and the https server that set it and on none of the others",
   entryPoint: "`servers: [{ protocol: \"http\", maxHeaderSize }]` in the module's config",
   async run(context) {
-    const [tight, loose] = await pickPorts(context, 2);
+    const { cert, key } = await pem(context);
+    const [tight, loose, secure] = await pickPorts(context, 3);
     const session = await open(context, {
       controllers: CORS_SOURCE,
-      config: { servers: [{ protocol: "http", host: "127.0.0.1", port: tight, maxHeaderSize: 2048 }, { protocol: "http", host: "127.0.0.1", port: loose }] },
+      config: { servers: [{ protocol: "http", host: "127.0.0.1", port: tight, maxHeaderSize: 2048, joinDuplicateHeaders: true }, { protocol: "http", host: "127.0.0.1", port: loose }, { protocol: "https", host: "127.0.0.1", port: secure, cert, key, joinDuplicateHeaders: true }] },
     });
     const big = { "x-padding": "p".repeat(4096) };
     const small = await session.fetch("GET a small request on the limited server", `http://127.0.0.1:${String(tight)}/ping`);
@@ -163,6 +164,13 @@ export const serverOptions: Journey = {
     context.expect(refused.folder, [status("the limit applies", refused, 431)]);
     const accepted = await session.fetch("GET 4 KiB of headers on the other server", `http://127.0.0.1:${String(loose)}/ping`, { headers: big });
     context.expect(accepted.folder, [status("the other server has no such limit", accepted, 200), same("and serves the routes", accepted.json, { ok: true })]);
+    const twice = { "user-agent": ["first/1", "second/2"] };
+    const joined = await session.fetch("GET a repeated header on the server with joinDuplicateHeaders", `http://127.0.0.1:${String(tight)}/ping/agent`, { headers: twice });
+    context.expect(joined.folder, [status("the repeated header", joined, 200), same("is joined: the option reached the http server", joined.json, { agent: "first/1, second/2" })]);
+    const kept = await session.fetch("GET a repeated header on the server without it", `http://127.0.0.1:${String(loose)}/ping/agent`, { headers: twice });
+    context.expect(kept.folder, [status("the repeated header", kept, 200), same("keeps the first value: the option is per server", kept.json, { agent: "first/1" })]);
+    const joinedTls = await session.fetch("GET a repeated header on the https server with joinDuplicateHeaders", `https://127.0.0.1:${String(secure)}/ping/agent`, { headers: twice });
+    context.expect(joinedTls.folder, [status("the repeated header", joinedTls, 200), same("is joined: the option reached the https server", joinedTls.json, { agent: "first/1, second/2" })]);
     await finish(session);
   },
 };

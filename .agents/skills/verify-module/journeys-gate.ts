@@ -19,6 +19,10 @@ export const startupGate: Journey = {
     context.expect(posted.folder, [status("a write is held back too", posted, 503), bodyIs("with the same body", posted, "error.server_starting")]);
     const live = await session.get("GET /_live while a module starts", "/_live");
     context.expect(live.folder, [status("liveness", live, 200)]);
+    for (const path of ["/_liveness", "/_live/x", "/_live2"]) {
+      const lookalike = await session.get(`GET ${path} while a module starts`, path);
+      context.expect(lookalike.folder, [status(`${path} is not the liveness probe`, lookalike, 503), bodyIs("and is held back like any request", lookalike, "error.server_starting")]);
+    }
     const unknown = await session.get("GET /nowhere while a module starts", "/nowhere");
     context.expect(unknown.folder, [status("even a path without a route is held back", unknown, 503)]);
     const preflight = await session.get("OPTIONS /ping while a module starts", "/ping", { method: "OPTIONS", headers: { origin: APP, "access-control-request-method": "POST" } });

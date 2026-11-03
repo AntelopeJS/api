@@ -210,6 +210,13 @@ export class StreamController extends Controller("/stream") {
     return context.response;
   }
 
+  @Get("override")
+  async override(@Context() context: RequestContext) {
+    const stream = context.response.getWriteStream("x/y", 207);
+    stream.end("streamed\n");
+    return "returned text";
+  }
+
   @Get("empty")
   async empty(@Context() context: RequestContext, @WriteStream() stream: PassThrough) {
     setTimeout(() => stream.end(), 100);

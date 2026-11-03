@@ -106,7 +106,9 @@ export const rateLimiting: Journey = {
     context.expect(windowStart.folder, [status("first request", windowStart, 200), headerIs("remaining", windowStart, "x-ratelimit-remaining", "1")]);
     await session.run("wait inside the window", "await waitFor(1500); return null;");
     const insideWindow = await session.get("GET /limited/fixed, second request inside the window", "/limited/fixed");
-    context.expect(insideWindow.folder, [status("second request", insideWindow, 200), headerIs("remaining", insideWindow, "x-ratelimit-remaining", "0")]);
+    context.expect(insideWindow.folder, [status("second request", insideWindow, 200), headerIs("remaining", insideWindow, "x-ratelimit-remaining", "0"), headerIs("Reset is the end of the window the first request started, not a new one", insideWindow, "x-ratelimit-reset", header(windowStart, "x-ratelimit-reset") ?? "")]);
+    const lateRejection = await session.get("GET /limited/fixed, over the limit about halfway through the window", "/limited/fixed");
+    context.expect(lateRejection.folder, [status("over the limit", lateRejection, 429), headerIs("the same Reset on a rejection", lateRejection, "x-ratelimit-reset", header(windowStart, "x-ratelimit-reset") ?? ""), holds("Retry-After is what is left of the 3 s window (1 or 2 s), not the whole window", /^[12]$/.test(header(lateRejection, "retry-after") ?? ""), String(header(lateRejection, "retry-after")))]);
     await session.run("wait until the first request's window is over", "await waitFor(1700); return null;");
     const nextWindow = await session.get("GET /limited/fixed, after the first request's window", "/limited/fixed");
     context.expect(nextWindow.folder, [status("a window starts with its first request and does not move with later ones", nextWindow, 200), headerIs("a new window", nextWindow, "x-ratelimit-remaining", "1")]);
