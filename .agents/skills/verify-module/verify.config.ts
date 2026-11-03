@@ -14,6 +14,7 @@ import { controllerRequired, customDecorators, routeRegistration } from "./journ
 import { resultBodies, resultErrors, resultHeaders, responseStreaming } from "./journeys-results.ts";
 import { controllerTree, quickStart, routeForms } from "./journeys-routes.ts";
 import { devRegistry, listenOnDemand, portFallback, productionBoot, serverOptions, serverPorts, serverProtocols } from "./journeys-servers.ts";
+import { serverReload, serverSockets } from "./journeys-sockets.ts";
 import { assertGuards, assertValidations, rateLimitOrdering, rateLimiting } from "./journeys-util.ts";
 import { secureWebsocket, websocketHandlers } from "./journeys-websocket.ts";
 
@@ -91,6 +92,8 @@ const config: VerifyConfig = {
     "server-protocols": serverProtocols,
     "server-options": serverOptions,
     "dev-registry": devRegistry,
+    "server-sockets": serverSockets,
+    "server-reload": serverReload,
     "listen-on-demand": listenOnDemand,
     "production-boot": productionBoot,
     "startup-gate": startupGate,

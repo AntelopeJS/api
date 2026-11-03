@@ -39,6 +39,12 @@ export const resultBodies: Journey = {
     }
     const vendor = await session.get("GET /examples/vendor-json", "/examples/vendor-json");
     context.expect(vendor.folder, [status("an object with a custom content type", vendor, 200), contentType("the custom type is kept for an object body", vendor, /^application\/vnd\.verify\+json/), bodyIs("the object is written as JSON", vendor, '{"id":7,"tags":["a","b"]}')]);
+    const utf8Text = await session.get("GET /examples/utf8-text", "/examples/utf8-text");
+    context.expect(utf8Text.folder, [status("a non-ASCII string", utf8Text, 200), contentType("is text/plain", utf8Text, /^text\/plain/), bodyIs("with its exact UTF-8 text", utf8Text, "café ✓ 日本 😀")]);
+    const utf8Json = await session.get("GET /examples/utf8-json", "/examples/utf8-json");
+    context.expect(utf8Json.folder, [status("a JSON body with non-ASCII text", utf8Json, 200), contentType("is application/json", utf8Json, /^application\/json/), same("with the exact UTF-8 values", utf8Json.json, { s: "é", list: ["✓", "😀"] })]);
+    const utf8Result = await session.get("GET /examples/utf8-result", "/examples/utf8-result");
+    context.expect(utf8Result.folder, [status("an HTTPResult with non-ASCII text", utf8Result, 200), bodyIs("has its exact UTF-8 text", utf8Result, "héllo €")]);
     const plainNumber = await session.get("GET /examples/plain-number", "/examples/plain-number");
     context.expect(plainNumber.folder, [status("a returned number", plainNumber, 200), contentType("a returned number is JSON", plainNumber, /^application\/json/), bodyIs("a returned number is its JSON text", plainNumber, "7")]);
     const emptyList = await session.get("GET /examples/empty-list", "/examples/empty-list");

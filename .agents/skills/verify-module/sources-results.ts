@@ -46,6 +46,21 @@ export class ExampleController extends Controller("/examples") {
     return new HTTPResult(200, { id: 7, tags: ["a", "b"] }, "application/vnd.verify+json");
   }
 
+  @Get("utf8-text")
+  utf8Text() {
+    return "café ✓ 日本 😀";
+  }
+
+  @Get("utf8-json")
+  utf8Json() {
+    return { s: "é", list: ["✓", "😀"] };
+  }
+
+  @Get("utf8-result")
+  utf8Result() {
+    return new HTTPResult(200, "héllo €", "text/plain; charset=utf-8");
+  }
+
   @Get("plain-number")
   plainNumber() {
     return 7;

@@ -16,6 +16,8 @@ journeys:
   - server-protocols
   - server-options
   - dev-registry
+  - server-sockets
+  - server-reload
   - listen-on-demand
   - production-boot
 ---
@@ -31,6 +33,8 @@ journeys:
 - `server-protocols`: `RequestContext.url` carries the scheme of the server that received the request (`https:` on the https server, `http:` on the http one); an https server (a generated certificate) beside an http one, the https port refuses plain http, the variables follow the first server's protocol.
 - `server-options`: keys other than protocol, host and port reach the Node.js server: `maxHeaderSize` on one server refuses 4 KiB of headers with 431 while the other accepts them, and `joinDuplicateHeaders` joins a repeated header on the http and the https server that set it, not on the one that does not.
 - `dev-registry`: the servers are recorded in `.antelope/dev.json` with a wildcard host as loopback, the protocol and the bound port, and the file is removed when the project stops.
+- `server-sockets`: four servers probed with raw sockets: `host` is the bind address (a `127.0.0.1` server refuses a connection to `127.0.0.2`, a `::1` server refuses `127.0.0.1`), `headersTimeout`, `requestTimeout` and `connectionsCheckingInterval` answer an unfinished header block with 408, `keepAliveTimeout` closes an idle keep-alive socket (the default does not within 1.5 s), `requireHostHeader: false` serves a request without Host (the default answers 400), and an https entry with `minVersion` TLSv1.3 refuses a TLSv1.2-only client.
+- `server-reload`: `StopModule`, `DestroyModule` and `LoadModule` with a new `config` on the api module of the running project: the new configuration binds the new port, the old port stops answering, and a `cors` key the new configuration omits no longer applies.
 - `listen-on-demand`: `autoListen: false` serves nothing until `Listen()`. `Listen()` returns a Promise.
 - `production-boot`: `ajs project build` then `start`: the boot fails without `publicBaseUrl` and says so, binds the exact port (a busy one is a failure, not a fallback), publishes `publicBaseUrl` without its slash, and sends no CORS header without a `cors` config; with a `cors` config the listed origin is allowed and `localhost` and `127.0.0.1` are not.
 
