@@ -22,7 +22,7 @@ export const handlerModes: Journey = {
   async run(context) {
     const session = await open(context, { controllers: HANDLERS_SOURCE });
     const ok = await session.get("GET /users/u1", "/users/u1");
-    context.expect(ok.folder, [status("the main handler answers when the prefix returns nothing", ok, 200), same("main body", ok.json, { id: "u1", name: "Sample User" }), headerIs("the postfix header", ok, "x-accessed-at", "postfix")]);
+    context.expect(ok.folder, [status("the main handler answers when the prefix returns nothing", ok, 200), same("main body", ok.json, { id: "u1", name: "Sample User" }), headerIs("the postfix header", ok, "x-accessed-at", "postfix"), holds("a monitor observes a snapshot: what it sets on ctx.response never reaches the client", header(ok, "x-monitor") === undefined, String(header(ok, "x-monitor")))]);
     context.expect(ok.folder, [same("a monitor observes the finished response", await drainLog(session, "read the monitor log"), ["200:ok:u1"])]);
     const missing = await session.get("GET /users/missing", "/users/missing");
     context.expect(missing.folder, [status("the prefix response", missing, 404), same("the prefix body replaces the main handler's", missing.json, { error: "User not found" })]);

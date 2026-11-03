@@ -137,8 +137,12 @@ export const serverProtocols: Journey = {
     });
     const secure = await session.fetch("GET https", `https://127.0.0.1:${String(tls)}/ping`);
     context.expect(secure.folder, [status("the https server", secure, 200), same("serves the routes", secure.json, { ok: true })]);
+    const tlsScheme = await session.fetch("GET https /ping/scheme", `https://127.0.0.1:${String(tls)}/ping/scheme`);
+    context.expect(tlsScheme.folder, [status("the https server", tlsScheme, 200), same("RequestContext.url carries the https scheme", tlsScheme.json, { protocol: "https:" })]);
     const clear = await session.fetch("GET http", `http://127.0.0.1:${String(plain)}/ping`);
     context.expect(clear.folder, [status("the http server", clear, 200), same("serves the same routes", clear.json, { ok: true })]);
+    const clearScheme = await session.fetch("GET http /ping/scheme", `http://127.0.0.1:${String(plain)}/ping/scheme`);
+    context.expect(clearScheme.folder, [status("the http server", clearScheme, 200), same("RequestContext.url carries the http scheme", clearScheme.json, { protocol: "http:" })]);
     const wrongScheme = await session.fetch("GET http on the https port", `http://127.0.0.1:${String(tls)}/ping`);
     context.expect(wrongScheme.folder, [holds("the https port does not answer plain http", wrongScheme.status !== 200, `status ${String(wrongScheme.status)}, error ${String(wrongScheme.error)}`)]);
     const vars = await session.run("read the variables", READ_VARIABLES);

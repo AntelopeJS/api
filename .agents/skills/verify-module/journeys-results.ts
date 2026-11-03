@@ -70,6 +70,8 @@ export const resultHeaders: Journey = {
     const session = await open(context, { controllers: RESULTS_SOURCE });
     const headers = await session.get("GET /examples/headers", "/examples/headers");
     context.expect(headers.folder, [headerIs("a header that was added and kept", headers, "x-rate-limit-remaining", "99"), headerIs("a header that was removed", headers, "x-rate-limit", undefined)]);
+    const head = await session.get("HEAD /examples/head-target", "/examples/head-target", { method: "HEAD" });
+    context.expect(head.folder, [status("a HEAD answer keeps the status", head, 201), contentType("and the content type", head, /^application\/vnd\.verify\+json/), headerIs("and the added header", head, "x-head-header", "kept"), bodyIs("and has no body", head, "")]);
     const wrapped = await session.get("GET /examples/with-headers", "/examples/with-headers");
     context.expect(wrapped.folder, [status("withHeaders on a plain body defaults to 200", wrapped, 200), same("the plain body", wrapped.json, { message: "Success" }), headerIs("the header", wrapped, "x-request-id", "abc-123")]);
     const statused = await session.get("GET /examples/with-headers-status", "/examples/with-headers-status");
@@ -176,6 +178,10 @@ export const resultErrors: Journey = {
       const failed = await session.get(`GET /failures/${route}`, `/failures/${route}`);
       context.expect(failed.folder, [status(`a handler failing with ${route}`, failed, 500)]);
     }
+    const plainObject = await session.get("GET /failures/plain-object", "/failures/plain-object");
+    context.expect(plainObject.folder, [status("a thrown plain object", plainObject, 500), contentType("is answered as JSON", plainObject, /^application\/json/), bodyIs("with its JSON text", plainObject, '{"code":7}')]);
+    const nested = await session.get("GET /failures/nested-message", "/failures/nested-message");
+    context.expect(nested.folder, [status("a thrown object whose message is an object", nested, 500), contentType("is answered as JSON", nested, /^application\/json/), bodyIs("with the JSON text of the message", nested, '{"a":1}')]);
     const ok = await session.get("GET /failures/ok after the failures", "/failures/ok");
     context.expect(ok.folder, [status("the server keeps serving", ok, 200), same("body", ok.json, { ok: true })]);
     await finish(session);

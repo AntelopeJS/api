@@ -19,6 +19,10 @@ export const startupGate: Journey = {
     context.expect(posted.folder, [status("a write is held back too", posted, 503), bodyIs("with the same body", posted, "error.server_starting")]);
     const live = await session.get("GET /_live while a module starts", "/_live");
     context.expect(live.folder, [status("liveness", live, 200)]);
+    const headHeld = await session.get("HEAD /ping while a module starts", "/ping", { method: "HEAD" });
+    context.expect(headHeld.folder, [status("a HEAD request is held back with the same status", headHeld, 503), headerIs("and the same Retry-After", headHeld, "retry-after", "1"), bodyIs("and no body", headHeld, "")]);
+    const headLive = await session.get("HEAD /_live while a module starts", "/_live", { method: "HEAD" });
+    context.expect(headLive.folder, [status("HEAD liveness", headLive, 200), bodyIs("has no body", headLive, "")]);
     for (const path of ["/_liveness", "/_live/x", "/_live2"]) {
       const lookalike = await session.get(`GET ${path} while a module starts`, path);
       context.expect(lookalike.folder, [status(`${path} is not the liveness probe`, lookalike, 503), bodyIs("and is held back like any request", lookalike, "error.server_starting")]);

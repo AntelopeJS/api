@@ -102,6 +102,13 @@ export class ExampleController extends Controller("/examples") {
     return result;
   }
 
+  @Get("head-target")
+  headTarget() {
+    const result = new HTTPResult(201, { created: true }, "application/vnd.verify+json");
+    result.addHeader("X-Head-Header", "kept");
+    return result;
+  }
+
   @Get("with-headers")
   withHeaders() {
     return HTTPResult.withHeaders({ message: "Success" }, { "X-Request-Id": "abc-123" });
@@ -164,6 +171,16 @@ export class FailureController extends Controller("/failures") {
   @Get("string")
   thrownString() {
     throw "just a string";
+  }
+
+  @Get("plain-object")
+  thrownPlainObject() {
+    throw { code: 7 };
+  }
+
+  @Get("nested-message")
+  thrownNestedMessage() {
+    throw { message: { a: 1 } };
   }
 
   @Get("ok")

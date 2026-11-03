@@ -23,6 +23,8 @@ export class UsersController extends Controller("/users") {
   @Monitor("get", ":id")
   logRequest(@Context() ctx: RequestContext, @Parameter("id") id: string) {
     log.push(ctx.response.getStatus() + ":" + (ctx.error ? String(ctx.error) : "ok") + ":" + id);
+    ctx.response.setStatus(299);
+    ctx.response.addHeader("X-Monitor", "mutated");
     return new HTTPResult(418, "ignored");
   }
 
