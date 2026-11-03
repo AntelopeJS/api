@@ -148,7 +148,7 @@ export function stop(): void {}
 
 <!-- antelopejs-docs-compat:end -->
 
-The generated table lists the interface packages and ranges this module loads, read from `package.json`. If another loaded module declares a range that excludes the copy this module loads, `@antelopejs/core` refuses to start the project. It reports `Incompatible interface package resolution` and names the module, its range, and the copy it found.
+The generated table lists `@antelopejs/core`, which this module requires as a peer dependency, and the interface packages it loads, with their ranges read from `package.json`. If another loaded module declares a range that excludes the copy this module loads, `@antelopejs/core` refuses to start the project. It reports `Incompatible interface package resolution` and names the module, its range, and the copy it found.
 
 ## Contributing
 
