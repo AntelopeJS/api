@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { createServer, type Server } from "node:http";
-import { HandlerPriority } from "@antelopejs/interface-api";
+import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 
 import { registerHandler, requestListener, unregisterHandler } from "../server";
 import type { RouteDefinition } from "../route-table";
@@ -77,6 +77,93 @@ function dispatchCases(): void {
       status: 200,
     });
     assert.equal((await request("/dispatch/missing", "OPTIONS")).status, 404);
+  });
+}
+
+function headFallbackCases(): void {
+  it("runs the GET prefixes and monitors for a HEAD request served by the GET handler", async () => {
+    const ran: string[] = [];
+    registeredIds.add("head-get-prefix");
+    registerHandler(
+      "head-get-prefix",
+      { mode: "prefix", method: "GET", location: "/head-fallback/refused" },
+      () => new HTTPResult(401, "refused"),
+    );
+    registeredIds.add("head-get-handler");
+    registerHandler(
+      "head-get-handler",
+      { mode: "handler", method: "GET", location: "/head-fallback/refused" },
+      () => {
+        ran.push("handler");
+        return "get";
+      },
+    );
+    registeredIds.add("head-get-monitor");
+    registerHandler(
+      "head-get-monitor",
+      { mode: "monitor", method: "GET", location: "/head-fallback/refused" },
+      () => {
+        ran.push("monitor");
+      },
+    );
+
+    assert.deepEqual(await request("/head-fallback/refused", "HEAD"), {
+      body: "",
+      status: 401,
+    });
+    assert.deepEqual(ran, ["monitor"]);
+  });
+
+  it("runs the GET postfixes for a HEAD request served by the GET handler", async () => {
+    register(
+      "head-postfix-handler",
+      { mode: "handler", method: "GET", location: "/head-fallback/postfix" },
+      "get",
+    );
+    registeredIds.add("head-get-postfix");
+    registerHandler(
+      "head-get-postfix",
+      { mode: "postfix", method: "GET", location: "/head-fallback/postfix" },
+      () => new HTTPResult(202, "postfix"),
+    );
+
+    assert.deepEqual(await request("/head-fallback/postfix", "HEAD"), {
+      body: "",
+      status: 202,
+    });
+  });
+
+  it("keeps running the HEAD prefixes for a HEAD request served by the GET handler", async () => {
+    register(
+      "head-own-handler",
+      { mode: "handler", method: "GET", location: "/head-fallback/own" },
+      "get",
+    );
+    registeredIds.add("head-own-prefix");
+    registerHandler(
+      "head-own-prefix",
+      { mode: "prefix", method: "HEAD", location: "/head-fallback/own" },
+      () => new HTTPResult(403, "refused"),
+    );
+
+    assert.equal((await request("/head-fallback/own", "HEAD")).status, 403);
+    assert.equal((await request("/head-fallback/own")).status, 200);
+  });
+
+  it("runs only the HEAD middleware when a HEAD handler is registered", async () => {
+    register(
+      "head-direct-handler",
+      { mode: "handler", method: "HEAD", location: "/head-fallback/direct" },
+      "head",
+    );
+    registeredIds.add("head-direct-get-prefix");
+    registerHandler(
+      "head-direct-get-prefix",
+      { mode: "prefix", method: "GET", location: "/head-fallback/direct" },
+      () => new HTTPResult(401, "refused"),
+    );
+
+    assert.equal((await request("/head-fallback/direct", "HEAD")).status, 200);
   });
 }
 
@@ -197,5 +284,6 @@ describe("Static route dispatch", () => {
   });
 
   dispatchCases();
+  headFallbackCases();
   exactEntryCases();
 });
