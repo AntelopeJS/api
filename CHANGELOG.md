@@ -1,5 +1,31 @@
 # Changelog
 
+## v2.0.0
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.6.0...v2.0.0)
+
+### 💅 Refactors
+
+- Clear the residual ratchet findings ([#81](https://github.com/AntelopeJS/api/pull/81))
+
+### 📖 Documentation
+
+- **readme:** Use one Discord invite ([#94](https://github.com/AntelopeJS/api/pull/94))
+- **github:** Send questions and ideas to Discord ([#105](https://github.com/AntelopeJS/api/pull/105))
+- **readme:** Link the package to AntelopeJS and AntelopeJS DMS ([f71e813](https://github.com/AntelopeJS/api/commit/f71e813))
+
+### 📦 Build
+
+- **deps:** Bump @antelopejs/tooling-configs to 0.2.17 ([#83](https://github.com/AntelopeJS/api/pull/83))
+
+### 🏡 Chore
+
+- Land the cleanup campaign on main ([#124](https://github.com/AntelopeJS/api/pull/124))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli ([@Upd4ting](http://github.com/Upd4ting))
+
 ## v1.6.0
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.5.0...v1.6.0)
