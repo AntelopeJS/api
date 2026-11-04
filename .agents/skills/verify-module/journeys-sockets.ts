@@ -97,7 +97,7 @@ export const serverSockets: Journey = {
       same("an idle keep-alive socket is closed after keepAliveTimeout 200", line("idleTuned"), "closed"),
       same("and stays open on a server with the default keepAliveTimeout", line("idleDefault"), "?"),
       same("an https entry with minVersion TLSv1.3 negotiates TLSv1.3", line("tlsAny"), "TLSv1.3"),
-      same("and refuses a client limited to TLSv1.2", line("tlsOld") === "TLSv1.3" ? "accepted" : "refused", "refused"),
+      same("and refuses a client limited to TLSv1.2", JSON.stringify(line("tlsOld")).startsWith("\"TLSv") ? "accepted" : "refused", "refused"),
     ]);
     await finish(session);
   },
