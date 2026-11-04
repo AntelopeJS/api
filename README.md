@@ -9,6 +9,8 @@
 
 The HTTP and WebSocket server of AntelopeJS, built on the Node.js `http`, `https` and `ws` servers.
 
+Part of [AntelopeJS](https://github.com/AntelopeJS/antelopejs). Used by [AntelopeJS DMS](https://github.com/AntelopeJS/dms), the open-source back office for your PostgreSQL, MongoDB or RethinkDB database.
+
 ## Interfaces
 
 | Interface                                                                            | Documentation                                                            |
