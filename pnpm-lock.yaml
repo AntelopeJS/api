@@ -5,7 +5,6 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@antelopejs/interface-api': file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz
   '@antelopejs/interface-api-util': file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz
   '@antelopejs/core': file:.campaign/tgz/antelopejs-core-184eb90.tgz
 
@@ -17,11 +16,11 @@ importers:
         specifier: file:.campaign/tgz/antelopejs-core-184eb90.tgz
         version: file:.campaign/tgz/antelopejs-core-184eb90.tgz
       '@antelopejs/interface-api':
-        specifier: file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz
-        version: file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz(@antelopejs/interface-core@0.4.0)
+        specifier: '>=0.2.0 <0.4.0'
+        version: 0.2.0(@antelopejs/interface-core@0.4.0)
       '@antelopejs/interface-api-util':
         specifier: file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz
-        version: file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz(@antelopejs/interface-api@file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz(@antelopejs/interface-core@0.4.0))(@antelopejs/interface-core@0.4.0)
+        version: file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz(@antelopejs/interface-api@0.2.0(@antelopejs/interface-core@0.4.0))(@antelopejs/interface-core@0.4.0)
       '@antelopejs/interface-core':
         specifier: '>=0.4.0 <1.0.0'
         version: 0.4.0
@@ -84,11 +83,11 @@ importers:
   playground:
     dependencies:
       '@antelopejs/interface-api':
-        specifier: file:../.campaign/tgz/antelopejs-interface-api-015a93a.tgz
-        version: file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz(@antelopejs/interface-core@0.4.0)
+        specifier: '>=0.2.0 <1.0.0'
+        version: 0.2.0(@antelopejs/interface-core@0.4.0)
       '@antelopejs/interface-api-util':
         specifier: file:../.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz
-        version: file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz(@antelopejs/interface-api@file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz(@antelopejs/interface-core@0.4.0))(@antelopejs/interface-core@0.4.0)
+        version: file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz(@antelopejs/interface-api@0.2.0(@antelopejs/interface-core@0.4.0))(@antelopejs/interface-core@0.4.0)
       '@antelopejs/interface-core':
         specifier: '>=0.4.0 <1.0.0'
         version: 0.4.0
@@ -118,9 +117,8 @@ packages:
       '@antelopejs/interface-api': '>=0.3.0 <1.0.0'
       '@antelopejs/interface-core': '>=0.2.4 <1.0.0'
 
-  '@antelopejs/interface-api@file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz':
-    resolution: {integrity: sha512-G7BRef+991Dn+O4zmxGE8f8KN5Xfj5GQa+W3LQo0f+XHhRUCz2E+brTIonhjV7HJ5Z+lFNrm4StPytwNIUxA5Q==, tarball: file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz}
-    version: 0.3.0
+  '@antelopejs/interface-api@0.2.0':
+    resolution: {integrity: sha512-N7HGrJjJLIR/EN2QSYEAvMdYa9A13XWBoCxWJhy+BlilcIC+3fZySAE9sfQVUwb26Dg/6St+BY2RV0OufgvE1A==}
     peerDependencies:
       '@antelopejs/interface-core': '>=0.4.0 <1.0.0'
 
@@ -2624,12 +2622,12 @@ snapshots:
       semver: 7.8.5
       typescript: 5.9.3
 
-  '@antelopejs/interface-api-util@file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz(@antelopejs/interface-api@file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz(@antelopejs/interface-core@0.4.0))(@antelopejs/interface-core@0.4.0)':
+  '@antelopejs/interface-api-util@file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz(@antelopejs/interface-api@0.2.0(@antelopejs/interface-core@0.4.0))(@antelopejs/interface-core@0.4.0)':
     dependencies:
-      '@antelopejs/interface-api': file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz(@antelopejs/interface-core@0.4.0)
+      '@antelopejs/interface-api': 0.2.0(@antelopejs/interface-core@0.4.0)
       '@antelopejs/interface-core': 0.4.0
 
-  '@antelopejs/interface-api@file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz(@antelopejs/interface-core@0.4.0)':
+  '@antelopejs/interface-api@0.2.0(@antelopejs/interface-core@0.4.0)':
     dependencies:
       '@antelopejs/interface-core': 0.4.0
 

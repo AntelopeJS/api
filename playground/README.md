@@ -32,7 +32,7 @@ The `playground` module receives the three config variables of `api` (`API_PORT`
 
 | Package                          | Supported                                                         | Tested with                                                    |
 | -------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
-| `@antelopejs/interface-api`      | `file:../.campaign/tgz/antelopejs-interface-api-015a93a.tgz`      | `file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz`      |
+| `@antelopejs/interface-api`      | `>=0.2.0 <1.0.0`                                                  | `0.2.0`                                                        |
 | `@antelopejs/interface-api-util` | `file:../.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz` | `file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz` |
 | `@antelopejs/interface-core`     | `>=0.4.0 <1.0.0`                                                  | `0.4.0`                                                        |
 
