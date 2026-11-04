@@ -24,6 +24,9 @@ const LOOPBACK_HOSTNAMES = ["localhost", "127.0.0.1", "::1", "[::1]"];
 const DEV_FALLBACK_CORS_CONFIG: CorsConfig = {};
 const PREFLIGHT_METHOD = "OPTIONS";
 const PREFLIGHT_REQUEST_METHOD_HEADER = "access-control-request-method";
+const VARY_ORIGIN = "Origin";
+const VARY_ORIGIN_AND_REQUEST_HEADERS =
+  "Origin, Access-Control-Request-Headers";
 
 function isString(value: AllowedOrigin | undefined): value is string {
   return typeof value === "string" || value instanceof String;
@@ -138,16 +141,18 @@ function addPreflightHeaders(
     cors.allowedMethods?.join(",") ?? DEFAULT_ALLOWED_METHODS;
 
   response.addHeader("Access-Control-Allow-Origin", allowedOriginHeader);
-  response.addHeader("Vary", "Origin");
+  response.addHeader(
+    "Vary",
+    hasStaticAllowedHeaders(cors)
+      ? VARY_ORIGIN
+      : VARY_ORIGIN_AND_REQUEST_HEADERS,
+  );
   response.addHeader("Access-Control-Allow-Methods", allowedMethods);
   addCredentialsHeader(response, cors);
   response.addHeader(
     "Access-Control-Allow-Headers",
     resolveAllowedHeaders(cors, requestContext),
   );
-  if (!hasStaticAllowedHeaders(cors)) {
-    response.addHeader("Vary", "Access-Control-Request-Headers");
-  }
 
   if (cors.maxAge !== undefined) {
     response.addHeader("Access-Control-Max-Age", String(cors.maxAge));
@@ -165,7 +170,7 @@ function addStandardCorsHeaders(
     "Access-Control-Allow-Origin",
     allowedOriginHeader,
   );
-  requestContext.response.addHeader("Vary", "Origin");
+  requestContext.response.addHeader("Vary", VARY_ORIGIN);
   addCredentialsHeader(requestContext.response, cors);
 }
 

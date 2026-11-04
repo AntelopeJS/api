@@ -177,7 +177,18 @@ describe("CORS", () => {
     });
 
     assert.equal(headers["Access-Control-Allow-Headers"], REQUESTED_HEADERS);
-    assert.equal(headers.Vary, "Access-Control-Request-Headers");
+  });
+
+  it("varies a preflight that reflects the requested headers on the origin too", () => {
+    setCorsConfig({ allowedOrigins: ALLOWED_ORIGIN });
+
+    const headers = preflightHeaders({
+      origin: ALLOWED_ORIGIN,
+      "access-control-request-headers": REQUESTED_HEADERS,
+    });
+
+    assert.equal(headers["Access-Control-Allow-Origin"], ALLOWED_ORIGIN);
+    assert.equal(headers.Vary, "Origin, Access-Control-Request-Headers");
   });
 
   it("uses the configured allowed headers over the requested ones", () => {
