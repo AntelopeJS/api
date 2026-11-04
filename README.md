@@ -144,7 +144,7 @@ export function stop(): void {}
 | `@antelopejs/core`               | `>=1.17.0 <2`                                                  | `file:.campaign/tgz/antelopejs-core-184eb90.tgz`               |
 | `@antelopejs/interface-api`      | `file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz`      | `file:.campaign/tgz/antelopejs-interface-api-015a93a.tgz`      |
 | `@antelopejs/interface-api-util` | `file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz` | `file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz` |
-| `@antelopejs/interface-core`     | `file:.campaign/tgz/antelopejs-interface-core-f7df541.tgz`     | `file:.campaign/tgz/antelopejs-interface-core-f7df541.tgz`     |
+| `@antelopejs/interface-core`     | `>=0.4.0 <1.0.0`                                               | `0.4.0`                                                        |
 
 <!-- antelopejs-docs-compat:end -->
 
