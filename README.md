@@ -9,6 +9,8 @@
 
 The HTTP and WebSocket server module of AntelopeJS. It implements the API interfaces on the Node.js `http`, `https`, and `ws` servers, so the controllers and routes that other modules declare with `@antelopejs/interface-api` answer requests.
 
+Part of [AntelopeJS](https://github.com/AntelopeJS/antelopejs). Used by [AntelopeJS DMS](https://github.com/AntelopeJS/dms), the open-source back office for your PostgreSQL, MongoDB or RethinkDB database.
+
 ## Interfaces
 
 | Interface                                                                            | Documentation                                                            |
