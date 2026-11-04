@@ -1,8 +1,8 @@
 diff --git a/package.json b/package.json
-index b49e364..317337e 100644
+index 640aa8c..c0a07c2 100644
 --- a/package.json
 +++ b/package.json
-@@ -106,7 +106,7 @@
+@@ -108,7 +108,7 @@
          {
            "protocol": "http",
            "host": "localhost",
@@ -10,4 +10,4 @@ index b49e364..317337e 100644
 +          "port": 8081
          }
        ]
-     }
+     },
