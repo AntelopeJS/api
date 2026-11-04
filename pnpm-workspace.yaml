@@ -1,6 +1,3 @@
 packages:
   - "./"
   - "playground"
-overrides:
-  "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz"
-  "@antelopejs/core": "file:.campaign/tgz/antelopejs-core-184eb90.tgz"

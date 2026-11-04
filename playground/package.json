@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "@antelopejs/interface-api": ">=0.2.0 <1.0.0",
-    "@antelopejs/interface-api-util": "file:../.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz",
+    "@antelopejs/interface-api-util": ">=0.3.0 <1.0.0",
     "@antelopejs/interface-core": ">=0.4.0 <1.0.0"
   },
   "devDependencies": {
