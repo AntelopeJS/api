@@ -50,13 +50,13 @@
   },
   "dependencies": {
     "@antelopejs/interface-api": ">=0.2.0 <0.4.0",
-    "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz",
+    "@antelopejs/interface-api-util": ">=0.3.0 <1.0.0",
     "@antelopejs/interface-core": ">=0.4.0 <1.0.0",
     "reflect-metadata": "^0.2.2",
     "ws": "^8.20.0"
   },
   "devDependencies": {
-    "@antelopejs/core": "file:.campaign/tgz/antelopejs-core-184eb90.tgz",
+    "@antelopejs/core": "^1.20.0",
     "@antelopejs/tooling-configs": "^0.2.17",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.19.15",
@@ -83,12 +83,6 @@
     }
   },
   "packageManager": "pnpm@10.6.5",
-  "pnpm": {
-    "overrides": {
-      "@antelopejs/interface-api-util": "file:.campaign/tgz/antelopejs-interface-api-util-639f38b.tgz",
-      "@antelopejs/core": "file:.campaign/tgz/antelopejs-core-184eb90.tgz"
-    }
-  },
   "antelopeJs": {
     "implements": [
       "@antelopejs/interface-api",
