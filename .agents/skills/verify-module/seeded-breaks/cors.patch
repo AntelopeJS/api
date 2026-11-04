@@ -1,0 +1,13 @@
+diff --git a/src/middlewares/cors.ts b/src/middlewares/cors.ts
+index 7fd7bcb..f74ce02 100644
+--- a/src/middlewares/cors.ts
++++ b/src/middlewares/cors.ts
+@@ -14,7 +14,7 @@ import { getConfig } from "../module-config";
+ 
+ type RequestHeaderValue = string | string[] | undefined;
+ 
+-const DEFAULT_ALLOWED_METHODS = "GET,HEAD,PUT,PATCH,POST,DELETE";
++const DEFAULT_ALLOWED_METHODS = "GET,HEAD,PUT,POST,DELETE";
+ const FALSE_ORIGIN = "false";
+ const CREDENTIALS_ENABLED_VALUE = "true";
+ const NO_BODY_LENGTH = "0";

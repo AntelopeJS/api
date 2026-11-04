@@ -5,7 +5,7 @@ import { HTTPResult } from "@antelopejs/interface-api";
 
 import { gateResponse } from "./startup-gate";
 import { applyCors } from "./middlewares/cors";
-import { type Awaitable, pendingOf } from "./thenable";
+import { type Awaitable, continueWith, pendingOf } from "./thenable";
 import type {
   RequestContext,
   RouteCallback,
@@ -39,15 +39,28 @@ function handleResult(
 
 function hasMessage(
   error: RequestContext["error"],
-): error is { message: RouteResult } {
+): error is { message: RequestContext["error"] } {
   return typeof error === "object" && error !== null && "message" in error;
 }
 
-function extractError(error: RequestContext["error"]) {
-  if (hasMessage(error)) {
-    return error.message ?? error;
+function isText(value: RequestContext["error"]): value is string {
+  return typeof value === "string";
+}
+
+/**
+ * The 500 answer for a thrown value: a thrown `HTTPResult` as is, else the
+ * value's `message` (or the value itself) as text when it is a string or
+ * `undefined`, and as its JSON text otherwise.
+ */
+function errorResponse(error: RequestContext["error"]): HTTPResult {
+  const value = hasMessage(error) ? (error.message ?? error) : error;
+  if (value instanceof HTTPResult) {
+    return value;
   }
-  return error;
+  if (value === undefined || isText(value)) {
+    return new HTTPResult(500, value);
+  }
+  return new HTTPResult(500, JSON.stringify(value), "application/json");
 }
 
 function copyHeaders(source: HTTPResult, target: HTTPResult) {
@@ -66,7 +79,9 @@ function replaceResponse(
 ) {
   const previousResponse = requestContext.response;
   const response =
-    result instanceof HTTPResult ? result : new HTTPResult(status, result);
+    result instanceof HTTPResult
+      ? result
+      : new HTTPResult(status, result === undefined ? undefined : result);
   copyHeaders(previousResponse, response);
   requestContext.response = response;
 }
@@ -113,18 +128,6 @@ function executeHandler(
   return handler.handler(requestContext);
 }
 
-function continueExecution<U>(
-  value: Awaitable<RouteResult>,
-  next: (result: RouteResult) => Awaitable<U>,
-): Awaitable<U> {
-  const pending = pendingOf(value);
-  if (pending) {
-    // oxlint-disable-next-line promise/no-callback-in-promise -- continuation-passing keeps the synchronous fast path allocation-free
-    return pending.then((result) => next(result));
-  }
-  return next(value);
-}
-
 function executePriorityHandlers(
   handlers: HandlerResult[],
   requestContext: RequestContext,
@@ -154,14 +157,14 @@ function executePriorityHandlers(
 
 function executeMiddleware(
   mode: "prefix" | "postfix",
-  method: string,
+  methods: readonly string[],
   path: string[],
   requestContext: RequestContext,
 ): Awaitable<RouteResult> {
   if (!hasHandlers(mode)) {
     return undefined;
   }
-  const handlers = getMultiHandlers(method, path, mode);
+  const handlers = getMultiHandlers(methods, path, mode);
   if (handlers.length === 0) {
     return undefined;
   }
@@ -185,7 +188,7 @@ function runMonitors(
       if (pending) {
         return pending.then(
           () => runMonitors(monitors, monitorContext, index + 1),
-          (error) => {
+          (error: unknown) => {
             console.error(error);
             return runMonitors(monitors, monitorContext, index + 1);
           },
@@ -198,14 +201,14 @@ function runMonitors(
 }
 
 function executeMonitors(
-  method: string,
+  methods: readonly string[],
   path: string[],
   requestContext: RequestContext,
 ): Awaitable<void> {
   if (!hasHandlers("monitor")) {
     return;
   }
-  const monitors = getMultiHandlers(method, path, "monitor");
+  const monitors = getMultiHandlers(methods, path, "monitor");
   if (monitors.length === 0) {
     return;
   }
@@ -233,40 +236,71 @@ function setMiddlewareResponse(
 }
 
 function executePostfix(
-  method: string,
+  methods: readonly string[],
   path: string[],
   requestContext: RequestContext,
 ): Awaitable<void> {
-  const execution = executeMiddleware("postfix", method, path, requestContext);
-  return continueExecution(execution, (result) => {
+  const execution = executeMiddleware("postfix", methods, path, requestContext);
+  return continueWith(execution, (result) => {
     setMiddlewareResponse(requestContext, result);
   });
 }
 
 function executeHandlerAndPostfix(
   handler: HandlerResult | RouteCallback,
-  method: string,
+  methods: readonly string[],
   path: string[],
   requestContext: RequestContext,
 ): Awaitable<void> {
   const execution = executeHandler(handler, requestContext);
-  return continueExecution(execution, (result) => {
+  return continueWith(execution, (result) => {
     setHandlerResponse(requestContext, result);
-    return executePostfix(method, path, requestContext);
+    return executePostfix(methods, path, requestContext);
   });
 }
 
-function executeRequest(
+/** The handler a request runs and the methods its prefixes, postfixes and monitors are registered under. */
+interface SelectedRoute {
+  method: string;
+  handler: HandlerResult | RouteCallback | undefined;
+  methods: readonly string[];
+}
+
+function asSingleHandler(
+  handler: ReturnType<typeof findRouteHandler>,
+): HandlerResult | RouteCallback | undefined {
+  return Array.isArray(handler) ? undefined : handler;
+}
+
+/**
+ * Selects the handler for a request. A HEAD request without a HEAD handler
+ * runs the GET handler, together with the HEAD and the GET middleware.
+ */
+function selectRoute(
   method: string,
   path: string[],
   exactPath: string,
+): SelectedRoute {
+  const handler = findRouteHandler("handler", method, path, exactPath);
+  if (handler || method !== "head") {
+    return { method, handler: asSingleHandler(handler), methods: [method] };
+  }
+  const getHandler = asSingleHandler(
+    findRouteHandler("handler", "get", path, exactPath),
+  );
+  return {
+    method,
+    handler: getHandler,
+    methods: getHandler ? [method, "get"] : [method],
+  };
+}
+
+function executeRequest(
+  route: SelectedRoute,
+  path: string[],
   requestContext: RequestContext,
 ): Awaitable<void> {
-  let handler = findRouteHandler("handler", method, path, exactPath);
-  if (!handler && method === "head") {
-    handler = findRouteHandler("handler", "get", path, exactPath);
-  }
-  const selectedHandler = Array.isArray(handler) ? undefined : handler;
+  const { method, handler: selectedHandler, methods } = route;
   if (!selectedHandler) {
     requestContext.response.setBody("Not Found");
     requestContext.response.setStatus(404);
@@ -276,18 +310,18 @@ function executeRequest(
   }
   const prefixExecution = executeMiddleware(
     "prefix",
-    method,
+    methods,
     path,
     requestContext,
   );
-  return continueExecution(prefixExecution, (prefixResult) => {
+  return continueWith(prefixExecution, (prefixResult) => {
     setMiddlewareResponse(requestContext, prefixResult);
     if (prefixResult || !selectedHandler) {
       return;
     }
     return executeHandlerAndPostfix(
       selectedHandler,
-      method,
+      methods,
       path,
       requestContext,
     );
@@ -297,18 +331,18 @@ function executeRequest(
 function completeRequest(
   didFail: boolean,
   error: RequestContext["error"],
-  method: string,
+  route: SelectedRoute,
   path: string[],
   requestContext: RequestContext,
 ): Awaitable<void> {
   if (didFail) {
-    replaceResponse(requestContext, extractError(error), 500);
+    replaceResponse(requestContext, errorResponse(error), 500);
   }
   requestContext.error = error;
-  const monitorExecution = executeMonitors(method, path, requestContext);
-  return continueExecution(monitorExecution, () =>
+  const monitorExecution = executeMonitors(route.methods, path, requestContext);
+  return continueWith(monitorExecution, () =>
     handleResult(
-      method === "head",
+      route.method === "head",
       requestContext.response,
       requestContext.rawResponse,
     ),
@@ -355,24 +389,22 @@ function processRequest(
   const path = url.pathname.split("/").filter((part) => part);
   const method = req.method?.toLowerCase() || "get";
 
+  const route = selectRoute(method, path, url.pathname);
+
   try {
-    const execution = executeRequest(
-      method,
-      path,
-      url.pathname,
-      requestContext,
-    );
+    const execution = executeRequest(route, path, requestContext);
     const pending = pendingOf(execution);
     if (pending) {
       return pending.then(
-        () => completeRequest(false, undefined, method, path, requestContext),
-        (error) => completeRequest(true, error, method, path, requestContext),
+        () => completeRequest(false, undefined, route, path, requestContext),
+        (error: unknown) =>
+          completeRequest(true, error, route, path, requestContext),
       );
     }
   } catch (error) {
-    return completeRequest(true, error, method, path, requestContext);
+    return completeRequest(true, error, route, path, requestContext);
   }
-  return completeRequest(false, undefined, method, path, requestContext);
+  return completeRequest(false, undefined, route, path, requestContext);
 }
 
 export function requestListener(
@@ -432,7 +464,7 @@ export async function upgradeListener(
     } else {
       const prefixExecution = executeMiddleware(
         "prefix",
-        method,
+        [method],
         path,
         requestContext,
       );
@@ -453,12 +485,12 @@ export async function upgradeListener(
     requestError = error;
     mustDestroySocket = true;
     if (!hasUpgradedConnection) {
-      replaceResponse(requestContext, extractError(error), 500);
+      replaceResponse(requestContext, errorResponse(error), 500);
       mustSendResponse = true;
     }
   } finally {
     requestContext.error = requestError;
-    const monitorExecution = executeMonitors(method, path, requestContext);
+    const monitorExecution = executeMonitors([method], path, requestContext);
     if (monitorExecution) {
       await monitorExecution;
     }

@@ -21,12 +21,14 @@ const HANDLER_MODES = [
 
 export type HandlerMode = (typeof HANDLER_MODES)[number];
 
-const roots: Record<HandlerMode, Record<string, RouteLevel>> = {
-  handler: {},
-  prefix: {},
-  postfix: {},
-  monitor: {},
-  websocket: {},
+type MethodTable = Map<string, RouteLevel>;
+
+const roots: Record<HandlerMode, MethodTable> = {
+  handler: new Map(),
+  prefix: new Map(),
+  postfix: new Map(),
+  monitor: new Map(),
+  websocket: new Map(),
 };
 
 const handlerCounts: Record<HandlerMode, number> = {
@@ -44,16 +46,13 @@ type HandlerLookupResult =
   | undefined;
 type ExactHandlerIndex = Record<string, Map<string, RouteCallback>>;
 
-const exactHandlerIndexes = new WeakMap<
-  Record<string, RouteLevel>,
-  ExactHandlerIndex
->([
+const exactHandlerIndexes = new WeakMap<MethodTable, ExactHandlerIndex>([
   [roots.handler, {}],
   [roots.websocket, {}],
 ]);
 
 function updateExactHandler(
-  source: Record<string, RouteLevel>,
+  source: MethodTable,
   method: string,
   level: RouteLevel,
   removedExactPath?: string,
@@ -81,11 +80,12 @@ function updateExactHandler(
 }
 
 function findForMethod(
-  source: Record<string, RouteLevel>,
+  source: MethodTable,
   method: string,
   search: HandlerSearch,
 ): HandlerResult | RouteCallback | undefined {
-  if (!(method in source)) {
+  const level = source.get(method);
+  if (!level) {
     return undefined;
   }
   if (!search.multi && search.exactPath) {
@@ -98,38 +98,34 @@ function findForMethod(
   }
   search.parameters = {};
   search.parameterCount = 0;
-  findHandlers(search, 0, source[method]);
+  findHandlers(search, 0, level);
   return isSettled(search) ? search.result[0] : undefined;
 }
 
 function getHandler(
   method: string,
   path: string[],
-  source: Record<string, RouteLevel>,
-  multi = false,
-  exactPath?: string,
+  source: MethodTable,
+  exactPath: string,
 ): HandlerLookupResult {
   const search: HandlerSearch = {
     path,
     result: [],
     parameters: {},
     parameterCount: 0,
-    multi,
+    multi: false,
     exactPath,
   };
-  const handler =
+  return (
     findForMethod(source, method, search) ??
-    findForMethod(source, "any", search);
-  if (handler) {
-    return handler;
-  }
-  return multi ? search.result : undefined;
+    findForMethod(source, "any", search)
+  );
 }
 
 function removeHandlerFromLevel(
   id: string,
   level: RouteLevel,
-  source: Record<string, RouteLevel>,
+  source: MethodTable,
   method: string,
 ): number {
   const handlerLength = level.handlers.length;
@@ -183,8 +179,8 @@ function removeHandlerFromLevel(
   return 0;
 }
 
-function removeHandler(id: string, source: Record<string, RouteLevel>): number {
-  for (const [method, level] of Object.entries(source)) {
+function removeHandler(id: string, source: MethodTable): number {
+  for (const [method, level] of source) {
     const removedCount = removeHandlerFromLevel(id, level, source, method);
     if (removedCount > 0) {
       return removedCount;
@@ -210,10 +206,10 @@ export function registerHandler(
   const parts = location.split("/").filter((part) => part);
   const source = roots[mode];
   const routeMethod = method?.toLowerCase() || "any";
-  let level = source[routeMethod];
+  let level = source.get(routeMethod);
   if (!level) {
     level = new RouteLevel();
-    source[routeMethod] = level;
+    source.set(routeMethod, level);
   }
   for (let i = 0; i < parts.length; ++i) {
     const part = parts[i];
@@ -283,13 +279,25 @@ export function unregisterHandler(id: string) {
   }
 }
 
+/** Collects the handlers of `mode` matching `path` under each of `methods`, in order, then under `any`. */
 export function getMultiHandlers(
-  method: string,
+  methods: readonly string[],
   path: string[],
   mode: HandlerMode,
 ): HandlerResult[] {
-  const handlers = getHandler(method, path, roots[mode], true);
-  return Array.isArray(handlers) ? handlers : [];
+  const source = roots[mode];
+  const search: HandlerSearch = {
+    path,
+    result: [],
+    parameters: {},
+    parameterCount: 0,
+    multi: true,
+  };
+  for (const method of methods) {
+    findForMethod(source, method, search);
+  }
+  findForMethod(source, "any", search);
+  return search.result;
 }
 
 export function hasHandlers(mode: HandlerMode): boolean {
@@ -302,5 +310,5 @@ export function findRouteHandler(
   path: string[],
   exactPath: string,
 ): HandlerLookupResult {
-  return getHandler(method, path, roots[mode], false, exactPath);
+  return getHandler(method, path, roots[mode], exactPath);
 }

@@ -5,6 +5,8 @@ import { createServer, type Server } from "node:http";
 import { GetMetadata } from "@antelopejs/interface-core";
 import {
   type ComputedParameter,
+  type ControllerClass,
+  Controller as ControllerBase,
   ControllerMeta,
   JSONBody,
   type RouteHandler,
@@ -12,10 +14,10 @@ import {
 
 import { requestListener } from "../server";
 import { routesProxy } from "../implementations/api";
+import { nullPrototypeThenable } from "./thenable";
 
 const TEST_HOST = "127.0.0.1";
 const TEST_ORIGIN = `http://${TEST_HOST}`;
-const THEN_PROPERTY = ["th", "en"].join("");
 const SYMBOL_PROPERTY = Symbol("computed-property");
 
 interface TestController {
@@ -31,12 +33,10 @@ interface TestResponse {
 
 interface StatefulThenable {
   readCount: () => number;
-  value: PromiseLike<string>;
+  value: object;
 }
 
-type ControllerConstructor = (new () => TestController) & {
-  location: string;
-};
+type ControllerConstructor = ControllerClass<TestController>;
 
 function computedParameter(
   provider: ComputedParameter["provider"],
@@ -46,27 +46,22 @@ function computedParameter(
 }
 
 function createController(): ControllerConstructor {
-  return class {
-    static location = "";
+  return class extends ControllerBase("") {
     sequence = 0;
   };
 }
 
 function statefulThenable(value: string): StatefulThenable {
   let reads = 0;
-  const thenable = Object.defineProperty<PromiseLike<string>>(
-    Object.create(null),
-    THEN_PROPERTY,
-    {
-      get: () => {
-        reads += 1;
-        if (reads > 1) {
-          throw new Error("then getter read more than once");
-        }
-        return (resolve: (resolved: string) => void) => resolve(value);
-      },
+  const thenable = nullPrototypeThenable({
+    get: () => {
+      reads += 1;
+      if (reads > 1) {
+        throw new Error("then getter read more than once");
+      }
+      return (resolve: (resolved: string) => void) => resolve(value);
     },
-  );
+  });
   return { readCount: () => reads, value: thenable };
 }
 
@@ -84,7 +79,7 @@ function createHandler(
     callback,
     parameters,
     properties,
-    proto: Controller.prototype,
+    controller: Controller,
   };
 }
 
@@ -131,8 +126,11 @@ async function post(
 }
 
 function jsonBodyParameter(): ComputedParameter {
-  const Controller = createController();
-  JSONBody()(Controller.prototype, "handle", 0);
+  class Controller extends ControllerBase("") {
+    handle(@JSONBody() body: unknown) {
+      return body;
+    }
+  }
   const metadata = GetMetadata(Controller, ControllerMeta);
   return metadata.computed_params.handle[0];
 }
@@ -239,6 +237,27 @@ function controllerInstanceCases(): void {
 
     assert.deepEqual(await get(port, location), { status: 200, body: "2" });
     assert.deepEqual(await get(port, location), { status: 200, body: "2" });
+  });
+
+  it("refuses a handler without a controller at registration", () => {
+    const location = "/controller-resolution/no-controller";
+    const handler = createHandler(createController(), () => "unused", location);
+    // @ts-expect-error off-contract handler without its required controller; routesProxy.register must throw a TypeError at registration
+    delete handler.controller;
+
+    assert.throws(
+      () => routesProxy.register("controller-resolution-refused", handler),
+      (error) =>
+        error instanceof TypeError &&
+        error.message.includes("GET") &&
+        error.message.includes(location) &&
+        error.message.includes("controller"),
+    );
+
+    assert.equal(
+      routesProxy.getRoutes().some((route) => route.uri === location),
+      false,
+    );
   });
 }
 
@@ -409,7 +428,7 @@ function computedValueCases(): void {
     const thenable = statefulThenable("value:thenable");
     const location = "/controller-resolution/mixed-modifiers";
     register(
-      createHandler(Controller, (value) => value, location, [
+      createHandler(Controller, (value: string) => value, location, [
         computedParameter(() => {
           events.push("provider");
           return thenable.value;

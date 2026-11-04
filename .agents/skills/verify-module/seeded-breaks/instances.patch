@@ -1,0 +1,13 @@
+diff --git a/src/implementations/api/index.ts b/src/implementations/api/index.ts
+index 29d7342..45ec618 100644
+--- a/src/implementations/api/index.ts
++++ b/src/implementations/api/index.ts
+@@ -220,7 +220,7 @@ function resolveControllerInstance(
+   context: RequestContextDev,
+ ): ControllerInstance | Promise<ControllerInstance> {
+   const controllerCache = getControllerCache(context);
+-  const cachedController = controllerCache.get(plan.cacheKey);
++  const cachedController = controllerCache.get(Object.create(null));
+ 
+   if (cachedController) {
+     return cachedController;

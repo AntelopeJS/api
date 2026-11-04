@@ -1,7 +1,7 @@
 import { GetMetadata } from "@antelopejs/interface-core";
-import type { Class } from "@antelopejs/interface-core/decorators";
 import {
   type ComputedParameter,
+  type ControllerClass,
   ControllerMeta,
   type CorsConfig,
   HTTPResult,
@@ -20,11 +20,9 @@ import { type Awaitable, pendingOf } from "../../thenable";
 
 type ComputedValue = ReturnType<ParameterModifier>;
 
-type ControllerInstance = Record<PropertyKey, ComputedValue>;
+type Controller = ControllerClass<object> & { prototype: object };
 
-type ControllerClass = Class<ControllerInstance> & {
-  location: string;
-};
+type ControllerInstance = InstanceType<Controller>;
 
 type ParameterResolver = (
   context: RequestContextDev,
@@ -37,13 +35,15 @@ interface ComputedPropertyResolver {
 }
 
 interface ControllerPlan {
-  controllerClass: ControllerClass;
+  controllerClass: Controller;
   cacheKey: object;
   computedProperties: ComputedPropertyResolver[];
 }
 
+type HandlerCallback = (...args: ComputedValue[]) => RouteResult;
+
 interface HandlerPlan {
-  callback: RouteHandler["callback"];
+  callback: HandlerCallback;
   controller: ControllerPlan;
   parameters: ParameterResolver[];
 }
@@ -53,7 +53,7 @@ const MALFORMED_REQUEST_PREFIX = "Malformed request";
 
 const classCacheSymbol = Symbol();
 const registeredRoutes = new Map<string, RouteHandler>();
-const controllerPlans = new WeakMap<ControllerClass, ControllerPlan>();
+const controllerPlans = new WeakMap<Controller, ControllerPlan>();
 
 interface RequestContextDev extends RequestContext {
   [classCacheSymbol]?: Map<object, ControllerInstance>;
@@ -139,13 +139,23 @@ function applyModifiers(
   return pendingOf(value) ?? value;
 }
 
+function ownEntries(
+  table: Record<PropertyKey, ComputedParameter>,
+): Array<[PropertyKey, ComputedParameter]> {
+  const bySymbol: Record<symbol, ComputedParameter> = table;
+  const symbols = Object.getOwnPropertySymbols(bySymbol).map(
+    (symbol): [PropertyKey, ComputedParameter] => [symbol, bySymbol[symbol]],
+  );
+  return [...Object.entries(table), ...symbols];
+}
+
 function compileController(
-  controllerClass: ControllerClass,
+  controllerClass: Controller,
   properties: Record<PropertyKey, ComputedParameter>,
 ): ControllerPlan {
-  const computedProperties = Reflect.ownKeys(properties).map((key) => ({
+  const computedProperties = ownEntries(properties).map(([key, parameter]) => ({
     key,
-    resolve: compileParameter(properties[key]),
+    resolve: compileParameter(parameter),
   }));
   const existingPlan = controllerPlans.get(controllerClass);
   const plan = existingPlan ?? {
@@ -158,7 +168,7 @@ function compileController(
   return plan;
 }
 
-function getControllerPlan(controllerClass: ControllerClass): ControllerPlan {
+function getControllerPlan(controllerClass: Controller): ControllerPlan {
   const cachedPlan = controllerPlans.get(controllerClass);
   if (cachedPlan) {
     return cachedPlan;
@@ -192,11 +202,11 @@ function applyComputedProperties(
     if (isPromiseLike(value)) {
       pending.push(
         Promise.resolve(value).then((resolved) => {
-          controllerInstance[property.key] = resolved;
+          Object.assign(controllerInstance, { [property.key]: resolved });
         }),
       );
     } else {
-      controllerInstance[property.key] = value;
+      Object.assign(controllerInstance, { [property.key]: value });
     }
   }
 
@@ -234,10 +244,10 @@ function resolveControllerInstance(
 }
 
 export async function GetControllerInstance(
-  controllerClass: Class<unknown>,
+  controllerClass: Controller,
   context: RequestContext,
 ) {
-  const plan = getControllerPlan(controllerClass as ControllerClass);
+  const plan = getControllerPlan(controllerClass);
   return resolveControllerInstance(plan, context);
 }
 
@@ -308,7 +318,7 @@ function invokeHandler(
 }
 
 function compileHandler(handler: RouteHandler): HandlerPlan {
-  const controllerClass: ControllerClass = handler.proto.constructor;
+  const controllerClass: Controller = handler.controller;
   return {
     callback: handler.callback,
     controller: compileController(controllerClass, handler.properties),
@@ -318,6 +328,11 @@ function compileHandler(handler: RouteHandler): HandlerPlan {
 
 export const routesProxy = {
   register: (id: string, handler: RouteHandler): void => {
+    if (!handler.controller) {
+      throw new TypeError(
+        `Cannot register ${handler.method.toUpperCase()} ${handler.location}: RouteHandler.controller is required`,
+      );
+    }
     registeredRoutes.set(id, handler);
     let plan: HandlerPlan | undefined;
     registerHandler(

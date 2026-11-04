@@ -1,0 +1,13 @@
+diff --git a/src/server.ts b/src/server.ts
+index 613a5e7..3a5bdcd 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -269,7 +269,7 @@ function executeRequest(
+   const selectedHandler = Array.isArray(handler) ? undefined : handler;
+   if (!selectedHandler) {
+     requestContext.response.setBody("Not Found");
+-    requestContext.response.setStatus(404);
++    requestContext.response.setStatus(410);
+   }
+   if (!selectedHandler && method !== "options") {
+     return;
