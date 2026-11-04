@@ -1,0 +1,13 @@
+diff --git a/src/port-binding.ts b/src/port-binding.ts
+index 530257d..fa22f9f 100644
+--- a/src/port-binding.ts
++++ b/src/port-binding.ts
+@@ -62,7 +62,7 @@ export function buildCandidatePorts(
+     { length: MAX_PORT_FALLBACK_OFFSET + 1 },
+     (_, offset) => requestedPort + offset,
+   );
+-  return [...sequentialPorts, RANDOM_PORT];
++  return [requestedPort];
+ }
+ 
+ /**
