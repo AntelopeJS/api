@@ -157,14 +157,14 @@ function executePriorityHandlers(
 
 function executeMiddleware(
   mode: "prefix" | "postfix",
-  method: string,
+  methods: readonly string[],
   path: string[],
   requestContext: RequestContext,
 ): Awaitable<RouteResult> {
   if (!hasHandlers(mode)) {
     return undefined;
   }
-  const handlers = getMultiHandlers(method, path, mode);
+  const handlers = getMultiHandlers(methods, path, mode);
   if (handlers.length === 0) {
     return undefined;
   }
@@ -201,14 +201,14 @@ function runMonitors(
 }
 
 function executeMonitors(
-  method: string,
+  methods: readonly string[],
   path: string[],
   requestContext: RequestContext,
 ): Awaitable<void> {
   if (!hasHandlers("monitor")) {
     return;
   }
-  const monitors = getMultiHandlers(method, path, "monitor");
+  const monitors = getMultiHandlers(methods, path, "monitor");
   if (monitors.length === 0) {
     return;
   }
@@ -236,11 +236,11 @@ function setMiddlewareResponse(
 }
 
 function executePostfix(
-  method: string,
+  methods: readonly string[],
   path: string[],
   requestContext: RequestContext,
 ): Awaitable<void> {
-  const execution = executeMiddleware("postfix", method, path, requestContext);
+  const execution = executeMiddleware("postfix", methods, path, requestContext);
   return continueWith(execution, (result) => {
     setMiddlewareResponse(requestContext, result);
   });
@@ -248,28 +248,59 @@ function executePostfix(
 
 function executeHandlerAndPostfix(
   handler: HandlerResult | RouteCallback,
-  method: string,
+  methods: readonly string[],
   path: string[],
   requestContext: RequestContext,
 ): Awaitable<void> {
   const execution = executeHandler(handler, requestContext);
   return continueWith(execution, (result) => {
     setHandlerResponse(requestContext, result);
-    return executePostfix(method, path, requestContext);
+    return executePostfix(methods, path, requestContext);
   });
 }
 
-function executeRequest(
+/** The handler a request runs and the methods its prefixes, postfixes and monitors are registered under. */
+interface SelectedRoute {
+  method: string;
+  handler: HandlerResult | RouteCallback | undefined;
+  methods: readonly string[];
+}
+
+function asSingleHandler(
+  handler: ReturnType<typeof findRouteHandler>,
+): HandlerResult | RouteCallback | undefined {
+  return Array.isArray(handler) ? undefined : handler;
+}
+
+/**
+ * Selects the handler for a request. A HEAD request without a HEAD handler
+ * runs the GET handler, together with the HEAD and the GET middleware.
+ */
+function selectRoute(
   method: string,
   path: string[],
   exactPath: string,
+): SelectedRoute {
+  const handler = findRouteHandler("handler", method, path, exactPath);
+  if (handler || method !== "head") {
+    return { method, handler: asSingleHandler(handler), methods: [method] };
+  }
+  const getHandler = asSingleHandler(
+    findRouteHandler("handler", "get", path, exactPath),
+  );
+  return {
+    method,
+    handler: getHandler,
+    methods: getHandler ? [method, "get"] : [method],
+  };
+}
+
+function executeRequest(
+  route: SelectedRoute,
+  path: string[],
   requestContext: RequestContext,
 ): Awaitable<void> {
-  let handler = findRouteHandler("handler", method, path, exactPath);
-  if (!handler && method === "head") {
-    handler = findRouteHandler("handler", "get", path, exactPath);
-  }
-  const selectedHandler = Array.isArray(handler) ? undefined : handler;
+  const { method, handler: selectedHandler, methods } = route;
   if (!selectedHandler) {
     requestContext.response.setBody("Not Found");
     requestContext.response.setStatus(404);
@@ -279,7 +310,7 @@ function executeRequest(
   }
   const prefixExecution = executeMiddleware(
     "prefix",
-    method,
+    methods,
     path,
     requestContext,
   );
@@ -290,7 +321,7 @@ function executeRequest(
     }
     return executeHandlerAndPostfix(
       selectedHandler,
-      method,
+      methods,
       path,
       requestContext,
     );
@@ -300,7 +331,7 @@ function executeRequest(
 function completeRequest(
   didFail: boolean,
   error: RequestContext["error"],
-  method: string,
+  route: SelectedRoute,
   path: string[],
   requestContext: RequestContext,
 ): Awaitable<void> {
@@ -308,10 +339,10 @@ function completeRequest(
     replaceResponse(requestContext, errorResponse(error), 500);
   }
   requestContext.error = error;
-  const monitorExecution = executeMonitors(method, path, requestContext);
+  const monitorExecution = executeMonitors(route.methods, path, requestContext);
   return continueWith(monitorExecution, () =>
     handleResult(
-      method === "head",
+      route.method === "head",
       requestContext.response,
       requestContext.rawResponse,
     ),
@@ -358,25 +389,22 @@ function processRequest(
   const path = url.pathname.split("/").filter((part) => part);
   const method = req.method?.toLowerCase() || "get";
 
+  const route = selectRoute(method, path, url.pathname);
+
   try {
-    const execution = executeRequest(
-      method,
-      path,
-      url.pathname,
-      requestContext,
-    );
+    const execution = executeRequest(route, path, requestContext);
     const pending = pendingOf(execution);
     if (pending) {
       return pending.then(
-        () => completeRequest(false, undefined, method, path, requestContext),
+        () => completeRequest(false, undefined, route, path, requestContext),
         (error: unknown) =>
-          completeRequest(true, error, method, path, requestContext),
+          completeRequest(true, error, route, path, requestContext),
       );
     }
   } catch (error) {
-    return completeRequest(true, error, method, path, requestContext);
+    return completeRequest(true, error, route, path, requestContext);
   }
-  return completeRequest(false, undefined, method, path, requestContext);
+  return completeRequest(false, undefined, route, path, requestContext);
 }
 
 export function requestListener(
@@ -436,7 +464,7 @@ export async function upgradeListener(
     } else {
       const prefixExecution = executeMiddleware(
         "prefix",
-        method,
+        [method],
         path,
         requestContext,
       );
@@ -462,7 +490,7 @@ export async function upgradeListener(
     }
   } finally {
     requestContext.error = requestError;
-    const monitorExecution = executeMonitors(method, path, requestContext);
+    const monitorExecution = executeMonitors([method], path, requestContext);
     if (monitorExecution) {
       await monitorExecution;
     }
