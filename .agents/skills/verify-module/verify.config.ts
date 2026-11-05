@@ -25,20 +25,17 @@ const config: VerifyConfig = {
     contract: {
       globs: ["package.json", "src/config-vars.ts", "src/server-config.ts"],
       funnels: [],
-      containments: [],
       why: "`antelopeJs.implements`, `configVars`, `configVarsFile` and `defaultConfig`, and the config keys `servers`, `publicBaseUrl`, `strictPort`, `autoListen` and `cors` that antelope.config.ts files already carry",
     },
     outbound: null,
     exposure: {
       globs: ["src/middlewares/cors.ts", "src/startup-gate.ts", "src/port-binding.ts", "src/port-listener.ts", "src/server-factory.ts", "src/server-origin.ts"],
       funnels: [],
-      containments: [],
       why: "these modules decide which origins, hosts, ports and phases of the project can reach the routes: a change that widens an origin, binds another host or opens the gate early exposes routes to callers that were refused",
     },
     publish: {
       globs: ["package.json", ".release-it.json", "changelogen.config.json", ".github/workflows/release.yml"],
       funnels: [],
-      containments: [],
       why: "the package name and release workflow claim @antelopejs/api on npm",
     },
   },
