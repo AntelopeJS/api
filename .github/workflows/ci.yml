@@ -19,6 +19,7 @@ jobs:
         README.md
         playground/README.md
       renovate-sync: false
+      test-job: true
 
   checks:
     if: always()

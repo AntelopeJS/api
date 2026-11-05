@@ -33,5 +33,5 @@ pnpm exec antelopejs-verify journey "$RUN" guards
 
 ## Gotchas
 
-- `covers` lists only `src/server.ts`: the guards live in the interface package, and the module's part (turning a thrown `HTTPResult` into a response and keeping headers) is covered by [handlers](handlers.md) and [results](results.md); a change to `src/server.ts` runs this feature too through the seeded break of [results](results.md) only when its journeys are listed in `plan`.
+- `covers` lists only `src/server.ts`: the guards live in the interface package, and the module's part (turning a thrown `HTTPResult` into a response and keeping headers) is covered by [handlers](handlers.md) and [results](results.md).
 - The rate-limit journey waits 1.7 s for a 1.5 s window.
