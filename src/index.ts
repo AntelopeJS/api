@@ -107,8 +107,15 @@ export async function construct(config: Config): Promise<void> {
   start();
 }
 
-export function destroy(): void {
+/**
+ * Releases the servers and listening sockets along with the lifecycle
+ * watch. The core does not call `stop` on a module that never became
+ * active, as after a failed `construct`, yet `provide` and `construct`
+ * already bound the ports.
+ */
+export async function destroy(): Promise<void> {
   unwatchModulesLifecycle();
+  await stop();
 }
 
 function closeServers(): Promise<void> {
