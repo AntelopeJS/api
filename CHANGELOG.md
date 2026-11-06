@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.7.1
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.7.0...v1.7.1)
+
+### 🩹 Fixes
+
+- Release the servers and listening sockets in destroy ([#126](https://github.com/AntelopeJS/api/pull/126))
+- **deps:** Update ws to resolve runtime advisories ([#129](https://github.com/AntelopeJS/api/pull/129))
+
+### 📦 Build
+
+- **deps:** Bump @antelopejs packages to the 2026-11-06 releases ([#131](https://github.com/AntelopeJS/api/pull/131))
+
+### 🏡 Chore
+
+- **verify:** Remove seeded runs from the verification skill ([#127](https://github.com/AntelopeJS/api/pull/127))
+- **ci:** Remove the weekly mutation caller ([#128](https://github.com/AntelopeJS/api/pull/128))
+
+### 🤖 CI
+
+- Call ci-node.yml@v1 ([#130](https://github.com/AntelopeJS/api/pull/130))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli ([@Upd4ting](http://github.com/Upd4ting))
+
 ## v1.7.0
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.6.0...v1.7.0)
