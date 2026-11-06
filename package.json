@@ -56,8 +56,8 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@antelopejs/core": "^1.20.0",
-    "@antelopejs/tooling-configs": "^0.3.1",
+    "@antelopejs/core": "^1.21.0",
+    "@antelopejs/tooling-configs": "^0.3.3",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.19.15",
     "@types/sinon": "^21.0.0",
@@ -75,7 +75,7 @@
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "@antelopejs/core": ">=1.17.0 <2"
+    "@antelopejs/core": ">=1.21.0 <2"
   },
   "peerDependenciesMeta": {
     "@antelopejs/core": {
