@@ -1,5 +1,7 @@
 ---
 covers:
+  - src/server-config.ts
+  - src/server-origin.ts
   - src/config-vars.ts
 docs:
   - README.md

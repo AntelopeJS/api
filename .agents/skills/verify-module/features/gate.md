@@ -1,5 +1,6 @@
 ---
 covers:
+  - src/index.ts
   - src/startup-gate.ts
 docs:
   - README.md

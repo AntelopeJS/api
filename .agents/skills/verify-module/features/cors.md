@@ -1,5 +1,6 @@
 ---
 covers:
+  - src/dev-mode.ts
   - src/middlewares/cors.ts
   - src/module-config.ts
 docs:
