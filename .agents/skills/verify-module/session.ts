@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { App, JourneyContext, StopResult } from "@antelopejs/tooling-configs/verify";
 
 import { APP_SOURCE } from "./app-source.ts";
@@ -104,11 +105,21 @@ function consumerFiles(context: JourneyContext, project: string, options: Option
   context.edit("second module source", path(project, "extra", "index.js"), options.extra);
 }
 
+/** The JavaScript `tsc` emitted for each controllers source, kept for the journeys of the same `antelopejs-verify journey` process. */
+const compiled = new Map<string, string>();
+
 async function compile(context: JourneyContext, project: string, controllers: string): Promise<void> {
   context.edit("controllers source", path(project, "app", "controllers.ts"), controllers);
+  const output = path(project, "app", "controllers.js");
+  const emitted = compiled.get(controllers);
+  if (emitted !== undefined) {
+    context.edit("controllers compiled by an earlier journey", output, emitted);
+    return;
+  }
   context.edit("controllers tsconfig", path(project, "app", "tsconfig.json"), APP_TSCONFIG);
   const built = await context.command("compile the controllers", "node", [path(context.repo, "node_modules/typescript/bin/tsc"), "-p", path(project, "app")]);
   if (built.exitCode !== 0) context.notVerified(`the controllers did not compile with the repository's tsc: ${built.stdout.slice(0, 400)}`);
+  compiled.set(controllers, readFileSync(output, "utf8"));
 }
 
 interface Prepared {
