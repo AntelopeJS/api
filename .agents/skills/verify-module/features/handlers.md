@@ -1,5 +1,8 @@
 ---
 covers:
+  - src/route-search.ts
+  - src/route-table.ts
+  - src/thenable.ts
   - src/server.ts
 docs:
   - README.md

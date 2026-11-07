@@ -1,5 +1,6 @@
 ---
 covers:
+  - src/module-config.ts
   - src/index.ts
   - src/port-binding.ts
   - src/port-listener.ts
