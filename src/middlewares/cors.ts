@@ -53,7 +53,7 @@ function isOriginAllowed(
   }
 
   if (allowedOrigin instanceof RegExp) {
-    return allowedOrigin.test(origin);
+    return origin.search(allowedOrigin) !== -1;
   }
 
   return Boolean(allowedOrigin);
