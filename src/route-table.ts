@@ -44,11 +44,11 @@ type HandlerLookupResult =
   | RouteCallback
   | HandlerResult[]
   | undefined;
-type ExactHandlerIndex = Record<string, Map<string, RouteCallback>>;
+type ExactHandlerIndex = Map<string, Map<string, RouteCallback>>;
 
 const exactHandlerIndexes = new WeakMap<MethodTable, ExactHandlerIndex>([
-  [roots.handler, {}],
-  [roots.websocket, {}],
+  [roots.handler, new Map()],
+  [roots.websocket, new Map()],
 ]);
 
 function updateExactHandler(
@@ -63,20 +63,20 @@ function updateExactHandler(
     return;
   }
 
-  const methodIndex = index[method];
+  let methodIndex = index.get(method);
   if (level.handlers.length !== 1) {
     methodIndex?.delete(exactPath);
     if (methodIndex?.size === 0) {
-      delete index[method];
+      index.delete(method);
     }
     return;
   }
 
-  const handler = level.handlers[0];
   if (!methodIndex) {
-    index[method] = new Map();
+    methodIndex = new Map();
+    index.set(method, methodIndex);
   }
-  index[method].set(exactPath, handler.callback);
+  methodIndex.set(exactPath, level.handlers[0].callback);
 }
 
 function findForMethod(
@@ -91,7 +91,8 @@ function findForMethod(
   if (!search.multi && search.exactPath) {
     const exactHandler = exactHandlerIndexes
       .get(source)
-      ?.[method]?.get(search.exactPath);
+      ?.get(method)
+      ?.get(search.exactPath);
     if (exactHandler) {
       return exactHandler;
     }

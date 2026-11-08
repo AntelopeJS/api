@@ -289,6 +289,21 @@ function prototypeKeyCases(): void {
     assert.equal((await request("/compiled/valueOf/x")).status, 404);
     assert.equal((await request("/hasOwnProperty")).status, 404);
   });
+
+  it("registers a handler under a method named like an Object.prototype key", async () => {
+    register(
+      "prototype-method",
+      { mode: "handler", method: "constructor", location: "/compiled/method" },
+      () => "constructor method",
+    );
+    register(
+      "prototype-method-get",
+      { mode: "handler", method: "get", location: "/compiled/method" },
+      () => "get method",
+    );
+
+    assert.equal((await request("/compiled/method")).body, "get method");
+  });
 }
 
 describe("Compiled route parameter extraction", () => {
