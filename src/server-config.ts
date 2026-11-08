@@ -41,5 +41,5 @@ export function resolveServers(config: Config): ServerConfig[] {
     return config.servers;
   }
 
-  return [DEFAULT_SERVER_CONFIG];
+  return [{ ...DEFAULT_SERVER_CONFIG }];
 }

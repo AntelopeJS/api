@@ -136,6 +136,20 @@ describe("Published config variables", () => {
     }
   });
 
+  it("keeps publishing port 80 after the running default server is rebound", () => {
+    const previous = getConfig();
+
+    try {
+      configure({});
+      const [running] = getConfig().servers ?? [];
+      running.port = SECONDARY_PORT;
+
+      assert.equal(configVars({})[API_PORT], 80);
+    } finally {
+      configure(previous);
+    }
+  });
+
   it("maps every bind host to a connectable url host", () => {
     const hostCases: LocalHostCase[] = [
       { bindHost: undefined, urlHost: TEST_HOST },
