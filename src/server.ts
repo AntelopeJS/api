@@ -440,6 +440,7 @@ function refuseUpgrade(
     socket.destroy();
     return;
   }
+  socket.on("error", () => socket.destroy());
   res.assignSocket(socket);
   res.shouldKeepAlive = false;
   res.on("finish", () => socket.destroy());

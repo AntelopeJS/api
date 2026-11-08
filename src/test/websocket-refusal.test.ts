@@ -46,6 +46,16 @@ function readBody(response: http.IncomingMessage): Promise<string> {
   });
 }
 
+function socketClosed(response: http.IncomingMessage): Promise<void> {
+  return new Promise((resolve) => {
+    if (response.socket.closed) {
+      resolve();
+      return;
+    }
+    response.socket.once("close", () => resolve());
+  });
+}
+
 function openRefused(port: number, path: string): Promise<Refusal> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(`ws://${TEST_HOST}:${port}${path}`);
@@ -54,8 +64,8 @@ function openRefused(port: number, path: string): Promise<Refusal> {
       reject(new Error("The upgrade was accepted"));
     });
     socket.on("unexpected-response", (_request, response) => {
-      readBody(response).then(
-        (body) =>
+      Promise.all([readBody(response), socketClosed(response)]).then(
+        ([body]) =>
           resolve({
             status: response.statusCode ?? 0,
             body,
