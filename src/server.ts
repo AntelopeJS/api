@@ -1,3 +1,4 @@
+import { Socket } from "node:net";
 import type stream from "node:stream";
 import { type WebSocket, WebSocketServer } from "ws";
 import { type IncomingMessage, ServerResponse } from "node:http";
@@ -425,6 +426,26 @@ const upgrader = (req: IncomingMessage, socket: stream.Duplex, head: Buffer) =>
     wss.handleUpgrade(req, socket, head, resolve),
   );
 
+/**
+ * Answers an upgrade request with `response` instead of switching protocols,
+ * then closes the socket once the answer is flushed, so the client reads the
+ * status and body rather than a dropped connection.
+ */
+function refuseUpgrade(
+  response: HTTPResult,
+  res: ServerResponse,
+  socket: stream.Duplex,
+): void {
+  if (!(socket instanceof Socket)) {
+    socket.destroy();
+    return;
+  }
+  res.assignSocket(socket);
+  res.shouldKeepAlive = false;
+  res.on("finish", () => socket.destroy());
+  handleResult(false, response, res);
+}
+
 export async function upgradeListener(
   req: IncomingMessage,
   socket: stream.Duplex,
@@ -445,8 +466,7 @@ export async function upgradeListener(
   };
 
   if (answerFromGate(requestContext)) {
-    handleResult(false, requestContext.response, res);
-    socket.destroy();
+    refuseUpgrade(requestContext.response, res, socket);
     return;
   }
   const path = url.pathname.split("/").filter((part) => part);
@@ -495,9 +515,8 @@ export async function upgradeListener(
       await monitorExecution;
     }
     if (mustSendResponse) {
-      handleResult(false, requestContext.response, res);
-    }
-    if (mustDestroySocket) {
+      refuseUpgrade(requestContext.response, res, socket);
+    } else if (mustDestroySocket) {
       socket.destroy();
     }
   }
