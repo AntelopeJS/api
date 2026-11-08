@@ -80,7 +80,7 @@ export const corsDefaults: Journey = {
 };
 
 export const corsCredentials: Journey = {
-  title: "credentials false sends no allow-credentials header on any actual response, and a RegExp origin is allowed on an ordinary request",
+  title: "credentials false sends no allow-credentials header on any actual response, and a RegExp origin, with or without the g and y flags, is allowed on every ordinary request",
   entryPoint: "`cors: { allowedOrigins, credentials: false }` and `SetCorsConfig({ allowedOrigins: /regexp/ })`, called over HTTP with Origin headers",
   async run(context) {
     const session = await open(context, { controllers: CORS_SOURCE, config: { cors: { allowedOrigins: APP, credentials: false } } });
@@ -94,6 +94,12 @@ export const corsCredentials: Journey = {
     context.expect(preview.folder, [status("an ordinary request", preview, 200), allows("a RegExp origin on an ordinary request", preview, "https://preview-7.example.com"), headerIs("with credentials", preview, "access-control-allow-credentials", "true")]);
     const other = await session.get("GET /ping from an origin the RegExp does not match", "/ping", { headers: { origin: "https://preview-x.example.com" } });
     context.expect(other.folder, [refuses("an ordinary request", other, "https://preview-x.example.com")]);
+    const stateful = await session.run("allow a RegExp origin with the g and y flags", "await api.SetCorsConfig({ allowedOrigins: /^https:\\/\\/preview-\\d+\\.example\\.com$/gy }); return null;");
+    context.expect(stateful.folder, [holds("the scenario ran", stateful.ok, JSON.stringify(stateful.error))]);
+    for (const attempt of [1, 2, 3]) {
+      const repeat = await session.get(`GET /ping from a g and y RegExp origin, request ${attempt}`, "/ping", { headers: { origin: "https://preview-7.example.com" } });
+      context.expect(repeat.folder, [allows(`a g and y RegExp origin on request ${attempt}`, repeat, "https://preview-7.example.com")]);
+    }
     await finish(session);
   },
 };
