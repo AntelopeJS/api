@@ -99,7 +99,7 @@ The package names the function that computes them, `configVars` in `dist/config-
 
 The module serves the port from `construct` on. Until the core announces that every module has started, it answers every request with `503`, the body `error.server_starting`, and `Retry-After: 1`. `@antelopejs/core` sends that announcement as `Events.ModulesStarted` of `@antelopejs/interface-core/modules`. When the whole project starts to stop at shutdown (`Events.ModulesStopping`), the module answers `503` again. Stopping, reloading, or removing a single module at run time leaves the gate open.
 
-A module that fails to start at launch ends the project. The module answers `503` until the start fails, then the core destroys every module, `ajs project` exits with code 1, and the port refuses connections. A `start()` that has not settled after 120 seconds makes the start fail the same way. Nothing runs for a request the gate holds, so a client can retry it. The module answers CORS preflights while the gate is closed, so a browser can read the `503`.
+A module that fails to start at launch ends the project. The module answers `503` until the start fails, then the core destroys every module, `ajs project` exits with code 1, and the port refuses connections. A `start()` that has not settled after 120 seconds makes the start fail the same way. A module marked `optional: true` in the project config starts after the gate opens, and the project runs on without it when its start fails. Nothing runs for a request the gate holds, so a client can retry it. The module answers CORS preflights while the gate is closed, so a browser can read the `503`.
 
 `GET /_live` always answers `200`. Use it as the liveness probe, and use a normal route as the readiness probe.
 
