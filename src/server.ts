@@ -97,7 +97,7 @@ function setHandlerResponse(
     replaceResponse(requestContext, result, 200);
     return;
   }
-  requestContext.response.setBody(result || "");
+  requestContext.response.setBody(result === undefined ? undefined : result);
   requestContext.response.setStatus(200);
 }
 
@@ -231,7 +231,7 @@ function setMiddlewareResponse(
     replaceResponse(requestContext, result, 200);
     return;
   }
-  requestContext.response.setBody(result);
+  requestContext.response.setBody(result === undefined ? undefined : result);
   requestContext.response.setStatus(200);
 }
 

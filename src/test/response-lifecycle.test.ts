@@ -153,6 +153,24 @@ function headerCases(): void {
     assert.equal(response.body, '{"created":true}');
     assert.equal(response.headers["content-type"], "application/json");
   });
+
+  it("answers a returned falsy value as JSON and only undefined as empty", async () => {
+    const returns = [0, false, null, undefined];
+    const answers = [];
+    for (const [index, value] of returns.entries()) {
+      const path = `${ROUTE_ROOT}/falsy-${index}`;
+      register("handler", path, () => value);
+      const { status, headers, body } = await request(port, path);
+      answers.push([status, headers["content-type"], body]);
+    }
+
+    assert.deepEqual(answers, [
+      [200, "application/json", "0"],
+      [200, "application/json", "false"],
+      [200, "application/json", "null"],
+      [200, "text/plain", ""],
+    ]);
+  });
 }
 
 function responseOutcomeCases(): void {
