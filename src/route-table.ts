@@ -140,7 +140,7 @@ function removeHandlerFromLevel(
     return removedCount;
   }
 
-  for (const child of Object.values(level.staticRoutes)) {
+  for (const child of level.staticRoutes.values()) {
     const staticRemovedCount = removeHandlerFromLevel(
       id,
       child,
@@ -243,17 +243,20 @@ export function registerHandler(
     }
 
     if (part.indexOf(":") >= 0) {
-      if (!(part in level.dynamicRoutes)) {
-        const route = compileDynamicRoute(part);
-        level.dynamicRoutes[part] = route;
+      let route = level.dynamicRoutes.get(part);
+      if (!route) {
+        route = compileDynamicRoute(part);
+        level.dynamicRoutes.set(part, route);
         level.dynamicRouteList.push(route);
       }
-      level = level.dynamicRoutes[part].sub;
+      level = route.sub;
     } else {
-      if (!(part in level.staticRoutes)) {
-        level.staticRoutes[part] = new RouteLevel();
+      let staticLevel = level.staticRoutes.get(part);
+      if (!staticLevel) {
+        staticLevel = new RouteLevel();
+        level.staticRoutes.set(part, staticLevel);
       }
-      level = level.staticRoutes[part];
+      level = staticLevel;
     }
   }
   const identifiableHandler: IndexedRouteCallback = {

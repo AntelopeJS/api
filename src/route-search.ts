@@ -193,10 +193,9 @@ export function findHandlers(
     return;
   }
 
-  const part = search.path[depth];
-
-  if (part in level.staticRoutes) {
-    findHandlers(search, depth + 1, level.staticRoutes[part]);
+  const staticLevel = level.staticRoutes.get(search.path[depth]);
+  if (staticLevel) {
+    findHandlers(search, depth + 1, staticLevel);
     if (isSettled(search)) {
       return;
     }
