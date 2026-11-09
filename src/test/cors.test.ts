@@ -215,6 +215,39 @@ describe("CORS", () => {
   });
 });
 
+describe("CORS RegExp origins", () => {
+  let originalConfig: ReturnType<typeof getConfig>;
+  let originalDevMode: boolean;
+
+  before(() => {
+    originalConfig = getConfig();
+    originalDevMode = isDevMode();
+    setDevMode(false);
+  });
+
+  after(() => {
+    configure(originalConfig);
+    setDevMode(originalDevMode);
+  });
+
+  it("allows a stateful RegExp origin on every request", () => {
+    for (const flags of ["g", "y", "gy"]) {
+      setCorsConfig({
+        allowedOrigins: new RegExp("^https://example\\.com$", flags),
+      });
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const headers = standardHeaders({ origin: ALLOWED_ORIGIN });
+        assert.equal(
+          headers["Access-Control-Allow-Origin"],
+          ALLOWED_ORIGIN,
+          `flags ${flags}, request ${attempt + 1}`,
+        );
+      }
+    }
+  });
+});
+
 describe("CORS loopback origins", () => {
   let originalConfig: ReturnType<typeof getConfig>;
   let originalDevMode: boolean;
