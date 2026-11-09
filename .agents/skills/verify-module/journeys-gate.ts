@@ -86,7 +86,7 @@ export const failedStart: Journey = {
   async run(context) {
     const failed = await attempt(context, "dev", { controllers: GATE_SOURCE, startDelayMs: 2000, startFails: true }, FAILED_START_PROBE);
     const seen = /^seen=(.*)$/m.exec(failed.stdout)?.[1] ?? "";
-    context.expect(failed.folder, [holds("the probe ran while the module started", failed.ready && seen !== "", failed.stdout.slice(0, 400)), holds("requests are held back with 503", seen.split(" ").includes("503"), seen), holds("no request is ever served after the start failed", !seen.split(" ").includes("200"), seen)]);
+    context.expect(failed.folder, [holds("the probe ran while the module started", failed.ready && seen !== "", failed.stdout.slice(0, 400)), holds("requests are held back with 503", seen.split(" ").includes("503"), seen), holds("no request is ever served after the start failed", !seen.split(" ").includes("200"), seen), holds("the failed start ends the project", failed.ended && failed.projectExit === "1", failed.stdout.slice(-400)), holds("and the port refuses connections from then on", seen.trim().split(" ").at(-1) === "000", seen)]);
   },
 };
 
