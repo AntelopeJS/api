@@ -126,6 +126,30 @@ describe("Published config variables", () => {
     assert.equal(vars[API_PUBLIC_BASE_URL], PUBLIC_BASE_URL);
   });
 
+  it("publishes the default server on port 80 when no server is configured", () => {
+    for (const config of [{}, { servers: [] }] satisfies Config[]) {
+      const vars = configVars(config);
+
+      assert.equal(vars[API_PORT], 80);
+      assert.equal(vars[API_LOCAL_BASE_URL], `http://${LOOPBACK_HOST}:80`);
+      assert.equal(vars[API_PUBLIC_BASE_URL], `http://${LOOPBACK_HOST}:80`);
+    }
+  });
+
+  it("keeps publishing port 80 after the running default server is rebound", () => {
+    const previous = getConfig();
+
+    try {
+      configure({});
+      const [running] = getConfig().servers ?? [];
+      running.port = SECONDARY_PORT;
+
+      assert.equal(configVars({})[API_PORT], 80);
+    } finally {
+      configure(previous);
+    }
+  });
+
   it("maps every bind host to a connectable url host", () => {
     const hostCases: LocalHostCase[] = [
       { bindHost: undefined, urlHost: TEST_HOST },
