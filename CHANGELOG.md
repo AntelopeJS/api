@@ -1,5 +1,39 @@
 # Changelog
 
+## v1.7.2
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.7.1...v1.7.2)
+
+### 🔥 Performance
+
+- **verify:** Compile each controllers source once per journey run ([#132](https://github.com/AntelopeJS/api/pull/132))
+
+### 🩹 Fixes
+
+- **verify:** List the files each feature's journeys catch breaks in ([#133](https://github.com/AntelopeJS/api/pull/133))
+- **routing:** Route path segments named like Object.prototype keys ([#135](https://github.com/AntelopeJS/api/pull/135))
+- **server:** Answer a handler's returned 0, false or null as JSON ([#138](https://github.com/AntelopeJS/api/pull/138))
+- **config-vars:** Publish the default server when servers is absent ([#139](https://github.com/AntelopeJS/api/pull/139))
+- **cors:** Match a g or y RegExp origin on every request ([#140](https://github.com/AntelopeJS/api/pull/140))
+- **server:** Send a refused WebSocket upgrade's answer to the client ([#136](https://github.com/AntelopeJS/api/pull/136))
+- **routes:** Run prefixes, postfixes and monitors declared for the method "*" ([#137](https://github.com/AntelopeJS/api/pull/137))
+
+### 📖 Documentation
+
+- **readme:** Say a module that fails to start ends the project ([#134](https://github.com/AntelopeJS/api/pull/134))
+
+### 📦 Build
+
+- **deps:** Bump @antelopejs/tooling-configs to 0.4.0 ([#142](https://github.com/AntelopeJS/api/pull/142))
+
+### ✅ Tests
+
+- **server:** Pin that postfix handlers skip a throwing main handler ([#141](https://github.com/AntelopeJS/api/pull/141))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli ([@Upd4ting](http://github.com/Upd4ting))
+
 ## v1.7.1
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.7.0...v1.7.1)
