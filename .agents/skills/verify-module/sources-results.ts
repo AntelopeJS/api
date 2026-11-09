@@ -183,6 +183,16 @@ export class FailureController extends Controller("/failures") {
     throw new Error("late failure");
   }
 
+  @Postfix("get", "error")
+  afterError(@Result() result: HTTPResult) {
+    result.addHeader("X-Postfix", "ran");
+  }
+
+  @Postfix("get", "rejection")
+  afterRejection(@Result() result: HTTPResult) {
+    result.addHeader("X-Postfix", "ran");
+  }
+
   @Get("string")
   thrownString() {
     throw "just a string";

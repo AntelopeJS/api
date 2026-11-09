@@ -183,7 +183,7 @@ export const resultErrors: Journey = {
     const texts = [["error", "plain failure"], ["rejection", "late failure"], ["string", "just a string"], ["text-message", "inner text"], ["undefined", ""]] as const;
     for (const [route, text] of texts) {
       const failed = await session.get(`GET /failures/${route}`, `/failures/${route}`);
-      context.expect(failed.folder, [status(`a handler failing with ${route}`, failed, 500), contentType("is answered as text", failed, /^text\/plain/), bodyIs("with the message, or the thrown string, as text", failed, text)]);
+      context.expect(failed.folder, [status(`a handler failing with ${route}`, failed, 500), contentType("is answered as text", failed, /^text\/plain/), bodyIs("with the message, or the thrown string, as text", failed, text), headerIs("and no postfix ran", failed, "x-postfix", undefined)]);
     }
     const number = await session.get("GET /failures/number", "/failures/number");
     context.expect(number.folder, [status("a thrown number", number, 500), contentType("is answered as JSON", number, /^application\/json/), bodyIs("with its JSON text", number, "42")]);

@@ -2,7 +2,12 @@ import assert from "node:assert";
 import { createServer, type Server } from "node:http";
 import { HTTPResult } from "@antelopejs/interface-api";
 
-import { registerHandler, requestListener, unregisterHandler } from "../server";
+import {
+  registerHandler,
+  requestListener,
+  type RouteCallback,
+  unregisterHandler,
+} from "../server";
 
 const TEST_HOST = "127.0.0.1";
 
@@ -122,6 +127,68 @@ describe("Server answer to a thrown value", () => {
     assert.deepEqual(
       answers,
       CASES.map((thrown) => thrown.answer),
+    );
+  });
+});
+
+describe("Postfix handlers when the main handler throws", () => {
+  const server = createServer((incoming, response) => {
+    void requestListener(incoming, response, "http");
+  });
+  const throwers = {
+    "/postfix-after-throw": () => {
+      throw new Error("handler failed");
+    },
+    "/postfix-after-rejection": () =>
+      Promise.reject(new Error("handler failed")),
+  } satisfies Record<string, RouteCallback>;
+  const ran: string[] = [];
+  let port: number;
+
+  before(async () => {
+    port = await listen(server);
+    for (const [location, thrower] of Object.entries(throwers)) {
+      registerHandler(
+        location,
+        { mode: "handler", method: "get", location },
+        thrower,
+      );
+      registerHandler(
+        `${location}-postfix`,
+        { mode: "postfix", method: "get", location },
+        ({ response }) => {
+          ran.push(location);
+          response.addHeader("x-postfix", "1");
+        },
+      );
+    }
+  });
+
+  after(async () => {
+    for (const location of Object.keys(throwers)) {
+      unregisterHandler(location);
+      unregisterHandler(`${location}-postfix`);
+    }
+    await close(server);
+  });
+
+  it("skips them and answers 500 without their headers", async () => {
+    const answers: Array<[number, string | null]> = [];
+    for (const location of Object.keys(throwers)) {
+      const response = await fetch(`http://${TEST_HOST}:${port}${location}`);
+      await response.text();
+      answers.push([response.status, response.headers.get("x-postfix")]);
+    }
+
+    assert.deepStrictEqual(
+      { answers, ran },
+      {
+        answers: [
+          [500, null],
+          [500, null],
+        ],
+        ran: [],
+      },
     );
   });
 });
