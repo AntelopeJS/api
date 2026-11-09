@@ -256,6 +256,56 @@ function routeLifecycleCases(): void {
   });
 }
 
+function prototypeKeyCases(): void {
+  it("routes segments named like Object.prototype keys", async () => {
+    register(
+      "prototype-constructor",
+      { mode: "handler", method: "get", location: "/constructor/anything" },
+      () => "constructor",
+    );
+    register(
+      "prototype-to-string",
+      { mode: "handler", method: "get", location: "/compiled/toString/:id" },
+      ({ routeParameters }) => `toString:${routeParameters.id}`,
+    );
+    register(
+      "prototype-proto",
+      { mode: "handler", method: "get", location: "/compiled/__proto__" },
+      () => "proto",
+    );
+
+    assert.equal((await request("/constructor/anything")).body, "constructor");
+    assert.equal((await request("/compiled/toString/a")).body, "toString:a");
+    assert.equal((await request("/compiled/__proto__")).body, "proto");
+  });
+
+  it("answers 404 for an unregistered Object.prototype key segment", async () => {
+    register(
+      "prototype-sibling",
+      { mode: "prefix", method: "get", location: "/compiled/sibling" },
+      () => undefined,
+    );
+
+    assert.equal((await request("/compiled/valueOf/x")).status, 404);
+    assert.equal((await request("/hasOwnProperty")).status, 404);
+  });
+
+  it("registers a handler under a method named like an Object.prototype key", async () => {
+    register(
+      "prototype-method",
+      { mode: "handler", method: "constructor", location: "/compiled/method" },
+      () => "constructor method",
+    );
+    register(
+      "prototype-method-get",
+      { mode: "handler", method: "get", location: "/compiled/method" },
+      () => "get method",
+    );
+
+    assert.equal((await request("/compiled/method")).body, "get method");
+  });
+}
+
 describe("Compiled route parameter extraction", () => {
   before(async () => {
     testServer = http.createServer(
@@ -284,4 +334,5 @@ describe("Compiled route parameter extraction", () => {
   segmentMatchingCases();
   parameterIsolationCases();
   routeLifecycleCases();
+  prototypeKeyCases();
 });

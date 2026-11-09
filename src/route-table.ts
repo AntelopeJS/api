@@ -44,11 +44,11 @@ type HandlerLookupResult =
   | RouteCallback
   | HandlerResult[]
   | undefined;
-type ExactHandlerIndex = Record<string, Map<string, RouteCallback>>;
+type ExactHandlerIndex = Map<string, Map<string, RouteCallback>>;
 
 const exactHandlerIndexes = new WeakMap<MethodTable, ExactHandlerIndex>([
-  [roots.handler, {}],
-  [roots.websocket, {}],
+  [roots.handler, new Map()],
+  [roots.websocket, new Map()],
 ]);
 
 function updateExactHandler(
@@ -63,20 +63,20 @@ function updateExactHandler(
     return;
   }
 
-  const methodIndex = index[method];
+  let methodIndex = index.get(method);
   if (level.handlers.length !== 1) {
     methodIndex?.delete(exactPath);
     if (methodIndex?.size === 0) {
-      delete index[method];
+      index.delete(method);
     }
     return;
   }
 
-  const handler = level.handlers[0];
   if (!methodIndex) {
-    index[method] = new Map();
+    methodIndex = new Map();
+    index.set(method, methodIndex);
   }
-  index[method].set(exactPath, handler.callback);
+  methodIndex.set(exactPath, level.handlers[0].callback);
 }
 
 function findForMethod(
@@ -91,7 +91,8 @@ function findForMethod(
   if (!search.multi && search.exactPath) {
     const exactHandler = exactHandlerIndexes
       .get(source)
-      ?.[method]?.get(search.exactPath);
+      ?.get(method)
+      ?.get(search.exactPath);
     if (exactHandler) {
       return exactHandler;
     }
@@ -140,7 +141,7 @@ function removeHandlerFromLevel(
     return removedCount;
   }
 
-  for (const child of Object.values(level.staticRoutes)) {
+  for (const child of level.staticRoutes.values()) {
     const staticRemovedCount = removeHandlerFromLevel(
       id,
       child,
@@ -243,17 +244,20 @@ export function registerHandler(
     }
 
     if (part.indexOf(":") >= 0) {
-      if (!(part in level.dynamicRoutes)) {
-        const route = compileDynamicRoute(part);
-        level.dynamicRoutes[part] = route;
+      let route = level.dynamicRoutes.get(part);
+      if (!route) {
+        route = compileDynamicRoute(part);
+        level.dynamicRoutes.set(part, route);
         level.dynamicRouteList.push(route);
       }
-      level = level.dynamicRoutes[part].sub;
+      level = route.sub;
     } else {
-      if (!(part in level.staticRoutes)) {
-        level.staticRoutes[part] = new RouteLevel();
+      let staticLevel = level.staticRoutes.get(part);
+      if (!staticLevel) {
+        staticLevel = new RouteLevel();
+        level.staticRoutes.set(part, staticLevel);
       }
-      level = level.staticRoutes[part];
+      level = staticLevel;
     }
   }
   const identifiableHandler: IndexedRouteCallback = {

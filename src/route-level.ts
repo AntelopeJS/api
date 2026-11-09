@@ -29,8 +29,8 @@ interface CatchAllRoute {
 
 export class RouteLevel {
   handlers: IndexedRouteCallback[] = [];
-  staticRoutes: Record<string, RouteLevel> = {};
-  dynamicRoutes: Record<string, DynamicRoute> = {};
+  staticRoutes = new Map<string, RouteLevel>();
+  dynamicRoutes = new Map<string, DynamicRoute>();
   dynamicRouteList: DynamicRoute[] = [];
   catchAllRoutes: CatchAllRoute[] = [];
 }
