@@ -6,7 +6,7 @@ import { requestContext } from "./journeys-context.ts";
 import { corsConfig, corsCredentials, corsDefaults, corsRuntime, corsUnconfigured } from "./journeys-cors.ts";
 import { failedStart, moduleLifecycle, startupGate } from "./journeys-gate.ts";
 import { handlerModes, handlerPriority, postfixChain } from "./journeys-handlers.ts";
-import { asyncHandlers, falsyReturns, methodScoping, middlewareMatrix, routeModes } from "./journeys-middleware.ts";
+import { asyncHandlers, falsyReturns, methodScoping, middlewareMatrix, routeModes, starMethod } from "./journeys-middleware.ts";
 import { controllerInstances } from "./journeys-instances.ts";
 import { lastProvider, multiParameters, parameterSources, propertyParameters } from "./journeys-params.ts";
 import { parameterModifiers, parameterProviders, parameterTransform } from "./journeys-modifiers.ts";
@@ -50,6 +50,7 @@ const config: VerifyConfig = {
     "handler-priority": handlerPriority,
     "postfix-chain": postfixChain,
     "method-scoping": methodScoping,
+    "star-method": starMethod,
     "falsy-returns": falsyReturns,
     "route-modes": routeModes,
     "async-handlers": asyncHandlers,

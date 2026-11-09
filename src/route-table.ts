@@ -23,6 +23,13 @@ export type HandlerMode = (typeof HANDLER_MODES)[number];
 
 type MethodTable = Map<string, RouteLevel>;
 
+const ANY_METHOD = "any";
+
+function methodKey(method: string | undefined): string {
+  const key = method?.toLowerCase();
+  return !key || key === "*" ? ANY_METHOD : key;
+}
+
 const roots: Record<HandlerMode, MethodTable> = {
   handler: new Map(),
   prefix: new Map(),
@@ -119,7 +126,7 @@ function getHandler(
   };
   return (
     findForMethod(source, method, search) ??
-    findForMethod(source, "any", search)
+    findForMethod(source, ANY_METHOD, search)
   );
 }
 
@@ -190,7 +197,7 @@ function removeHandler(id: string, source: MethodTable): number {
   return 0;
 }
 
-/** Where a handler is registered: its mode, HTTP method (`any` when absent), location and priority. */
+/** Where a handler is registered: its mode, HTTP method (`any` when absent or `*`), location and priority. */
 export interface RouteDefinition {
   mode: HandlerMode;
   method?: string;
@@ -206,7 +213,7 @@ export function registerHandler(
   const { mode, method, location, priority = HandlerPriority.NORMAL } = route;
   const parts = location.split("/").filter((part) => part);
   const source = roots[mode];
-  const routeMethod = method?.toLowerCase() || "any";
+  const routeMethod = methodKey(method);
   let level = source.get(routeMethod);
   if (!level) {
     level = new RouteLevel();
@@ -300,7 +307,7 @@ export function getMultiHandlers(
   for (const method of methods) {
     findForMethod(source, method, search);
   }
-  findForMethod(source, "any", search);
+  findForMethod(source, ANY_METHOD, search);
   return search.result;
 }
 

@@ -11,6 +11,7 @@ journeys:
   - handler-priority
   - postfix-chain
   - method-scoping
+  - star-method
   - falsy-returns
   - route-modes
   - async-handlers
@@ -27,6 +28,7 @@ The four handler modes of [Controllers and routes](https://interfaces.antelopejs
 - `handler-priority`: five prefixes declared out of order run HIGHEST to LOWEST, the first that returns a value ends the chain; a prefix, postfix and monitor without a priority each run between HIGH and LOW.
 - `postfix-chain`: postfixes at three priorities all run, a returning one skips the later ones, a throwing monitor changes neither the response nor the other monitors.
 - `method-scoping`: a prefix, postfix and monitor declared with `"get"` run for a GET and not for a POST at the same location, and the ones declared with `"post"` run for the POST only (the prefixes answer 403 and 409, the postfixes stamp `X-Stamp`, the monitors log their method).
+- `star-method`: a prefix declared with `"*"` refuses both a GET and a POST with 418 and neither main handler runs; a postfix and a monitor declared with `"*"` run for a DELETE.
 - `falsy-returns`: a prefix returning `0`, an empty string or `false` does not answer, and the main handler runs; a postfix returning `0` does not stop the next postfix.
 - `route-modes`: the `mode` argument of `@Get`, `@Post`, `@Put` and `@Delete`: with `"prefix"` the method answers (403, 409, 422, 410) before the main handler of the same location, which never runs; with `"postfix"` it adds a header to the result; with `"monitor"` it observes the request.
 - `async-handlers`: the asynchronous variants of the chain: an async prefix resolving or rejecting with an `HTTPResult` answers it and skips the main handler, async prefixes returning nothing continue, an async main handler followed by a postfix header, an async postfix resolving an `HTTPResult` skips the later postfix and one returning nothing does not, an async monitor that rejects stops no later monitor, and a monitor sees the status and `ctx.error` of an async handler that rejects.

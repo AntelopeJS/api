@@ -80,6 +80,65 @@ function dispatchCases(): void {
   });
 }
 
+function anyMethodCases(): void {
+  it("runs a prefix declared for the method * on every method", async () => {
+    register(
+      "star-get",
+      { mode: "handler", method: "GET", location: "/star/prefix" },
+      "get",
+    );
+    register(
+      "star-post",
+      { mode: "handler", method: "POST", location: "/star/prefix" },
+      "post",
+    );
+    registeredIds.add("star-prefix");
+    registerHandler(
+      "star-prefix",
+      { mode: "prefix", method: "*", location: "/star/prefix" },
+      () => new HTTPResult(418, "any method"),
+    );
+
+    assert.deepEqual(await request("/star/prefix"), {
+      body: "any method",
+      status: 418,
+    });
+    assert.deepEqual(await request("/star/prefix", "POST"), {
+      body: "any method",
+      status: 418,
+    });
+  });
+
+  it("runs a postfix and a monitor declared for the method * on every method", async () => {
+    const monitored: string[] = [];
+    register(
+      "star-handler",
+      { mode: "handler", method: "DELETE", location: "/star/after" },
+      "deleted",
+    );
+    registeredIds.add("star-postfix");
+    registerHandler(
+      "star-postfix",
+      { mode: "postfix", method: "*", location: "/star/after" },
+      () => new HTTPResult(202, "postfix"),
+    );
+    registeredIds.add("star-monitor");
+    registerHandler(
+      "star-monitor",
+      { mode: "monitor", method: "*", location: "/star/after" },
+      ({ response }) => {
+        monitored.push(String(response.getBody()));
+      },
+    );
+
+    assert.deepEqual(await request("/star/after", "DELETE"), {
+      body: "postfix",
+      status: 202,
+    });
+    assert.deepEqual(monitored, ["postfix"]);
+  });
+}
+
 function headFallbackCases(): void {
   it("runs the GET prefixes and monitors for a HEAD request served by the GET handler", async () => {
     const ran: string[] = [];
@@ -284,6 +343,7 @@ describe("Static route dispatch", () => {
   });
 
   dispatchCases();
+  anyMethodCases();
   headFallbackCases();
   exactEntryCases();
 });

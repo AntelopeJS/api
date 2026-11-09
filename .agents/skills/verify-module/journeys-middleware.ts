@@ -4,7 +4,7 @@ import { holds, same } from "./checks.ts";
 import { bodyIs, headerIs, status } from "./client.ts";
 import { open, type Session } from "./session.ts";
 import { SCOPING_SOURCE } from "./sources-handlers.ts";
-import { ASYNC_SOURCE, MATRIX_SOURCE, MODES_SOURCE } from "./sources-middleware.ts";
+import { ASYNC_SOURCE, MATRIX_SOURCE, MODES_SOURCE, STAR_SOURCE } from "./sources-middleware.ts";
 
 async function finish(session: Session): Promise<void> {
   const stopped = await session.stop();
@@ -43,6 +43,24 @@ export const methodScoping: Journey = {
     const getOnly = await session.get("GET /m/only", "/m/only");
     context.expect(getOnly.folder, [status("the GET", getOnly, 200)]);
     context.expect(getOnly.folder, [same("the GET prefix ran for the GET", await drainLog(session, "read the log after the GET"), ["prefix-get"])]);
+    await finish(session);
+  },
+};
+
+export const starMethod: Journey = {
+  title: "a prefix, postfix or monitor declared for the method \"*\" runs for every HTTP method",
+  entryPoint: "`@Prefix(\"*\")` beside a `@Get` and a `@Post`, and `@Postfix(\"*\")` and `@Monitor(\"*\")` beside a `@Delete`, called over HTTP",
+  async run(context) {
+    const session = await open(context, { controllers: STAR_SOURCE });
+    const get = await session.get("GET /star/refused", "/star/refused");
+    context.expect(get.folder, [status("the * prefix refuses a GET", get, 418), bodyIs("with its body", get, "any method")]);
+    const post = await session.get("POST /star/refused", "/star/refused", { method: "POST", body: "{}" });
+    context.expect(post.folder, [status("the * prefix refuses a POST", post, 418), bodyIs("with its body", post, "any method")]);
+    context.expect(post.folder, [same("no main handler ran", await drainLog(session, "read the log after the prefix"), [])]);
+    const removed = await session.get("DELETE /star/after", "/star/after", { method: "DELETE" });
+    context.expect(removed.folder, [status("the main handler answers", removed, 200), headerIs("the * postfix adjusts a DELETE result", removed, "x-star", "postfix")]);
+    await session.run("wait for the monitor", "await waitFor(300); return null;");
+    context.expect(removed.folder, [same("the * monitor observes the DELETE", await drainLog(session, "read the monitor log"), ["monitor"])]);
     await finish(session);
   },
 };

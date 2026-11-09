@@ -324,3 +324,42 @@ export class MatrixController extends Controller("/mx") {
   }
 }
 `;
+
+export const STAR_SOURCE = String.raw`import { Controller, Delete, Get, HTTPResult, Monitor, Post, Postfix, Prefix, Result } from "@antelopejs/interface-api";
+
+export const log: string[] = [];
+
+export class StarController extends Controller("/star") {
+  @Prefix("*", "refused")
+  refuse() {
+    return new HTTPResult(418, "any method");
+  }
+
+  @Get("refused")
+  getRefused() {
+    log.push("get-main");
+    return { main: "get" };
+  }
+
+  @Post("refused")
+  postRefused() {
+    log.push("post-main");
+    return new HTTPResult(201, { main: "post" });
+  }
+
+  @Delete("after")
+  deleteAfter() {
+    return { main: "delete" };
+  }
+
+  @Postfix("*", "after")
+  stamp(@Result() result: HTTPResult) {
+    result.addHeader("X-Star", "postfix");
+  }
+
+  @Monitor("*", "after")
+  watch() {
+    log.push("monitor");
+  }
+}
+`;
