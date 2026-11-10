@@ -31,6 +31,7 @@ import {
   start,
   stop,
 } from "../index";
+import { isAddressInfo } from "../port-binding";
 
 const PORT_IN_USE = { code: "EADDRINUSE" };
 const TEST_HOST = "127.0.0.1";
@@ -458,7 +459,7 @@ describe("Advertised host agreement", () => {
 
   function boundPort(server: net.Server): number {
     const address = server.address();
-    assert.ok(address instanceof Object);
+    assert.ok(isAddressInfo(address));
     return address.port;
   }
 

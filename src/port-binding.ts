@@ -19,7 +19,7 @@ export function isPortInUseError(
   return error?.code === "EADDRINUSE";
 }
 
-function isAddressInfo(
+export function isAddressInfo(
   address: ReturnType<net.Server["address"]>,
 ): address is net.AddressInfo {
   return address !== null && typeof address === "object";
