@@ -9,6 +9,7 @@ import {
   unregisterHandler,
 } from "../server";
 import type { RouteDefinition } from "../route-table";
+import { isAddressInfo } from "../port-binding";
 
 const registeredIds: string[] = [];
 let testServer: http.Server;
@@ -315,7 +316,7 @@ describe("Compiled route parameter extraction", () => {
       testServer.listen(0, "127.0.0.1", resolve),
     );
     const address = testServer.address();
-    assert.ok(address instanceof Object);
+    assert.ok(isAddressInfo(address));
     baseUrl = `http://127.0.0.1:${address.port}`;
   });
 

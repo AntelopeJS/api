@@ -4,6 +4,7 @@ import { HandlerPriority, HTTPResult } from "@antelopejs/interface-api";
 
 import { registerHandler, requestListener, unregisterHandler } from "../server";
 import type { RouteDefinition } from "../route-table";
+import { isAddressInfo } from "../port-binding";
 
 interface TestResponse {
   body: string;
@@ -323,7 +324,7 @@ describe("Static route dispatch", () => {
       server.listen(0, "127.0.0.1", resolve),
     );
     const address = server.address();
-    if (!(address instanceof Object)) {
+    if (!isAddressInfo(address)) {
       throw new Error("Test server did not expose a TCP address");
     }
     baseUrl = `http://127.0.0.1:${address.port}`;

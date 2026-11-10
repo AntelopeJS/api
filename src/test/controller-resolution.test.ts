@@ -15,6 +15,7 @@ import {
 import { requestListener } from "../server";
 import { routesProxy } from "../implementations/api";
 import { nullPrototypeThenable } from "./thenable";
+import { isAddressInfo } from "../port-binding";
 
 const TEST_HOST = "127.0.0.1";
 const TEST_ORIGIN = `http://${TEST_HOST}`;
@@ -87,7 +88,7 @@ function listen(server: Server): Promise<number> {
   return new Promise((resolve) => {
     server.listen(0, TEST_HOST, () => {
       const address = server.address();
-      if (!(address instanceof Object)) {
+      if (!isAddressInfo(address)) {
         throw new Error("Unable to resolve test server port");
       }
       resolve(address.port);

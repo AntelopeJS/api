@@ -9,6 +9,7 @@ import {
   requestListener,
   unregisterHandler,
 } from "../server";
+import { isAddressInfo } from "../port-binding";
 
 const HOST = "127.0.0.1";
 const ROUTE_ROOT = "/response-lifecycle";
@@ -44,7 +45,7 @@ function listen(server: http.Server): Promise<number> {
     server.once("error", reject);
     server.listen(0, HOST, () => {
       const address = server.address();
-      assert.ok(address instanceof Object);
+      assert.ok(isAddressInfo(address));
       resolve(address.port);
     });
   });

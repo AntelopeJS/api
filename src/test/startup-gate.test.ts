@@ -5,6 +5,7 @@ import { Events } from "@antelopejs/interface-core/modules";
 
 import { configure, getConfig } from "../index";
 import { registerHandler, requestListener, unregisterHandler } from "../server";
+import { isAddressInfo } from "../port-binding";
 
 const ALLOWED_ORIGIN = "https://app.example.com";
 const HANDLER_ID = "startup-gate-handler";
@@ -27,7 +28,7 @@ describe("Startup gate", () => {
       server.listen(0, "127.0.0.1", resolve),
     );
     const address = server.address();
-    if (!(address instanceof Object)) {
+    if (!isAddressInfo(address)) {
       throw new Error("Test server did not expose a TCP address");
     }
     baseUrl = `http://127.0.0.1:${address.port}`;

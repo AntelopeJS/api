@@ -15,6 +15,7 @@ import {
 } from "../server";
 import type { RouteDefinition } from "../route-table";
 import { nullPrototypeThenable } from "./thenable";
+import { isAddressInfo } from "../port-binding";
 
 const TEST_HOST = "127.0.0.1";
 const SUCCESS_STATUS = 200;
@@ -77,7 +78,7 @@ function listen(server: http.Server): Promise<number> {
   return new Promise((resolve) => {
     server.listen(0, TEST_HOST, () => {
       const address = server.address();
-      if (!(address instanceof Object)) {
+      if (!isAddressInfo(address)) {
         throw new Error("Expected an IP server address");
       }
       resolve(address.port);

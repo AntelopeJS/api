@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import { HandlerPriority } from "@antelopejs/interface-api";
 
 import { registerHandler, requestListener, unregisterHandler } from "../server";
+import { isAddressInfo } from "../port-binding";
 
 const TEST_HOST = "127.0.0.1";
 const TEST_PATH = "/server-fast-path-lifecycle";
@@ -29,7 +30,7 @@ function listen(server: Server): Promise<number> {
     server.once("error", reject);
     server.listen(0, TEST_HOST, () => {
       const address = server.address();
-      if (!(address instanceof Object)) {
+      if (!isAddressInfo(address)) {
         reject(new Error("Test server did not bind a TCP port"));
         return;
       }

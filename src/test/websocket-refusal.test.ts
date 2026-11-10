@@ -10,6 +10,7 @@ import {
   unregisterHandler,
   upgradeListener,
 } from "../server";
+import { isAddressInfo } from "../port-binding";
 
 const TEST_HOST = "127.0.0.1";
 const SOCKET_PATH = "/refusal/socket";
@@ -26,7 +27,7 @@ function listen(server: http.Server): Promise<number> {
   return new Promise((resolve) => {
     server.listen(0, TEST_HOST, () => {
       const address = server.address();
-      if (!(address instanceof Object)) {
+      if (!isAddressInfo(address)) {
         throw new Error("Expected an IP server address");
       }
       resolve(address.port);
