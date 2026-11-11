@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.7.3
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.7.2...v1.7.3)
+
+### 🩹 Fixes
+
+- **routes:** Handle a started parameter's rejection when a later one throws synchronously ([#146](https://github.com/AntelopeJS/api/pull/146))
+
+### 📖 Documentation
+
+- **verify:** Add the features index the verify-module skill points to ([#144](https://github.com/AntelopeJS/api/pull/144))
+
+### 📦 Build
+
+- **deps:** Bump @antelopejs/tooling-configs to 0.5.0 ([#143](https://github.com/AntelopeJS/api/pull/143))
+- **deps:** Bump @antelopejs/tooling-configs to 0.5.1 ([#145](https://github.com/AntelopeJS/api/pull/145))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli ([@Upd4ting](http://github.com/Upd4ting))
+
 ## v1.7.2
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.7.1...v1.7.2)
