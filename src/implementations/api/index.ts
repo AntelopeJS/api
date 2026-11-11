@@ -198,15 +198,20 @@ function applyComputedProperties(
 
   const pending: Promise<void>[] = [];
   for (const property of computedProperties) {
-    const value = property.resolve(context, controllerInstance);
-    if (isPromiseLike(value)) {
-      pending.push(
-        Promise.resolve(value).then((resolved) => {
-          Object.assign(controllerInstance, { [property.key]: resolved });
-        }),
-      );
-    } else {
-      Object.assign(controllerInstance, { [property.key]: value });
+    try {
+      const value = property.resolve(context, controllerInstance);
+      if (isPromiseLike(value)) {
+        pending.push(
+          Promise.resolve(value).then((resolved) => {
+            Object.assign(controllerInstance, { [property.key]: resolved });
+          }),
+        );
+      } else {
+        Object.assign(controllerInstance, { [property.key]: value });
+      }
+    } catch (error) {
+      pending.push(Promise.reject(error));
+      break;
     }
   }
 
@@ -290,9 +295,15 @@ function invokeCallback(
     return plan.callback.call(controllerInstance, parameter);
   }
 
-  const parameters = plan.parameters.map((resolve) =>
-    resolve(context, controllerInstance),
-  );
+  const parameters: Awaitable<ComputedValue>[] = [];
+  for (const resolve of plan.parameters) {
+    try {
+      parameters.push(resolve(context, controllerInstance));
+    } catch (error) {
+      parameters.push(Promise.reject(error));
+      break;
+    }
+  }
   if (parameters.some(isPromiseLike)) {
     return Promise.all(parameters).then((resolved) =>
       plan.callback.apply(controllerInstance, resolved),
