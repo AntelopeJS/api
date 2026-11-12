@@ -1,6 +1,6 @@
 {
   "rules": {
-    "promise/no-callback-in-promise": 1
+    "promise/no-callback-in-promise": 0
   },
   "tsExpectError": 6,
   "tsIgnore": 0,

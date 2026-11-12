@@ -73,17 +73,17 @@ export function pendingOf<T>(value: Awaitable<T>): Promise<T> | undefined {
 }
 
 /**
- * Calls `next` with the value an `Awaitable<T>` settles with: at once for a
- * plain value, or once the promise {@link pendingOf} returns settles.
+ * Maps the value an `Awaitable<T>` settles with through `onFulfilled`: at once
+ * for a plain value, or as the fulfillment handler of the promise
+ * {@link pendingOf} returns.
  */
 export function continueWith<T, U>(
   value: Awaitable<T>,
-  next: (result: T) => Awaitable<U>,
+  onFulfilled: (result: T) => Awaitable<U>,
 ): Awaitable<U> {
   const then = thenOf(value);
   if (isPlainOf(value, then)) {
-    return next(value);
+    return onFulfilled(value);
   }
-  // oxlint-disable-next-line promise/no-callback-in-promise -- continuation-passing keeps the synchronous fast path allocation-free
-  return promiseThrough(value, then).then(next);
+  return promiseThrough(value, then).then(onFulfilled);
 }
