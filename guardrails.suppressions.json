@@ -2,7 +2,7 @@
   "rules": {
     "promise/no-callback-in-promise": 0
   },
-  "tsExpectError": 6,
+  "tsExpectError": 3,
   "tsIgnore": 0,
   "safety": 0,
   "config": {},

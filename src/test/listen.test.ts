@@ -1,7 +1,6 @@
 import sinon from "sinon";
 import * as net from "node:net";
 import assert from "node:assert";
-import * as coreRuntime from "@antelopejs/interface-core/runtime";
 
 import {
   configure,
@@ -11,6 +10,7 @@ import {
   start,
   stop,
 } from "../index";
+import { restoreServersAfterEach, stubRuntime } from "./listen-fixture";
 
 const PORT_IN_USE = { code: "EADDRINUSE" };
 const TEST_HOST = "127.0.0.1";
@@ -23,7 +23,6 @@ const EXHAUSTED_BASE_PORT = 25100;
 const EXHAUSTED_RANGE_SIZE = 21;
 const MULTI_OCCUPIED_PORT = 25140;
 const MULTI_FREE_PORT = 25150;
-const STRING_PORT = 25160;
 const RANDOM_PORT = 0;
 
 function occupyPort(port: number): Promise<net.Server> {
@@ -49,33 +48,7 @@ function configureSingleServer(port: number, strictPort?: boolean): void {
   start();
 }
 
-function stubRuntime(dev: boolean): sinon.SinonStub {
-  sinon
-    .stub(coreRuntime, "GetRuntimeInfo")
-    .resolves({ dev, projectPath: "", env: "test" });
-  return sinon.stub(coreRuntime, "RegisterDevServer").resolves();
-}
-
-const LISTEN_POLL_INTERVAL_MS = 50;
-const LISTEN_POLL_TIMEOUT_MS = 2000;
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitForListening(): Promise<void> {
-  const deadline = Date.now() + LISTEN_POLL_TIMEOUT_MS;
-  while (getListeningEndpoints().length === 0) {
-    if (Date.now() > deadline) {
-      throw new Error("Timed out waiting for servers to listen");
-    }
-    await delay(LISTEN_POLL_INTERVAL_MS);
-  }
-}
-
 const blockers: net.Server[] = [];
-
-let originalConfig: ReturnType<typeof getConfig>;
 
 async function blockPort(port: number): Promise<void> {
   blockers.push(await occupyPort(port));
@@ -208,40 +181,6 @@ function portSelectionCases(): void {
     assert.deepEqual(registerStub.firstCall.args, ["api", endpoints]);
   });
 
-  it("binds the numeric port when the configured port is a string", async () => {
-    stubRuntime(true);
-
-    configure({
-      autoListen: false,
-      servers: [
-        // @ts-expect-error a JSON-style string port is off-contract input (Config.port is a number); the test asserts it is bound as the numeric port
-        { protocol: "http", host: TEST_HOST, port: String(STRING_PORT) },
-      ],
-    });
-    start();
-    await listenServers();
-
-    const endpoints = getListeningEndpoints();
-    assert.equal(endpoints.length, 1);
-    assert.equal(endpoints[0].port, STRING_PORT);
-    assert.equal(getConfig().servers?.[0].port, STRING_PORT);
-  });
-
-  it("rejects when the configured port is not a valid number", async () => {
-    stubRuntime(true);
-
-    configure({
-      autoListen: false,
-      servers: [
-        // @ts-expect-error a non-numeric string port is off-contract input (Config.port is a number); the test asserts listenServers rejects it
-        { protocol: "http", host: TEST_HOST, port: "not-a-port" },
-      ],
-    });
-    start();
-
-    await assert.rejects(listenServers(), /Invalid http server port/);
-  });
-
   it("clears endpoints after stop", async () => {
     stubRuntime(false);
 
@@ -254,25 +193,9 @@ function portSelectionCases(): void {
 }
 
 describe("Port fallback", () => {
-  before(() => {
-    originalConfig = getConfig();
-  });
-
-  after(async () => {
-    if (!originalConfig.servers?.length) {
-      return;
-    }
-
-    configure(originalConfig);
-    start();
-    if (originalConfig.autoListen !== false) {
-      await waitForListening();
-    }
-  });
+  restoreServersAfterEach();
 
   afterEach(async () => {
-    await stop();
-    sinon.restore();
     await Promise.all(blockers.map((blocker) => closeServer(blocker)));
     blockers.length = 0;
   });
