@@ -20,6 +20,7 @@ jobs:
         playground/README.md
       renovate-sync: false
       test-job: true
+      windows: true
   renovate-sync:
     if: >-
       github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/') && github.event.pull_request.head.repo.full_name == github.repository
