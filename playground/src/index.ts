@@ -34,7 +34,7 @@ export class PlaygroundController extends Controller("/playground") {
   }
 
   @Get("/ping")
-  async ping(@Parameter("pong", "query") pong: string) {
+  async ping(@Parameter("pong", "query") pong: string | true | undefined) {
     assert(pong === "pong", 400, "Pong must be pong");
 
     return { message: "Pong", pong };
