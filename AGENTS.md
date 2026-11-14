@@ -10,7 +10,7 @@ The HTTP and WebSocket server module of AntelopeJS, published as `@antelopejs/ap
 
 ## Versioning
 
-- Every `@antelopejs/*` range stops below the next minor of its floor (`>=0.5.1 <0.6.0` on 0.x, `~1.22.0` from 1.0); the `dependency:ranges` step of `pnpm run checks` enforces it. The `@antelopejs/core` peer floor is 1.22.0, the first core that loads `@antelopejs/interface-core` 0.5.1.
+- Every `@antelopejs/*` range stops below the next minor of its floor (`>=0.5.1 <0.6.0` on 0.x, `~1.23.0` from 1.0), with its floor in the newest published minor; the `dependency:ranges` step of `pnpm run checks` enforces the cap.
 - A change users must act on, such as a raised core or interface minimum, gets an `### Upgrade notes` section in `CHANGELOG.md`, added after the release in a `docs(changelog)` commit (see #71 and #74).
 
 ## Tests
