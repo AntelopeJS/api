@@ -14,7 +14,7 @@ import {
 
 import { requestListener } from "../server";
 import { routesProxy } from "../implementations/api";
-import { nullPrototypeThenable } from "./thenable";
+import { countedThenable } from "./thenable";
 import { isAddressInfo } from "../port-binding";
 
 const TEST_HOST = "127.0.0.1";
@@ -32,11 +32,6 @@ interface TestResponse {
   body: string;
 }
 
-interface StatefulThenable {
-  readCount: () => number;
-  value: object;
-}
-
 type ControllerConstructor = ControllerClass<TestController>;
 
 function computedParameter(
@@ -50,20 +45,6 @@ function createController(): ControllerConstructor {
   return class extends ControllerBase("") {
     sequence = 0;
   };
-}
-
-function statefulThenable(value: string): StatefulThenable {
-  let reads = 0;
-  const thenable = nullPrototypeThenable({
-    get: () => {
-      reads += 1;
-      if (reads > 1) {
-        throw new Error("then getter read more than once");
-      }
-      return (resolve: (resolved: string) => void) => resolve(value);
-    },
-  });
-  return { readCount: () => reads, value: thenable };
 }
 
 function createHandler(
@@ -405,7 +386,7 @@ function computedValueCases(): void {
   it("continues remaining modifiers after the first asynchronous value", async () => {
     const Controller = createController();
     const events: string[] = [];
-    const thenable = statefulThenable("value:thenable");
+    const thenable = countedThenable("value:thenable");
     const location = "/controller-resolution/mixed-modifiers";
     register(
       createHandler(Controller, (value: string) => value, location, [
