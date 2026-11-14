@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.7.4
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.7.3...v1.7.4)
+
+### 💅 Refactors
+
+- **thenable:** Drop the last lint suppression and lower its ceiling to 0 ([#148](https://github.com/AntelopeJS/api/pull/148))
+
+### 📖 Documentation
+
+- **readme:** Adopt the AntelopeJS framework README style ([#147](https://github.com/AntelopeJS/api/pull/147))
+
+### 📦 Build
+
+- **deps:** Cap @antelopejs ranges below the next minor with tooling-configs 0.6.0 ([#152](https://github.com/AntelopeJS/api/pull/152))
+
+### ✅ Tests
+
+- Move off-contract input tests to untyped JS specs ([#149](https://github.com/AntelopeJS/api/pull/149))
+
+### 🤖 CI
+
+- Run CI on Windows in parallel with Linux ([#151](https://github.com/AntelopeJS/api/pull/151))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli ([@Upd4ting](http://github.com/Upd4ting))
+
 ## v1.7.3
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.7.2...v1.7.3)
