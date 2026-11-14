@@ -146,10 +146,10 @@ export function stop(): void {}
 
 | Package                          | Supported        | Tested with |
 | -------------------------------- | ---------------- | ----------- |
-| `@antelopejs/core`               | `>=1.21.0 <2`    | `1.21.0`    |
-| `@antelopejs/interface-api`      | `>=0.2.0 <0.4.0` | `0.2.0`     |
-| `@antelopejs/interface-api-util` | `>=0.3.0 <1.0.0` | `0.3.0`     |
-| `@antelopejs/interface-core`     | `>=0.4.0 <1.0.0` | `0.4.0`     |
+| `@antelopejs/core`               | `~1.22.0`        | `1.22.0`    |
+| `@antelopejs/interface-api`      | `>=0.3.0 <0.4.0` | `0.3.0`     |
+| `@antelopejs/interface-api-util` | `>=0.3.0 <0.4.0` | `0.3.0`     |
+| `@antelopejs/interface-core`     | `>=0.5.1 <0.6.0` | `0.5.1`     |
 
 <!-- antelopejs-docs-compat:end -->
 
