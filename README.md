@@ -121,8 +121,8 @@ import { Controller, Get, Parameter } from "@antelopejs/interface-api";
 
 export class HelloController extends Controller("/greetings") {
   @Get()
-  hello(@Parameter("name", "query") name = "world") {
-    return { message: `Hello ${name}` };
+  hello(@Parameter("name", "query") name: string | true | undefined) {
+    return { message: `Hello ${typeof name === "string" ? name : "world"}` };
   }
 }
 
