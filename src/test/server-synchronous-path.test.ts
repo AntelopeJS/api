@@ -14,7 +14,7 @@ import {
   upgradeListener,
 } from "../server";
 import type { RouteDefinition } from "../route-table";
-import { nullPrototypeThenable } from "./thenable";
+import { countedThenable, nullPrototypeThenable } from "./thenable";
 import { isAddressInfo } from "../port-binding";
 
 const TEST_HOST = "127.0.0.1";
@@ -33,45 +33,20 @@ interface RequestOptions {
   path?: string;
 }
 
-interface StatefulThenable {
-  getReadCount: () => number;
-  value: object;
-}
-
-function laterTickThenable(onSettle: () => void): object {
-  return nullPrototypeThenable({
-    value: (resolve: (resolved: undefined) => void) =>
-      setImmediate(() => {
-        onSettle();
-        resolve(undefined);
+function laterTickThenable(onSettle: () => void): PromiseLike<undefined> {
+  return nullPrototypeThenable(
+    () =>
+      new Promise<undefined>((resolve) => {
+        setImmediate(() => {
+          onSettle();
+          resolve(undefined);
+        });
       }),
-  });
+  );
 }
 
-function rejectedThenable(error: Error): object {
-  return nullPrototypeThenable({
-    value: (
-      _resolve: (resolved: never) => void,
-      reject: (reason: Error) => void,
-    ) => reject(error),
-  });
-}
-
-function statefulThenable(value: string): StatefulThenable {
-  let readCount = 0;
-  const thenable = nullPrototypeThenable({
-    get: () => {
-      readCount += 1;
-      if (readCount > 1) {
-        throw new Error("then getter read more than once");
-      }
-      return (resolve: (resolved: string) => void) => resolve(value);
-    },
-  });
-  return {
-    getReadCount: () => readCount,
-    value: thenable,
-  };
+function rejectedThenable(error: Error): PromiseLike<never> {
+  return nullPrototypeThenable(() => Promise.reject(error));
 }
 
 function listen(server: http.Server): Promise<number> {
@@ -208,7 +183,7 @@ function synchronousOrderCases(): void {
 
   it("continues in order when each phase returns a promise or thenable", async () => {
     const order: string[] = [];
-    const handlerResult = statefulThenable("async-ok");
+    const handlerResult = countedThenable("async-ok");
     register(
       "async-prefix",
       { mode: "prefix", method: "GET", location: "/async" },
@@ -220,7 +195,6 @@ function synchronousOrderCases(): void {
     register(
       "thenable-handler",
       { mode: "handler", method: "GET", location: "/async" },
-      // @ts-expect-error off-contract result: a null-prototype thenable typed `object`; the test asserts its value is answered and its `then` read once
       () => {
         order.push("handler");
         return handlerResult.value;
@@ -229,7 +203,6 @@ function synchronousOrderCases(): void {
     register(
       "thenable-postfix",
       { mode: "postfix", method: "GET", location: "/async" },
-      // @ts-expect-error off-contract result: a null-prototype thenable typed `object`; the test asserts the monitor runs only after that thenable settles on a later tick
       () => {
         order.push("postfix");
         return laterTickThenable(() => order.push("postfix-settled"));
@@ -245,7 +218,7 @@ function synchronousOrderCases(): void {
 
     assert.equal(response.body, "async-ok");
     assert.ok(listenerResult instanceof Promise);
-    assert.equal(handlerResult.getReadCount(), 1);
+    assert.equal(handlerResult.readCount(), 1);
     assert.deepEqual(order, [
       "prefix",
       "handler",
@@ -335,7 +308,6 @@ function priorityAndErrorCases(): void {
     register(
       "thenable-reject",
       { mode: "handler", method: "GET", location: "/thenable-reject" },
-      // @ts-expect-error off-contract result: a null-prototype thenable typed `object` that rejects; the test asserts a 500 with the rejection message
       () => rejectedThenable(new Error("thenable failure")),
     );
 
