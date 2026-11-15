@@ -43,7 +43,7 @@ export default defineConfig({
       source: {
         type: "package",
         package: "@antelopejs/api",
-        version: "^1.3.4",
+        version: "~1.7.5",
       },
       config: {
         servers: [
