@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.7.5
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.7.4...v1.7.5)
+
+### 🩹 Fixes
+
+- **deps:** Accept @antelopejs/core 1.24 ([#153](https://github.com/AntelopeJS/api/pull/153))
+
+### ✅ Tests
+
+- Build test thenables with a plain then and drop their ts-expect-error ([#150](https://github.com/AntelopeJS/api/pull/150))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli ([@Upd4ting](http://github.com/Upd4ting))
+
 ## v1.7.4
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.7.3...v1.7.4)
