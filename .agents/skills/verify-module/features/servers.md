@@ -21,11 +21,12 @@ journeys:
   - server-reload
   - listen-on-demand
   - production-boot
+  - server-shutdown
 ---
 
 # Servers
 
-`servers`, `publicBaseUrl`, `strictPort` and `autoListen` of README.md: which sockets the module binds, which one the config variables describe, and what changes outside development.
+`servers`, `publicBaseUrl`, `strictPort`, `autoListen` and `shutdownGracePeriodMs` of README.md: which sockets the module binds, which one the config variables describe, what changes outside development, and how long a stop lets requests in flight finish.
 
 ## Sub-features
 
@@ -37,11 +38,12 @@ journeys:
 - `server-sockets`: four servers probed with raw sockets: `host` is the bind address (a `127.0.0.1` server refuses a connection to `127.0.0.2`, a `::1` server refuses `127.0.0.1`), `headersTimeout`, `requestTimeout` and `connectionsCheckingInterval` answer an unfinished header block with 408, `keepAliveTimeout` closes an idle keep-alive socket (the default does not within 1.5 s), `requireHostHeader: false` serves a request without Host (the default answers 400), and an https entry with `minVersion` TLSv1.3 refuses a TLSv1.2-only client.
 - `server-reload`: `StopModule`, `DestroyModule` and `LoadModule` with a new `config` on the api module of the running project: the new configuration binds the new port, the old port stops answering, and a `cors` key the new configuration omits no longer applies.
 - `listen-on-demand`: `autoListen: false` serves nothing until `Listen()`. `Listen()` returns a Promise.
+- `server-shutdown`: Ctrl+C while a 2.5 s request is in flight: with `shutdownGracePeriodMs: 4000` the request is answered 200 and the project exits once it is, before the grace ends; without the key the default 1 s grace cuts the same request and the project exits after it.
 - `production-boot`: `ajs project build` then `start`: the boot fails without `publicBaseUrl` and says so, binds the exact port (a busy one is a failure, not a fallback), publishes `publicBaseUrl` without its slash, and sends no CORS header without a `cors` config; with a `cors` config the listed origin is allowed and `localhost` and `127.0.0.1` are not.
 
 ## How to get to it (user POV)
 
-- `servers`, `publicBaseUrl`, `strictPort`, `autoListen` in the module's `config`, and `${@api.API_PORT}` in another module's.
+- `servers`, `publicBaseUrl`, `strictPort`, `autoListen`, `shutdownGracePeriodMs` in the module's `config`, and `${@api.API_PORT}` in another module's.
 
 ## Driving it with antelopejs-verify
 
