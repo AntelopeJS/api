@@ -21,37 +21,54 @@ type ServerFactories = {
   [P in ServerProtocol]: (config: ConfigByProtocol[P]) => net.Server;
 };
 
-function closeConnectionAfter(response: http.ServerResponse): void {
-  if (!response.headersSent) {
-    response.setHeader("Connection", "close");
+function closesConnection(
+  response: http.ServerResponse | undefined,
+  closes: boolean,
+): void {
+  if (!response || response.headersSent) {
+    return;
   }
+  if (closes) {
+    response.setHeader("Connection", "close");
+    return;
+  }
+  response.removeHeader("Connection");
 }
 
 /**
- * Once `server` closes, every response it still sends tells the client to
- * close the connection, so a keep-alive connection ends with its last
- * in-flight request instead of holding `stop` for the whole shutdown
- * grace period.
+ * Once `server` closes, the last response it owes on each connection tells
+ * the client to close it, so a keep-alive connection ends with its last
+ * in-flight request instead of holding `stop` for the whole shutdown grace
+ * period. Only the last one: Node ends a connection after a
+ * `Connection: close` response, which would drop the pipelined responses
+ * queued behind it.
  */
 function closeConnectionsOnceClosed(server: net.Server): void {
-  const inFlight = new Set<http.ServerResponse>();
+  const pending = new Map<net.Socket, http.ServerResponse[]>();
   let closed = false;
 
   server.on(
     "request",
-    (_req: http.IncomingMessage, res: http.ServerResponse) => {
+    (req: http.IncomingMessage, res: http.ServerResponse) => {
+      const responses = pending.get(req.socket) ?? [];
+      const previous = responses.at(-1);
+      responses.push(res);
+      pending.set(req.socket, responses);
+      res.once("close", () => {
+        responses.splice(responses.indexOf(res), 1);
+        if (responses.length === 0) {
+          pending.delete(req.socket);
+        }
+      });
       if (closed) {
-        closeConnectionAfter(res);
-        return;
+        closesConnection(previous, false);
+        closesConnection(res, true);
       }
-      inFlight.add(res);
-      res.once("close", () => inFlight.delete(res));
     },
   );
   server.once("close", () => {
     closed = true;
-    inFlight.forEach(closeConnectionAfter);
-    inFlight.clear();
+    pending.forEach((responses) => closesConnection(responses.at(-1), true));
   });
 }
 

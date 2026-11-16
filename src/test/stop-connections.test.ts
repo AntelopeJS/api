@@ -1,6 +1,7 @@
 import sinon from "sinon";
 import assert from "node:assert";
 import * as http from "node:http";
+import * as net from "node:net";
 import { WebSocket } from "ws";
 import { HandlerPriority } from "@antelopejs/interface-api";
 import * as coreRuntime from "@antelopejs/interface-core/runtime";
@@ -29,11 +30,16 @@ const IN_FLIGHT_PORT = 25410;
 const WEBSOCKET_PORT = 25420;
 const LONG_REQUEST_PORT = 25430;
 const KEEP_ALIVE_PORT = 25440;
+const UNBOUNDED_GRACE_PORT = 25450;
+const PIPELINED_PORT = 25460;
 const ROUTE_ROOT = "/stop-connections";
 const STREAM_PATH = `${ROUTE_ROOT}/stream`;
 const SLOW_PATH = `${ROUTE_ROOT}/slow`;
 const LONG_PATH = `${ROUTE_ROOT}/long`;
 const KEEP_ALIVE_PATH = `${ROUTE_ROOT}/keep-alive`;
+const UNBOUNDED_PATH = `${ROUTE_ROOT}/unbounded`;
+const PIPELINED_PATH = `${ROUTE_ROOT}/pipelined`;
+const OK_STATUS_LINE = /HTTP\/1\.1 200 OK/g;
 const SOCKET_PATH = `${ROUTE_ROOT}/socket`;
 const PUBLIC_BASE_URL = "https://api.example.com";
 const SLOW_RESPONSE_MS = 200;
@@ -131,6 +137,19 @@ function request(
   });
 }
 
+function pipelineTwoRequests(port: number, path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const request = `GET ${path} HTTP/1.1\r\nHost: ${TEST_HOST}\r\n\r\n`;
+    const socket = net.connect(port, TEST_HOST, () =>
+      socket.write(request + request),
+    );
+    const chunks: Buffer[] = [];
+    socket.on("data", (chunk: Buffer) => chunks.push(chunk));
+    socket.once("close", () => resolve(Buffer.concat(chunks).toString()));
+    socket.once("error", reject);
+  });
+}
+
 function openWebSocket(port: number): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(`ws://${TEST_HOST}:${port}${SOCKET_PATH}`);
@@ -139,24 +158,46 @@ function openWebSocket(port: number): Promise<WebSocket> {
   });
 }
 
-describe("Stopping with open connections", () => {
-  const registeredIds: string[] = [];
-  let originalConfig: Config;
+const registeredIds: string[] = [];
 
-  function register(mode: RouteMode, path: string, callback: RouteCallback) {
-    const id = `stop-connections-${registeredIds.length}`;
-    registeredIds.push(id);
-    registerHandler(
-      id,
-      {
-        mode: mode,
-        method: "get",
-        location: path,
-        priority: HandlerPriority.NORMAL,
-      },
-      callback,
-    );
-  }
+function register(mode: RouteMode, path: string, callback: RouteCallback) {
+  const id = `stop-connections-${registeredIds.length}`;
+  registeredIds.push(id);
+  registerHandler(
+    id,
+    {
+      mode: mode,
+      method: "get",
+      location: path,
+      priority: HandlerPriority.NORMAL,
+    },
+    callback,
+  );
+}
+
+/**
+ * Registers a route answering after `durationMs`; the promise resolves once
+ * `requestCount` requests are being handled.
+ */
+function registerSlowRoute(path: string, durationMs: number, requestCount = 1) {
+  let handled = 0;
+  let markReceived: () => void = () => undefined;
+  const received = new Promise<void>((resolve) => {
+    markReceived = resolve;
+  });
+  register("handler", path, async () => {
+    handled += 1;
+    if (handled === requestCount) {
+      markReceived();
+    }
+    await delay(durationMs);
+    return SLOW_RESPONSE_BODY;
+  });
+  return received;
+}
+
+describe("Stopping with open connections", () => {
+  let originalConfig: Config;
 
   before(() => {
     originalConfig = getConfig();
@@ -194,19 +235,6 @@ describe("Stopping with open connections", () => {
     );
     await streamClosed;
   });
-
-  function registerSlowRoute(path: string, durationMs: number) {
-    let markReceived: () => void = () => undefined;
-    const received = new Promise<void>((resolve) => {
-      markReceived = resolve;
-    });
-    register("handler", path, async () => {
-      markReceived();
-      await delay(durationMs);
-      return SLOW_RESPONSE_BODY;
-    });
-    return received;
-  }
 
   it("lets an in-flight request complete", async () => {
     const received = registerSlowRoute(SLOW_PATH, SLOW_RESPONSE_MS);
@@ -255,6 +283,36 @@ describe("Stopping with open connections", () => {
     assert.ok(
       stopDuration < LONG_GRACE_PERIOD_MS,
       `Stop took ${stopDuration} ms after the last request on a keep-alive connection`,
+    );
+  });
+
+  it("lets an in-flight request complete under an unbounded grace period", async () => {
+    const received = registerSlowRoute(UNBOUNDED_PATH, SLOW_RESPONSE_MS);
+    await serve(UNBOUNDED_GRACE_PORT, Infinity);
+    const response = request(UNBOUNDED_GRACE_PORT, UNBOUNDED_PATH);
+    await received;
+
+    const stopping = stop();
+
+    assert.deepEqual(await response, {
+      status: SUCCESS_STATUS,
+      body: SLOW_RESPONSE_BODY,
+    });
+    await stopping;
+  });
+
+  it("answers every pipelined request in flight when stop begins", async () => {
+    const bothReceived = registerSlowRoute(PIPELINED_PATH, SLOW_RESPONSE_MS, 2);
+    await serve(PIPELINED_PORT, LONG_GRACE_PERIOD_MS);
+    const raw = pipelineTwoRequests(PIPELINED_PORT, PIPELINED_PATH);
+    await bothReceived;
+
+    const stopDuration = await measureStop();
+
+    assert.equal((await raw).match(OK_STATUS_LINE)?.length, 2);
+    assert.ok(
+      stopDuration < LONG_GRACE_PERIOD_MS,
+      `Stop took ${stopDuration} ms after the last pipelined request`,
     );
   });
 

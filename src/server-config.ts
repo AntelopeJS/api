@@ -39,6 +39,7 @@ export interface Config {
 
 export const DEFAULT_HTTP_PORT = 80;
 export const DEFAULT_SHUTDOWN_GRACE_PERIOD_MS = 1000;
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 export const RANDOM_PORT = 0;
 
 const DEFAULT_SERVER_CONFIG: HTTPConfig = {
@@ -46,8 +47,18 @@ const DEFAULT_SERVER_CONFIG: HTTPConfig = {
   port: DEFAULT_HTTP_PORT,
 };
 
+/**
+ * The configured grace period within the range a Node timer accepts: Node
+ * fires a timer set beyond it, or to `NaN`, after 1 ms, which would destroy
+ * in-flight requests at once.
+ */
 export function resolveShutdownGracePeriod(config: Config): number {
-  return config.shutdownGracePeriodMs ?? DEFAULT_SHUTDOWN_GRACE_PERIOD_MS;
+  const gracePeriodMs =
+    config.shutdownGracePeriodMs ?? DEFAULT_SHUTDOWN_GRACE_PERIOD_MS;
+  if (Number.isNaN(gracePeriodMs)) {
+    return DEFAULT_SHUTDOWN_GRACE_PERIOD_MS;
+  }
+  return Math.min(Math.max(gracePeriodMs, 0), MAX_TIMER_DELAY_MS);
 }
 
 export function resolveServers(config: Config): ServerConfig[] {
