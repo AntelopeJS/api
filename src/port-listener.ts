@@ -34,9 +34,9 @@ export interface BoundListener extends ListenerAddress {
   /**
    * Stops accepting and frees the port once every connection has ended.
    * Unserved connections are dropped at once; served ones get
-   * `CONNECTION_GRACE_PERIOD_MS` to finish before they are destroyed.
+   * `gracePeriodMs` to finish before they are destroyed.
    */
-  close: () => Promise<void>;
+  close: (gracePeriodMs: number) => Promise<void>;
 }
 
 /**
@@ -51,15 +51,6 @@ interface ListenAttempt {
   socket?: net.Server;
   error?: NodeJS.ErrnoException;
 }
-
-/**
- * How long served connections may stay open once their listener closes.
- * In-flight requests get this long to complete; long-lived connections,
- * such as event streams, websockets or busy keep-alive connections, are
- * destroyed when it elapses so they cannot hold `stop` until the core
- * gives up on it.
- */
-export const CONNECTION_GRACE_PERIOD_MS = 1000;
 
 const UNSERVED_GRACE_PERIOD_MS = 0;
 
@@ -153,11 +144,11 @@ function createListener(
       queued.forEach((connection) => handOver(server, connection));
       queued.clear();
     },
-    close: () =>
+    close: (gracePeriodMs) =>
       closeSocket(
         socket,
         connections,
-        target ? CONNECTION_GRACE_PERIOD_MS : UNSERVED_GRACE_PERIOD_MS,
+        target ? gracePeriodMs : UNSERVED_GRACE_PERIOD_MS,
       ),
   };
 }
@@ -221,7 +212,7 @@ export async function bindServerPorts(
       listeners.push(listener);
     }
   } catch (error) {
-    await closeListeners(listeners);
+    await closeListeners(listeners, UNSERVED_GRACE_PERIOD_MS);
     throw error;
   }
 
@@ -247,10 +238,14 @@ export function isBoundFor(
 }
 
 /**
- * Closes every listener, freeing their ports.
+ * Closes every listener, freeing their ports once their served
+ * connections end or `gracePeriodMs` elapses.
  */
-export function closeListeners(listeners: BoundListener[]): Promise<void> {
-  return Promise.all(listeners.map((listener) => listener.close())).then(
-    () => undefined,
-  );
+export function closeListeners(
+  listeners: BoundListener[],
+  gracePeriodMs: number,
+): Promise<void> {
+  return Promise.all(
+    listeners.map((listener) => listener.close(gracePeriodMs)),
+  ).then(() => undefined);
 }

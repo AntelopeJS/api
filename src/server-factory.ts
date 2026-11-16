@@ -21,11 +21,46 @@ type ServerFactories = {
   [P in ServerProtocol]: (config: ConfigByProtocol[P]) => net.Server;
 };
 
+function closeConnectionAfter(response: http.ServerResponse): void {
+  if (!response.headersSent) {
+    response.setHeader("Connection", "close");
+  }
+}
+
+/**
+ * Once `server` closes, every response it still sends tells the client to
+ * close the connection, so a keep-alive connection ends with its last
+ * in-flight request instead of holding `stop` for the whole shutdown
+ * grace period.
+ */
+function closeConnectionsOnceClosed(server: net.Server): void {
+  const inFlight = new Set<http.ServerResponse>();
+  let closed = false;
+
+  server.on(
+    "request",
+    (_req: http.IncomingMessage, res: http.ServerResponse) => {
+      if (closed) {
+        closeConnectionAfter(res);
+        return;
+      }
+      inFlight.add(res);
+      res.once("close", () => inFlight.delete(res));
+    },
+  );
+  server.once("close", () => {
+    closed = true;
+    inFlight.forEach(closeConnectionAfter);
+    inFlight.clear();
+  });
+}
+
 function attachServerListeners(
   server: net.Server,
   protocol: ServerProtocol,
   socketProtocol: SocketProtocol,
 ): void {
+  closeConnectionsOnceClosed(server);
   server.on(
     "request",
     (req: http.IncomingMessage, res: http.ServerResponse) =>

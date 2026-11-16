@@ -53,6 +53,7 @@ export default defineConfig({
         publicBaseUrl: "https://api.example.com",
         strictPort: false,
         autoListen: true,
+        shutdownGracePeriodMs: 1000,
         cors: {
           allowedOrigins: ["https://app.example.com", /\.example\.com$/],
           allowedMethods: ["GET", "POST", "PUT", "DELETE"],
@@ -66,13 +67,14 @@ export default defineConfig({
 });
 ```
 
-| Key             | Default                      | Description                                                                                                                                                      |
-| --------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `servers`       | one HTTP server on port `80` | Servers to start. Each entry takes `protocol` (`http` or `https`), an optional `host` and `port`, and any Node.js `http.ServerOptions` or `https.ServerOptions`. |
-| `publicBaseUrl` | `API_LOCAL_BASE_URL` in dev  | Origin that browsers use to reach the API. Outside development it is required, and the boot fails without it.                                                    |
-| `strictPort`    | `false`                      | In development, fail instead of falling back to the next free port. Outside development, the module always binds the exact port.                                 |
-| `autoListen`    | `true`                       | Set to `false` to create the servers and serve them only when a module calls `Listen()`.                                                                         |
-| `cors`          | none                         | CORS policy. `allowedMethods` defaults to `GET,HEAD,PUT,PATCH,POST,DELETE`, and `credentials` defaults to `true`. Change it at run time with `SetCorsConfig()`.  |
+| Key                     | Default                      | Description                                                                                                                                                                       |
+| ----------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `servers`               | one HTTP server on port `80` | Servers to start. Each entry takes `protocol` (`http` or `https`), an optional `host` and `port`, and any Node.js `http.ServerOptions` or `https.ServerOptions`.                  |
+| `publicBaseUrl`         | `API_LOCAL_BASE_URL` in dev  | Origin that browsers use to reach the API. Outside development it is required, and the boot fails without it.                                                                     |
+| `strictPort`            | `false`                      | In development, fail instead of falling back to the next free port. Outside development, the module always binds the exact port.                                                  |
+| `autoListen`            | `true`                       | Set to `false` to create the servers and serve them only when a module calls `Listen()`.                                                                                          |
+| `shutdownGracePeriodMs` | `1000`                       | How long `stop` lets in-flight requests finish, in milliseconds. Event streams and websockets still open when it elapses are destroyed. The core caps the whole shutdown at 10 s. |
+| `cors`                  | none                         | CORS policy. `allowedMethods` defaults to `GET,HEAD,PUT,PATCH,POST,DELETE`, and `credentials` defaults to `true`. Change it at run time with `SetCorsConfig()`.                   |
 
 In development, loopback origins (`localhost`, `127.0.0.1`, `[::1]`, any port) pass CORS without configuration. List every other origin in `allowedOrigins`.
 

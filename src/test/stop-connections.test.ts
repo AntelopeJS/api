@@ -5,8 +5,10 @@ import { WebSocket } from "ws";
 import { HandlerPriority } from "@antelopejs/interface-api";
 import * as coreRuntime from "@antelopejs/interface-core/runtime";
 
-import type { Config } from "../server-config";
-import { CONNECTION_GRACE_PERIOD_MS } from "../port-listener";
+import {
+  type Config,
+  DEFAULT_SHUTDOWN_GRACE_PERIOD_MS,
+} from "../server-config";
 import {
   type RouteCallback,
   registerHandler,
@@ -25,17 +27,23 @@ const TEST_HOST = "127.0.0.1";
 const STREAM_PORT = 25400;
 const IN_FLIGHT_PORT = 25410;
 const WEBSOCKET_PORT = 25420;
+const LONG_REQUEST_PORT = 25430;
+const KEEP_ALIVE_PORT = 25440;
 const ROUTE_ROOT = "/stop-connections";
 const STREAM_PATH = `${ROUTE_ROOT}/stream`;
 const SLOW_PATH = `${ROUTE_ROOT}/slow`;
+const LONG_PATH = `${ROUTE_ROOT}/long`;
+const KEEP_ALIVE_PATH = `${ROUTE_ROOT}/keep-alive`;
 const SOCKET_PATH = `${ROUTE_ROOT}/socket`;
 const PUBLIC_BASE_URL = "https://api.example.com";
 const SLOW_RESPONSE_MS = 200;
+const LONG_RESPONSE_MS = 1500;
+const LONG_GRACE_PERIOD_MS = 3000;
 const SLOW_RESPONSE_BODY = "done";
 const STREAM_EVENT = "data: ready\n\n";
 const SUCCESS_STATUS = 200;
 const STOP_MARGIN_MS = 1000;
-const STOP_DEADLINE_MS = CONNECTION_GRACE_PERIOD_MS + STOP_MARGIN_MS;
+const STOP_DEADLINE_MS = DEFAULT_SHUTDOWN_GRACE_PERIOD_MS + STOP_MARGIN_MS;
 
 type RouteMode = "handler" | "websocket";
 
@@ -51,9 +59,13 @@ function stubRuntime(): void {
   sinon.stub(coreRuntime, "RegisterDevServer").resolves();
 }
 
-function singleServerConfig(port: number): Config {
+function singleServerConfig(
+  port: number,
+  shutdownGracePeriodMs?: number,
+): Config {
   return {
     autoListen: false,
+    shutdownGracePeriodMs,
     publicBaseUrl: PUBLIC_BASE_URL,
     servers: [{ protocol: "http", host: TEST_HOST, port }],
   };
@@ -63,9 +75,12 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function serve(port: number): Promise<void> {
+async function serve(
+  port: number,
+  shutdownGracePeriodMs?: number,
+): Promise<void> {
   stubRuntime();
-  await provide(singleServerConfig(port));
+  await provide(singleServerConfig(port, shutdownGracePeriodMs));
   start();
   await listenServers();
 }
@@ -95,10 +110,14 @@ function waitForClose(
   return new Promise((resolve) => emitter.once("close", () => resolve()));
 }
 
-function request(port: number, path: string): Promise<CapturedResponse> {
+function request(
+  port: number,
+  path: string,
+  agent: http.Agent | false = false,
+): Promise<CapturedResponse> {
   return new Promise((resolve, reject) => {
     http
-      .get({ host: TEST_HOST, port, path, agent: false }, (res) => {
+      .get({ host: TEST_HOST, port, path, agent }, (res) => {
         const chunks: Buffer[] = [];
         res.on("data", (chunk: Buffer) => chunks.push(chunk));
         res.once("end", () =>
@@ -176,16 +195,21 @@ describe("Stopping with open connections", () => {
     await streamClosed;
   });
 
-  it("lets an in-flight request complete", async () => {
+  function registerSlowRoute(path: string, durationMs: number) {
     let markReceived: () => void = () => undefined;
     const received = new Promise<void>((resolve) => {
       markReceived = resolve;
     });
-    register("handler", SLOW_PATH, async () => {
+    register("handler", path, async () => {
       markReceived();
-      await delay(SLOW_RESPONSE_MS);
+      await delay(durationMs);
       return SLOW_RESPONSE_BODY;
     });
+    return received;
+  }
+
+  it("lets an in-flight request complete", async () => {
+    const received = registerSlowRoute(SLOW_PATH, SLOW_RESPONSE_MS);
     await serve(IN_FLIGHT_PORT);
     const response = request(IN_FLIGHT_PORT, SLOW_PATH);
     await received;
@@ -197,6 +221,41 @@ describe("Stopping with open connections", () => {
       body: SLOW_RESPONSE_BODY,
     });
     await stopping;
+  });
+
+  it("lets a request outlive the default grace period under a longer configured one", async () => {
+    const received = registerSlowRoute(LONG_PATH, LONG_RESPONSE_MS);
+    await serve(LONG_REQUEST_PORT, LONG_GRACE_PERIOD_MS);
+    const response = request(LONG_REQUEST_PORT, LONG_PATH);
+    await received;
+
+    const stopping = stop();
+
+    assert.deepEqual(await response, {
+      status: SUCCESS_STATUS,
+      body: SLOW_RESPONSE_BODY,
+    });
+    await stopping;
+  });
+
+  it("ends a keep-alive connection with its last in-flight request", async () => {
+    const received = registerSlowRoute(KEEP_ALIVE_PATH, SLOW_RESPONSE_MS);
+    await serve(KEEP_ALIVE_PORT, LONG_GRACE_PERIOD_MS);
+    const agent = new http.Agent({ keepAlive: true });
+    const response = request(KEEP_ALIVE_PORT, KEEP_ALIVE_PATH, agent);
+    await received;
+
+    const stopDuration = await measureStop();
+
+    assert.deepEqual(await response, {
+      status: SUCCESS_STATUS,
+      body: SLOW_RESPONSE_BODY,
+    });
+    agent.destroy();
+    assert.ok(
+      stopDuration < LONG_GRACE_PERIOD_MS,
+      `Stop took ${stopDuration} ms after the last request on a keep-alive connection`,
+    );
   });
 
   it("ends an open websocket within the grace period", async () => {
