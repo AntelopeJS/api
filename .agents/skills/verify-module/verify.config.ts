@@ -1,5 +1,6 @@
 import type { VerifyConfig } from "@antelopejs/tooling-configs/verify";
 
+import { bodyRejection } from "./journeys-body-rejection.ts";
 import { bodyLimits, bodyReading, bodyStreaming } from "./journeys-bodies.ts";
 import { configVariables, interfaceRanges, manifest, modulesAdd } from "./journeys-config.ts";
 import { requestContext } from "./journeys-context.ts";
@@ -17,6 +18,9 @@ import { devRegistry, listenOnDemand, portFallback, productionBoot, serverOption
 import { serverReload, serverSockets } from "./journeys-sockets.ts";
 import { assertGuards, assertValidations, rateLimitOrdering, rateLimiting } from "./journeys-util.ts";
 import { secureWebsocket, websocketHandlers } from "./journeys-websocket.ts";
+import { websocketRefusals } from "./journeys-websocket-refusals.ts";
+
+const FORMAL_ROUTE_TREE = ".agents/skills/formal-route-tree";
 
 const config: VerifyConfig = {
   doors: {
@@ -39,6 +43,15 @@ const config: VerifyConfig = {
       why: "the package name and release workflow claim @antelopejs/api on npm",
     },
   },
+  formal: [
+    {
+      name: "formal-route-tree",
+      covers: ["src/route-table.ts", "src/route-level.ts", "src/route-search.ts"],
+      files: [`${FORMAL_ROUTE_TREE}/**`, "src/test/formal-route-tree.test.ts", "src/test/route-reference.ts"],
+      command: ["node", `${FORMAL_ROUTE_TREE}/check.mjs`, "--full"],
+      violation: /^(?:finding|BROKEN|HOLDS) +(\w+)/gm,
+    },
+  ],
   moduleConfig() {
     return { servers: [{ protocol: "http", host: "127.0.0.1", port: 0 }] };
   },
@@ -69,6 +82,7 @@ const config: VerifyConfig = {
     "body-reading": bodyReading,
     "body-limits": bodyLimits,
     "body-streaming": bodyStreaming,
+    "body-rejection": bodyRejection,
     "request-context": requestContext,
     "result-bodies": resultBodies,
     "result-headers": resultHeaders,
@@ -85,6 +99,7 @@ const config: VerifyConfig = {
     "rate-limit-ordering": rateLimitOrdering,
     "websocket-handlers": websocketHandlers,
     "secure-websocket": secureWebsocket,
+    "websocket-refusals": websocketRefusals,
     "server-ports": serverPorts,
     "port-fallback": portFallback,
     "server-protocols": serverProtocols,
