@@ -21,54 +21,37 @@ type ServerFactories = {
   [P in ServerProtocol]: (config: ConfigByProtocol[P]) => net.Server;
 };
 
-function closesConnection(
-  response: http.ServerResponse | undefined,
-  closes: boolean,
-): void {
-  if (!response || response.headersSent) {
-    return;
-  }
-  if (closes) {
-    response.setHeader("Connection", "close");
-    return;
-  }
-  response.removeHeader("Connection");
-}
-
 /**
- * Once `server` closes, the last response it owes on each connection tells
- * the client to close it, so a keep-alive connection ends with its last
+ * Once `server` closes, ends each connection when its last pending
+ * response is done, so a keep-alive connection ends with its last
  * in-flight request instead of holding `stop` for the whole shutdown grace
- * period. Only the last one: Node ends a connection after a
- * `Connection: close` response, which would drop the pipelined responses
- * queued behind it.
+ * period. Connections idle at that moment are closed by `server.close()`
+ * itself; this does the same for the ones that become idle afterwards.
  */
-function closeConnectionsOnceClosed(server: net.Server): void {
-  const pending = new Map<net.Socket, http.ServerResponse[]>();
+function endConnectionsOnceClosed(server: net.Server): void {
+  const pendingResponses = new Map<net.Socket, number>();
   let closed = false;
 
   server.on(
     "request",
     (req: http.IncomingMessage, res: http.ServerResponse) => {
-      const responses = pending.get(req.socket) ?? [];
-      const previous = responses.at(-1);
-      responses.push(res);
-      pending.set(req.socket, responses);
+      const socket = req.socket;
+      pendingResponses.set(socket, (pendingResponses.get(socket) ?? 0) + 1);
       res.once("close", () => {
-        responses.splice(responses.indexOf(res), 1);
-        if (responses.length === 0) {
-          pending.delete(req.socket);
+        const remaining = (pendingResponses.get(socket) ?? 1) - 1;
+        if (remaining > 0) {
+          pendingResponses.set(socket, remaining);
+          return;
+        }
+        pendingResponses.delete(socket);
+        if (closed) {
+          socket.end();
         }
       });
-      if (closed) {
-        closesConnection(previous, false);
-        closesConnection(res, true);
-      }
     },
   );
   server.once("close", () => {
     closed = true;
-    pending.forEach((responses) => closesConnection(responses.at(-1), true));
   });
 }
 
@@ -77,7 +60,7 @@ function attachServerListeners(
   protocol: ServerProtocol,
   socketProtocol: SocketProtocol,
 ): void {
-  closeConnectionsOnceClosed(server);
+  endConnectionsOnceClosed(server);
   server.on(
     "request",
     (req: http.IncomingMessage, res: http.ServerResponse) =>

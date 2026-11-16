@@ -32,6 +32,7 @@ const LONG_REQUEST_PORT = 25430;
 const KEEP_ALIVE_PORT = 25440;
 const UNBOUNDED_GRACE_PORT = 25450;
 const PIPELINED_PORT = 25460;
+const QUEUED_PORT = 25470;
 const ROUTE_ROOT = "/stop-connections";
 const STREAM_PATH = `${ROUTE_ROOT}/stream`;
 const SLOW_PATH = `${ROUTE_ROOT}/slow`;
@@ -39,6 +40,10 @@ const LONG_PATH = `${ROUTE_ROOT}/long`;
 const KEEP_ALIVE_PATH = `${ROUTE_ROOT}/keep-alive`;
 const UNBOUNDED_PATH = `${ROUTE_ROOT}/unbounded`;
 const PIPELINED_PATH = `${ROUTE_ROOT}/pipelined`;
+const QUEUED_SLOW_PATH = `${ROUTE_ROOT}/queued-slow`;
+const QUEUED_FAST_PATH = `${ROUTE_ROOT}/queued-fast`;
+const FAST_RESPONSE_MS = 0;
+const FAST_RESPONSE_SETTLE_MS = 50;
 const OK_STATUS_LINE = /HTTP\/1\.1 200 OK/g;
 const SOCKET_PATH = `${ROUTE_ROOT}/socket`;
 const PUBLIC_BASE_URL = "https://api.example.com";
@@ -137,12 +142,12 @@ function request(
   });
 }
 
-function pipelineTwoRequests(port: number, path: string): Promise<string> {
+function pipelineRequests(port: number, paths: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    const request = `GET ${path} HTTP/1.1\r\nHost: ${TEST_HOST}\r\n\r\n`;
-    const socket = net.connect(port, TEST_HOST, () =>
-      socket.write(request + request),
-    );
+    const requests = paths
+      .map((path) => `GET ${path} HTTP/1.1\r\nHost: ${TEST_HOST}\r\n\r\n`)
+      .join("");
+    const socket = net.connect(port, TEST_HOST, () => socket.write(requests));
     const chunks: Buffer[] = [];
     socket.on("data", (chunk: Buffer) => chunks.push(chunk));
     socket.once("close", () => resolve(Buffer.concat(chunks).toString()));
@@ -196,7 +201,11 @@ function registerSlowRoute(path: string, durationMs: number, requestCount = 1) {
   return received;
 }
 
-describe("Stopping with open connections", () => {
+/**
+ * Stops the server after each test, then restores the configuration the
+ * test project started with.
+ */
+function restoreServerAfterEach(): void {
   let originalConfig: Config;
 
   before(() => {
@@ -204,7 +213,7 @@ describe("Stopping with open connections", () => {
   });
 
   after(() => {
-    registeredIds.forEach((id) => unregisterHandler(id));
+    registeredIds.splice(0).forEach((id) => unregisterHandler(id));
     if (!originalConfig.servers?.length) {
       return;
     }
@@ -217,6 +226,10 @@ describe("Stopping with open connections", () => {
     await stop();
     sinon.restore();
   });
+}
+
+describe("Stopping with open connections", () => {
+  restoreServerAfterEach();
 
   it("ends an open event stream within the grace period", async () => {
     register("handler", STREAM_PATH, ({ response }) => {
@@ -250,6 +263,28 @@ describe("Stopping with open connections", () => {
     });
     await stopping;
   });
+
+  it("ends an open websocket within the grace period", async () => {
+    register("websocket", SOCKET_PATH, (context) => {
+      assert.ok(context.connection);
+      context.connection.send("connected");
+    });
+    await serve(WEBSOCKET_PORT);
+    const socket = await openWebSocket(WEBSOCKET_PORT);
+    const socketClosed = waitForClose(socket);
+
+    const stopDuration = await measureStop();
+
+    assert.ok(
+      stopDuration < STOP_DEADLINE_MS,
+      `Stop took ${stopDuration} ms with an open websocket`,
+    );
+    await socketClosed;
+  });
+});
+
+describe("Stopping under a configured grace period", () => {
+  restoreServerAfterEach();
 
   it("lets a request outlive the default grace period under a longer configured one", async () => {
     const received = registerSlowRoute(LONG_PATH, LONG_RESPONSE_MS);
@@ -304,7 +339,10 @@ describe("Stopping with open connections", () => {
   it("answers every pipelined request in flight when stop begins", async () => {
     const bothReceived = registerSlowRoute(PIPELINED_PATH, SLOW_RESPONSE_MS, 2);
     await serve(PIPELINED_PORT, LONG_GRACE_PERIOD_MS);
-    const raw = pipelineTwoRequests(PIPELINED_PORT, PIPELINED_PATH);
+    const raw = pipelineRequests(PIPELINED_PORT, [
+      PIPELINED_PATH,
+      PIPELINED_PATH,
+    ]);
     await bothReceived;
 
     const stopDuration = await measureStop();
@@ -316,21 +354,23 @@ describe("Stopping with open connections", () => {
     );
   });
 
-  it("ends an open websocket within the grace period", async () => {
-    register("websocket", SOCKET_PATH, (context) => {
-      assert.ok(context.connection);
-      context.connection.send("connected");
-    });
-    await serve(WEBSOCKET_PORT);
-    const socket = await openWebSocket(WEBSOCKET_PORT);
-    const socketClosed = waitForClose(socket);
+  it("ends a connection once a pipelined response queued behind a slow one is sent", async () => {
+    const slowReceived = registerSlowRoute(QUEUED_SLOW_PATH, SLOW_RESPONSE_MS);
+    const fastReceived = registerSlowRoute(QUEUED_FAST_PATH, FAST_RESPONSE_MS);
+    await serve(QUEUED_PORT, LONG_GRACE_PERIOD_MS);
+    const raw = pipelineRequests(QUEUED_PORT, [
+      QUEUED_SLOW_PATH,
+      QUEUED_FAST_PATH,
+    ]);
+    await Promise.all([slowReceived, fastReceived]);
+    await delay(FAST_RESPONSE_SETTLE_MS);
 
     const stopDuration = await measureStop();
 
+    assert.equal((await raw).match(OK_STATUS_LINE)?.length, 2);
     assert.ok(
-      stopDuration < STOP_DEADLINE_MS,
-      `Stop took ${stopDuration} ms with an open websocket`,
+      stopDuration < LONG_GRACE_PERIOD_MS,
+      `Stop took ${stopDuration} ms after a queued pipelined response`,
     );
-    await socketClosed;
   });
 });
