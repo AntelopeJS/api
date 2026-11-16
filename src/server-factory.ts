@@ -21,6 +21,31 @@ type ServerFactories = {
   [P in ServerProtocol]: (config: ConfigByProtocol[P]) => net.Server;
 };
 
+const CLOSE = "close";
+
+/**
+ * Asks the client to close the connection after its only pending response,
+ * so it does not send another request the server would then end the
+ * connection under. With more pending it asks nothing: Node ends a
+ * connection after a `Connection: close` response, which would drop the
+ * pipelined responses queued behind it.
+ */
+function announceClose(responses: http.ServerResponse[]): void {
+  const [response, ...queued] = responses;
+  if (response && queued.length === 0 && !response.headersSent) {
+    response.setHeader("Connection", CLOSE);
+  }
+}
+
+function withdrawClose(responses: http.ServerResponse[]): void {
+  responses
+    .filter(
+      (response) =>
+        !response.headersSent && response.getHeader("Connection") === CLOSE,
+    )
+    .forEach((response) => response.removeHeader("Connection"));
+}
+
 /**
  * Once `server` closes, ends each connection when its last pending
  * response is done, so a keep-alive connection ends with its last
@@ -29,21 +54,28 @@ type ServerFactories = {
  * itself; this does the same for the ones that become idle afterwards.
  */
 function endConnectionsOnceClosed(server: net.Server): void {
-  const pendingResponses = new Map<net.Socket, number>();
+  const pending = new Map<net.Socket, http.ServerResponse[]>();
   let closed = false;
 
   server.on(
     "request",
     (req: http.IncomingMessage, res: http.ServerResponse) => {
       const socket = req.socket;
-      pendingResponses.set(socket, (pendingResponses.get(socket) ?? 0) + 1);
+      const responses = pending.get(socket) ?? [];
+      if (closed) {
+        withdrawClose(responses);
+      }
+      responses.push(res);
+      pending.set(socket, responses);
+      if (closed) {
+        announceClose(responses);
+      }
       res.once("close", () => {
-        const remaining = (pendingResponses.get(socket) ?? 1) - 1;
-        if (remaining > 0) {
-          pendingResponses.set(socket, remaining);
+        responses.splice(responses.indexOf(res), 1);
+        if (responses.length > 0) {
           return;
         }
-        pendingResponses.delete(socket);
+        pending.delete(socket);
         if (closed) {
           socket.end();
         }
@@ -52,6 +84,7 @@ function endConnectionsOnceClosed(server: net.Server): void {
   );
   server.once("close", () => {
     closed = true;
+    pending.forEach(announceClose);
   });
 }
 

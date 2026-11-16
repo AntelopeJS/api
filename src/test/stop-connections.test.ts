@@ -33,6 +33,7 @@ const KEEP_ALIVE_PORT = 25440;
 const UNBOUNDED_GRACE_PORT = 25450;
 const PIPELINED_PORT = 25460;
 const QUEUED_PORT = 25470;
+const REUSED_PORT = 25480;
 const ROUTE_ROOT = "/stop-connections";
 const STREAM_PATH = `${ROUTE_ROOT}/stream`;
 const SLOW_PATH = `${ROUTE_ROOT}/slow`;
@@ -43,6 +44,7 @@ const PIPELINED_PATH = `${ROUTE_ROOT}/pipelined`;
 const QUEUED_SLOW_PATH = `${ROUTE_ROOT}/queued-slow`;
 const QUEUED_FAST_PATH = `${ROUTE_ROOT}/queued-fast`;
 const FAST_RESPONSE_MS = 0;
+const REUSED_PATH = `${ROUTE_ROOT}/reused`;
 const FAST_RESPONSE_SETTLE_MS = 50;
 const OK_STATUS_LINE = /HTTP\/1\.1 200 OK/g;
 const SOCKET_PATH = `${ROUTE_ROOT}/socket`;
@@ -151,6 +153,34 @@ function pipelineRequests(port: number, paths: string[]): Promise<string> {
     const chunks: Buffer[] = [];
     socket.on("data", (chunk: Buffer) => chunks.push(chunk));
     socket.once("close", () => resolve(Buffer.concat(chunks).toString()));
+    socket.once("error", reject);
+  });
+}
+
+interface ReuseOutcome {
+  /** Status lines the client read. */
+  responses: number;
+}
+
+/**
+ * Sends a request, then a second one on the same connection as soon as the
+ * first response arrives, as a keep-alive client reusing it would.
+ */
+function reuseConnection(port: number, path: string): Promise<ReuseOutcome> {
+  return new Promise((resolve, reject) => {
+    const request = `GET ${path} HTTP/1.1\r\nHost: ${TEST_HOST}\r\n\r\n`;
+    const socket = net.connect(port, TEST_HOST, () => socket.write(request));
+    let received = "";
+    socket.on("data", (chunk: Buffer) => {
+      const isFirstResponse = received === "";
+      received += chunk.toString();
+      if (isFirstResponse && !socket.writableEnded) {
+        socket.write(request, () => undefined);
+      }
+    });
+    socket.once("close", () =>
+      resolve({ responses: received.match(OK_STATUS_LINE)?.length ?? 0 }),
+    );
     socket.once("error", reject);
   });
 }
@@ -285,6 +315,27 @@ describe("Stopping with open connections", () => {
 
 describe("Stopping under a configured grace period", () => {
   restoreServerAfterEach();
+
+  it("answers every request it handles on a connection reused during stop", async () => {
+    let handled = 0;
+    let markReceived: () => void = () => undefined;
+    const received = new Promise<void>((resolve) => {
+      markReceived = resolve;
+    });
+    register("handler", REUSED_PATH, async () => {
+      handled += 1;
+      markReceived();
+      await delay(SLOW_RESPONSE_MS);
+      return SLOW_RESPONSE_BODY;
+    });
+    await serve(REUSED_PORT, LONG_GRACE_PERIOD_MS);
+    const outcome = reuseConnection(REUSED_PORT, REUSED_PATH);
+    await received;
+
+    await stop();
+
+    assert.equal((await outcome).responses, handled);
+  });
 
   it("lets a request outlive the default grace period under a longer configured one", async () => {
     const received = registerSlowRoute(LONG_PATH, LONG_RESPONSE_MS);

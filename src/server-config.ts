@@ -51,12 +51,14 @@ const DEFAULT_SERVER_CONFIG: HTTPConfig = {
  * The configured grace period within the range a Node timer accepts: Node
  * fires a timer set beyond it, or to a value that is not a number, after
  * 1 ms, which would destroy in-flight requests at once. A numeric string,
- * as config substitution can produce, counts as its number.
+ * as config substitution can produce, counts as its number; a missing,
+ * blank or non-numeric value gets the default.
  */
 export function resolveShutdownGracePeriod(config: Config): number {
-  const gracePeriodMs = Number(
-    config.shutdownGracePeriodMs ?? DEFAULT_SHUTDOWN_GRACE_PERIOD_MS,
-  );
+  const configured =
+    config.shutdownGracePeriodMs ?? DEFAULT_SHUTDOWN_GRACE_PERIOD_MS;
+  const gracePeriodMs =
+    String(configured).trim() === "" ? Number.NaN : Number(configured);
   if (Number.isNaN(gracePeriodMs)) {
     return DEFAULT_SHUTDOWN_GRACE_PERIOD_MS;
   }
