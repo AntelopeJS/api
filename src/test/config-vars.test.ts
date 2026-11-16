@@ -226,7 +226,7 @@ describe("Port binding", () => {
   }
 
   afterEach(async () => {
-    await closeListeners(listeners);
+    await closeListeners(listeners, 0);
     listeners = [];
     await Promise.all(blockers.map((blocker) => closeServer(blocker)));
     blockers.length = 0;
