@@ -3,7 +3,7 @@ import { interrupted, type Journey } from "@antelopejs/tooling-configs/verify";
 import { holds, same } from "./checks.ts";
 import { bodyIs, status, type Reply } from "./client.ts";
 import { open, type Json, type Session } from "./session.ts";
-import { QUICK_START_SOURCE, ROUTES_SOURCE } from "./sources-routes.ts";
+import { quickStartSource, ROUTES_SOURCE } from "./sources-routes.ts";
 
 async function finish(session: Session): Promise<void> {
   const stopped = await session.stop();
@@ -80,12 +80,13 @@ export const controllerTree: Journey = {
 
 
 export const quickStart: Journey = {
-  title: "the README quick start: the controller answers Hello world without a name and Hello Ada with ?name=Ada, at the path its @Get() gives it",
+  title: "the README quick start: the controller answers Hello world without a name or with a bare ?name, and Hello Ada with ?name=Ada, at /greetings/hello as the README says",
   entryPoint: "the README's `HelloController`, loaded by a module and called over HTTP",
   async run(context) {
-    const session = await open(context, { controllers: QUICK_START_SOURCE });
-    await expectJson(session, { label: "the parameter default applies when the query has no name", method: "GET", route: "/hello/hello", code: 200, expected: { message: "Hello world" } });
-    await expectJson(session, { label: "the query value reaches the handler", method: "GET", route: "/hello/hello?name=Ada", code: 200, expected: { message: "Hello Ada" } });
+    const session = await open(context, { controllers: quickStartSource(context) });
+    await expectJson(session, { label: "a query without name greets the world", method: "GET", route: "/greetings/hello", code: 200, expected: { message: "Hello world" } });
+    await expectJson(session, { label: "a bare ?name is true and greets the world", method: "GET", route: "/greetings/hello?name", code: 200, expected: { message: "Hello world" } });
+    await expectJson(session, { label: "the URL the README calls reaches the handler with the query value", method: "GET", route: "/greetings/hello?name=Ada", code: 200, expected: { message: "Hello Ada" } });
     await finish(session);
   },
 };

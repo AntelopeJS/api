@@ -15,6 +15,7 @@ import { controllerRequired, customDecorators, routeRegistration } from "./journ
 import { resultBodies, resultErrors, resultHeaders, responseStreaming } from "./journeys-results.ts";
 import { controllerTree, quickStart, routeForms } from "./journeys-routes.ts";
 import { devRegistry, listenOnDemand, portFallback, productionBoot, serverOptions, serverPorts, serverProtocols } from "./journeys-servers.ts";
+import { serverShutdown } from "./journeys-shutdown.ts";
 import { serverReload, serverSockets } from "./journeys-sockets.ts";
 import { assertGuards, assertValidations, rateLimitOrdering, rateLimiting } from "./journeys-util.ts";
 import { secureWebsocket, websocketHandlers } from "./journeys-websocket.ts";
@@ -29,7 +30,7 @@ const config: VerifyConfig = {
     contract: {
       globs: ["package.json", "src/config-vars.ts", "src/server-config.ts"],
       funnels: [],
-      why: "`antelopeJs.implements`, `configVars`, `configVarsFile` and `defaultConfig`, and the config keys `servers`, `publicBaseUrl`, `strictPort`, `autoListen` and `cors` that antelope.config.ts files already carry",
+      why: "`antelopeJs.implements`, `configVars`, `configVarsFile` and `defaultConfig`, and the config keys `servers`, `publicBaseUrl`, `strictPort`, `autoListen`, `shutdownGracePeriodMs` and `cors` that antelope.config.ts files already carry",
     },
     outbound: null,
     exposure: {
@@ -109,6 +110,7 @@ const config: VerifyConfig = {
     "server-reload": serverReload,
     "listen-on-demand": listenOnDemand,
     "production-boot": productionBoot,
+    "server-shutdown": serverShutdown,
     "startup-gate": startupGate,
     "failed-start": failedStart,
     "module-lifecycle": moduleLifecycle,

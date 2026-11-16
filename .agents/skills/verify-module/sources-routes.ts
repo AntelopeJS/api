@@ -1,3 +1,8 @@
+import { readFileSync } from "node:fs";
+import type { JourneyContext } from "@antelopejs/tooling-configs/verify";
+
+const QUICK_START_BLOCK = /```typescript \[src\/index\.ts\]\n([\s\S]*?)```/;
+
 export const ROUTES_SOURCE = String.raw`import { Controller, Delete, Get, HTTPResult, Parameter, PartialController, Post, Put, Route } from "@antelopejs/interface-api";
 
 export class UsersController extends Controller("/users") {
@@ -123,18 +128,9 @@ export class TypedController extends Controller("/typed", Greeter) {
 }
 `;
 
-/** The quick start of README.md, verbatim. */
-export const QUICK_START_SOURCE = String.raw`import { Controller, Get, Parameter } from "@antelopejs/interface-api";
-
-export class HelloController extends Controller("/hello") {
-  @Get()
-  hello(@Parameter("name", "query") name = "world") {
-    return { message: ` + "`Hello ${name}`" + String.raw` };
-  }
+/** The quick start of README.md, read from it so the journey compiles what the README shows. */
+export function quickStartSource(context: JourneyContext): string {
+  const readme = readFileSync(`${context.repo}/README.md`, "utf8");
+  const snippet = QUICK_START_BLOCK.exec(readme.slice(readme.indexOf("## Quick start")))?.[1];
+  return snippet ?? context.notVerified("README.md has no `typescript [src/index.ts]` block under its Quick start");
 }
-
-export function construct(): void {}
-export function destroy(): void {}
-export function start(): void {}
-export function stop(): void {}
-`;
