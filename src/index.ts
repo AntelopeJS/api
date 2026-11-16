@@ -6,7 +6,7 @@ import type { DevServerEndpoint } from "@antelopejs/interface-core/runtime";
 
 import { isDevMode, resolveDevMode } from "./dev-mode";
 import { logServerStarted } from "./port-binding";
-import type { Config } from "./server-config";
+import { type Config, resolveShutdownGracePeriod } from "./server-config";
 import { assertPublicBaseUrl, configVars } from "./config-vars";
 import { unwatchModulesLifecycle, watchModulesLifecycle } from "./startup-gate";
 import { createConfiguredServer } from "./server-factory";
@@ -33,7 +33,7 @@ let listeners: BoundListener[] = [];
 function releaseListeners(): Promise<void> {
   const pending = listeners;
   listeners = [];
-  return closeListeners(pending);
+  return closeListeners(pending, resolveShutdownGracePeriod(getConfig()));
 }
 
 async function bindConfiguredPorts(): Promise<void> {
