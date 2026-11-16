@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.7.6
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.7.5...v1.7.6)
+
+### 🩹 Fixes
+
+- **shutdown:** Let in-flight requests finish within a configurable grace period ([#156](https://github.com/AntelopeJS/api/pull/156))
+
+### 📦 Build
+
+- Move to @antelopejs/tooling-configs 0.8 and the three-tier CI ([#154](https://github.com/AntelopeJS/api/pull/154))
+
+### ✅ Tests
+
+- Add a formal target for the route tree and journeys for refused upgrades and oversized bodies ([#157](https://github.com/AntelopeJS/api/pull/157))
+- **verify:** Cover shutdownGracePeriodMs and read the quick start from README.md ([#158](https://github.com/AntelopeJS/api/pull/158))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli
+
 ## v1.7.5
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.7.4...v1.7.5)
