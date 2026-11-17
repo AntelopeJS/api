@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.7.7
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.7.6...v1.7.7)
+
+### 🚀 Enhancements
+
+- **shutdown:** Drain requests in flight before any module stops ([#160](https://github.com/AntelopeJS/api/pull/160))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli
+
 ## v1.7.6
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.7.5...v1.7.6)
