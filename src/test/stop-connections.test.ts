@@ -39,6 +39,7 @@ const PIPELINED_REUSE_PORT = 25490;
 const STREAMED_PORT = 25500;
 const DRAIN_PORT = 25520;
 const DRAIN_THEN_STOP_PORT = 25530;
+const DRAIN_DEFAULT_GRACE_PORT = 25540;
 const ROUTE_ROOT = "/stop-connections";
 const STREAM_PATH = `${ROUTE_ROOT}/stream`;
 const SLOW_PATH = `${ROUTE_ROOT}/slow`;
@@ -53,6 +54,9 @@ const REUSED_PATH = `${ROUTE_ROOT}/reused`;
 const STREAMED_PATH = `${ROUTE_ROOT}/streamed`;
 const DEPENDENT_PATH = `${ROUTE_ROOT}/dependent`;
 const DRAIN_THEN_STOP_PATH = `${ROUTE_ROOT}/drain-then-stop`;
+const DRAIN_DEFAULT_GRACE_PATH = `${ROUTE_ROOT}/drain-default-grace`;
+const DRAINED_RESPONSE_MS = 2000;
+const DRAINED_TEST_TIMEOUT_MS = 2 * DRAINED_RESPONSE_MS;
 const STREAM_CHUNK = "a";
 const CHUNKED_BODY_END = "0\r\n\r\n";
 const FIRST_OF_PAIR_MS = 50;
@@ -555,5 +559,26 @@ describe("Draining at shutdown", () => {
 
     assert.equal((await response).status, SUCCESS_STATUS);
     await draining;
+  });
+
+  it("answers a 2 s request in flight under the default grace period", async function () {
+    this.timeout(DRAINED_TEST_TIMEOUT_MS);
+    const received = registerSlowRoute(
+      DRAIN_DEFAULT_GRACE_PATH,
+      DRAINED_RESPONSE_MS,
+    );
+    await serve(DRAIN_DEFAULT_GRACE_PORT);
+    const response = request(
+      DRAIN_DEFAULT_GRACE_PORT,
+      DRAIN_DEFAULT_GRACE_PATH,
+    );
+    await received;
+
+    await drain();
+
+    assert.deepEqual(await response, {
+      status: SUCCESS_STATUS,
+      body: SLOW_RESPONSE_BODY,
+    });
   });
 });
