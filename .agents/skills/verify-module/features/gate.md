@@ -12,7 +12,7 @@ journeys:
 
 # Gate
 
-The startup gate of README.md: the port is served from `construct` on, but every request is answered `503 error.server_starting` with `Retry-After: 1` until `Events.ModulesStarted`, and again from `Events.ModulesStopping`; `GET /_live` always answers 200 and a CORS preflight is answered.
+The startup gate of README.md: the port is served from `construct` on, but every request is answered `503 error.server_starting` with `Retry-After: 1` until `Events.ModulesStarted`, and again from `Events.ModulesStopping` on a connection already open, while the port refuses new connections from the drain on; `GET /_live` answers 200 while the port accepts connections, and a CORS preflight is answered.
 
 ## Sub-features
 
