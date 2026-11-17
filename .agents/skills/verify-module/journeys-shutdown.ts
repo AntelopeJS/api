@@ -45,3 +45,38 @@ export const serverShutdown: Journey = {
     context.expect(short.stopFolder, [holds("the project exits at the end of the default grace", short.stopMs < SLOW_MS - IN_FLIGHT_BEFORE_SIGNAL_MS, `stopped after ${String(short.stopMs)} ms, grace ${String(DEFAULT_GRACE_MS)} ms`)]);
   },
 };
+
+const DEPENDENT_MS = 1500;
+
+const DEPENDENT_SOURCE = String.raw`import { Controller, Get } from "@antelopejs/interface-api";
+
+export class DependentController extends Controller("/dependent") {
+  @Get("")
+  async dependent() {
+    await new Promise((resolve) => setTimeout(resolve, ${String(DEPENDENT_MS)}));
+    if ((globalThis as { verifyStoreStopped?: boolean }).verifyStoreStopped) throw new Error("the store stopped under the request");
+    return { done: true };
+  }
+}
+`;
+
+const STORE_MODULE = String.raw`"use strict";
+exports.construct = function construct() {};
+exports.start = function start() {};
+exports.stop = function stop() { globalThis.verifyStoreStopped = true; };
+exports.destroy = function destroy() {};
+`;
+
+export const serverDrain: Journey = {
+  title: "Ctrl+C answers a request in flight 200 although a module its handler calls stops at shutdown",
+  entryPoint: "Ctrl+C on `ajs project dev` while a request is in flight whose handler needs another module of the project",
+  async run(context) {
+    const session = await open(context, { controllers: DEPENDENT_SOURCE, extra: STORE_MODULE, config: { shutdownGracePeriodMs: LONG_GRACE_MS } });
+    const reply = session.get("GET /dependent, interrupted while in flight", "/dependent", { timeoutMs: DEPENDENT_MS + LONG_GRACE_MS });
+    await sleep(IN_FLIGHT_BEFORE_SIGNAL_MS);
+    const stopped = await session.stop();
+    context.expect(stopped.folder, [interrupted(stopped)]);
+    const answered = await reply;
+    context.expect(answered.folder, [status("the request in flight is answered before the store stops", answered, 200), same("its body", answered.json, { done: true })]);
+  },
+};

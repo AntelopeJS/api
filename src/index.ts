@@ -29,6 +29,7 @@ import "./middlewares/cors";
 let servers: net.Server[] = [];
 let listening = false;
 let listeners: BoundListener[] = [];
+let closing: Promise<void> = Promise.resolve();
 
 function releaseListeners(): Promise<void> {
   const pending = listeners;
@@ -205,6 +206,24 @@ export async function listenServers(): Promise<void> {
   await registerDevServerEndpoints(getListeningEndpoints());
 }
 
-export async function stop(): Promise<void> {
-  await Promise.all([closeServers(), releaseListeners()]);
+/**
+ * Stops accepting connections and resolves once the requests in flight
+ * have ended or `shutdownGracePeriodMs` has elapsed, including the
+ * requests of a drain still in progress.
+ */
+export function stop(): Promise<void> {
+  closing = Promise.all([closing, closeServers(), releaseListeners()]).then(
+    () => undefined,
+  );
+  return closing;
+}
+
+/**
+ * The core's drain step at project shutdown, run before any module stops:
+ * the requests in flight end while the modules their handlers call still
+ * run. The core stops the modules anyway after 5 s; `stop` then still
+ * waits for the requests of this drain.
+ */
+export function drain(): Promise<void> {
+  return stop();
 }
