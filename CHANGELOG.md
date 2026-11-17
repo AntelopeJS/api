@@ -9,6 +9,10 @@
 - **shutdown:** Let the drain wait for requests in flight up to the core's 5 s ([#162](https://github.com/AntelopeJS/api/pull/162))
 - Require core 1.24.4 for the shutdown drain ([#163](https://github.com/AntelopeJS/api/pull/163))
 
+### Upgrade notes
+
+- Drain at shutdown needs `@antelopejs/core` 1.24.4 or later. From `Events.ModulesStopping` the module refuses new connections and waits for the requests in flight before any module stops. On an earlier core the port stays open until this module stops, and the gate answers `503` there.
+
 ### ❤️ Contributors
 
 - Antony Rizzitelli
