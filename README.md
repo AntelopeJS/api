@@ -67,14 +67,14 @@ export default defineConfig({
 });
 ```
 
-| Key                     | Default                      | Description                                                                                                                                                                       |
-| ----------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `servers`               | one HTTP server on port `80` | Servers to start. Each entry takes `protocol` (`http` or `https`), an optional `host` and `port`, and any Node.js `http.ServerOptions` or `https.ServerOptions`.                  |
-| `publicBaseUrl`         | `API_LOCAL_BASE_URL` in dev  | Origin that browsers use to reach the API. Outside development it is required, and the boot fails without it.                                                                     |
-| `strictPort`            | `false`                      | In development, fail instead of falling back to the next free port. Outside development, the module always binds the exact port.                                                  |
-| `autoListen`            | `true`                       | Set to `false` to create the servers and serve them only when a module calls `Listen()`.                                                                                          |
-| `shutdownGracePeriodMs` | `1000`                       | How long `stop` lets in-flight requests finish, in milliseconds. Event streams and websockets still open when it elapses are destroyed. The core caps the whole shutdown at 10 s. |
-| `cors`                  | none                         | CORS policy. `allowedMethods` defaults to `GET,HEAD,PUT,PATCH,POST,DELETE`, and `credentials` defaults to `true`. Change it at run time with `SetCorsConfig()`.                   |
+| Key                     | Default                      | Description                                                                                                                                                                                                                            |
+| ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `servers`               | one HTTP server on port `80` | Servers to start. Each entry takes `protocol` (`http` or `https`), an optional `host` and `port`, and any Node.js `http.ServerOptions` or `https.ServerOptions`.                                                                       |
+| `publicBaseUrl`         | `API_LOCAL_BASE_URL` in dev  | Origin that browsers use to reach the API. Outside development it is required, and the boot fails without it.                                                                                                                          |
+| `strictPort`            | `false`                      | In development, fail instead of falling back to the next free port. Outside development, the module always binds the exact port.                                                                                                       |
+| `autoListen`            | `true`                       | Set to `false` to create the servers and serve them only when a module calls `Listen()`.                                                                                                                                               |
+| `shutdownGracePeriodMs` | `1000`                       | How long the shutdown lets in-flight requests finish, in milliseconds. Event streams and websockets still open when it elapses are destroyed. The core stops the other modules after 5 s of drain and caps the whole shutdown at 10 s. |
+| `cors`                  | none                         | CORS policy. `allowedMethods` defaults to `GET,HEAD,PUT,PATCH,POST,DELETE`, and `credentials` defaults to `true`. Change it at run time with `SetCorsConfig()`.                                                                        |
 
 In development, loopback origins (`localhost`, `127.0.0.1`, `[::1]`, any port) pass CORS without configuration. List every other origin in `allowedOrigins`.
 
@@ -102,11 +102,11 @@ The package names the function that computes them, `configVars` in `dist/config-
 
 ### Startup gate
 
-The module serves the port from `construct` on. Until the core announces that every module has started, it answers every request with `503`, the body `error.server_starting`, and `Retry-After: 1`. `@antelopejs/core` sends that announcement as `Events.ModulesStarted` of `@antelopejs/interface-core/modules`. When the whole project starts to stop at shutdown (`Events.ModulesStopping`), the module answers `503` again. Stopping, reloading, or removing a single module at run time leaves the gate open.
+The module serves the port from `construct` on. Until the core announces that every module has started, it answers every request with `503`, the body `error.server_starting`, and `Retry-After: 1`. `@antelopejs/core` sends that announcement as `Events.ModulesStarted` of `@antelopejs/interface-core/modules`. When the whole project starts to stop at shutdown (`Events.ModulesStopping`), the module answers `503` again to a new request on a connection already open, and refuses new connections. It then drains: the requests in flight finish before any module stops, so a handler can still call the modules it needs. Stopping, reloading, or removing a single module at run time leaves the gate open.
 
 A module that fails to start at launch ends the project. The module answers `503` until the start fails, then the core destroys every module, `ajs project` exits with code 1, and the port refuses connections. A `start()` that has not settled after 120 seconds makes the start fail the same way. A module marked `optional: true` in the project config starts after the gate opens, and the project runs on without it when its start fails. Nothing runs for a request the gate holds, so a client can retry it. The module answers CORS preflights while the gate is closed, so a browser can read the `503`.
 
-`GET /_live` always answers `200`. Use it as the liveness probe, and use a normal route as the readiness probe.
+`GET /_live` answers `200` whenever the port accepts connections. Use it as the liveness probe, and use a normal route as the readiness probe.
 
 ## Quick start
 

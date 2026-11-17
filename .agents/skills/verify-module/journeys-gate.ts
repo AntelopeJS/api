@@ -14,7 +14,7 @@ function names(value: Json | undefined): string[] {
 }
 
 export const startupGate: Journey = {
-  title: "the API port is bound before other modules construct, and until every module has started, every request is answered 503 error.server_starting with Retry-After 1 and nothing runs, while /_live answers 200 and a CORS preflight is answered; then requests are served, and the gate closes again when the project stops while /_live still answers 200",
+  title: "the API port is bound before other modules construct, and until every module has started, every request is answered 503 error.server_starting with Retry-After 1 and nothing runs, while /_live answers 200 and a CORS preflight is answered; then requests are served, and the port refuses new connections, /_live included, once the project stops",
   entryPoint: "requests sent while a module is still starting and while the project is stopping",
   async run(context) {
     const session = await open(context, { controllers: GATE_SOURCE, config: { cors: { allowedOrigins: APP } }, appConfig: { connectAtConstruct: "${@api.API_PORT}" }, startDelayMs: 4500, stopDelayMs: 4500 });
@@ -62,11 +62,9 @@ export const startupGate: Journey = {
 
     const stopping = session.stop();
     const closing = await session.get("GET /ping while the project stops", "/ping");
-    context.expect(closing.folder, [status("the gate closes when the project starts stopping", closing, 503), bodyIs("with the same body", closing, "error.server_starting"), headerIs("and Retry-After", closing, "retry-after", "1")]);
+    context.expect(closing.folder, [holds("the port refuses new connections once the project starts stopping", closing.status === null, `status ${String(closing.status)}`)]);
     const liveStopping = await session.get("GET /_live while the project stops", "/_live");
-    context.expect(liveStopping.folder, [status("/_live always answers 200, also while the project stops", liveStopping, 200)]);
-    const liveQueryStopping = await session.get("GET /_live?probe=1 while the project stops", "/_live?probe=1");
-    context.expect(liveQueryStopping.folder, [status("with a query string too", liveQueryStopping, 200)]);
+    context.expect(liveStopping.folder, [holds("/_live is refused too", liveStopping.status === null, `status ${String(liveStopping.status)}`)]);
     const stopped = await stopping;
     context.expect(stopped.folder, [holds("the project stopped on SIGINT", stopped.exitCode === 130 || stopped.signal === "SIGINT", `exit ${String(stopped.exitCode)}, signal ${String(stopped.signal)}`)]);
   },
