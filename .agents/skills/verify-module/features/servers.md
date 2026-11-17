@@ -22,6 +22,7 @@ journeys:
   - listen-on-demand
   - production-boot
   - server-shutdown
+  - server-drain
 ---
 
 # Servers
@@ -39,6 +40,7 @@ journeys:
 - `server-reload`: `StopModule`, `DestroyModule` and `LoadModule` with a new `config` on the api module of the running project: the new configuration binds the new port, the old port stops answering, and a `cors` key the new configuration omits no longer applies.
 - `listen-on-demand`: `autoListen: false` serves nothing until `Listen()`. `Listen()` returns a Promise.
 - `server-shutdown`: Ctrl+C while a 2.5 s request is in flight: with `shutdownGracePeriodMs: 4000` the request is answered 200 and the project exits once it is, before the grace ends; without the key the default 1 s grace cuts the same request and the project exits after it.
+- `server-drain`: Ctrl+C while a 1.5 s request is in flight whose handler throws once a second module of the project has stopped: the request is answered 200, because the module drains its requests before any module stops.
 - `production-boot`: `ajs project build` then `start`: the boot fails without `publicBaseUrl` and says so, binds the exact port (a busy one is a failure, not a fallback), publishes `publicBaseUrl` without its slash, and sends no CORS header without a `cors` config; with a `cors` config the listed origin is allowed and `localhost` and `127.0.0.1` are not.
 
 ## How to get to it (user POV)
