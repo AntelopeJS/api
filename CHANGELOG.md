@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.7.8
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.7.7...v1.7.8)
+
+### 🩹 Fixes
+
+- **shutdown:** Let the drain wait for requests in flight up to the core's 5 s ([#162](https://github.com/AntelopeJS/api/pull/162))
+- Require core 1.24.4 for the shutdown drain ([#163](https://github.com/AntelopeJS/api/pull/163))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli
+
 ## v1.7.7
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.7.6...v1.7.7)
