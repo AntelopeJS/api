@@ -7,7 +7,7 @@ import { open, type ModuleConfig } from "./session.ts";
 
 const SLOW_MS = 2500;
 const LONG_GRACE_MS = 4000;
-const DEFAULT_GRACE_MS = 1000;
+const DRAIN_GRACE_MS = 5000;
 const IN_FLIGHT_BEFORE_SIGNAL_MS = 500;
 
 const SHUTDOWN_SOURCE = String.raw`import { Controller, Get } from "@antelopejs/interface-api";
@@ -34,15 +34,15 @@ async function stopDuringRequest(context: JourneyContext, config: ModuleConfig, 
 }
 
 export const serverShutdown: Journey = {
-  title: "Ctrl+C lets a request in flight finish within shutdownGracePeriodMs and exits once it is answered, while the default grace of 1 s cuts the same request",
+  title: "Ctrl+C lets a request in flight finish within shutdownGracePeriodMs, or within the 5 s the core waits for the drain without the key, and exits once it is answered",
   entryPoint: "`shutdownGracePeriodMs` in the module's config, and Ctrl+C on `ajs project dev` while a request is in flight",
   async run(context) {
     const long = await stopDuringRequest(context, { shutdownGracePeriodMs: LONG_GRACE_MS }, `under a ${String(LONG_GRACE_MS)} ms grace`);
     context.expect(long.reply.folder, [status("the request in flight is answered", long.reply, 200), same("its body", long.reply.json, { done: true })]);
     context.expect(long.stopFolder, [holds("the project exits once the request is answered, not at the end of the grace", long.stopMs < LONG_GRACE_MS, `stopped after ${String(long.stopMs)} ms`)]);
-    const short = await stopDuringRequest(context, {}, "under the default grace");
-    context.expect(short.reply.folder, [holds("the default grace cuts a request longer than it", short.reply.status !== 200, `status ${String(short.reply.status)}`)]);
-    context.expect(short.stopFolder, [holds("the project exits at the end of the default grace", short.stopMs < SLOW_MS - IN_FLIGHT_BEFORE_SIGNAL_MS, `stopped after ${String(short.stopMs)} ms, grace ${String(DEFAULT_GRACE_MS)} ms`)]);
+    const unset = await stopDuringRequest(context, {}, "without shutdownGracePeriodMs");
+    context.expect(unset.reply.folder, [status("the drain lets a request longer than the 1 s stop grace finish", unset.reply, 200), same("its body", unset.reply.json, { done: true })]);
+    context.expect(unset.stopFolder, [holds("the project exits once the request is answered, not at the end of the drain", unset.stopMs < DRAIN_GRACE_MS, `stopped after ${String(unset.stopMs)} ms`)]);
   },
 };
 

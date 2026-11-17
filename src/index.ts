@@ -6,7 +6,11 @@ import type { DevServerEndpoint } from "@antelopejs/interface-core/runtime";
 
 import { isDevMode, resolveDevMode } from "./dev-mode";
 import { logServerStarted } from "./port-binding";
-import { type Config, resolveShutdownGracePeriod } from "./server-config";
+import {
+  type Config,
+  DEFAULT_DRAIN_GRACE_PERIOD_MS,
+  resolveShutdownGracePeriod,
+} from "./server-config";
 import { assertPublicBaseUrl, configVars } from "./config-vars";
 import { unwatchModulesLifecycle, watchModulesLifecycle } from "./startup-gate";
 import { createConfiguredServer } from "./server-factory";
@@ -31,10 +35,12 @@ let listening = false;
 let listeners: BoundListener[] = [];
 let closing: Promise<void> = Promise.resolve();
 
-function releaseListeners(): Promise<void> {
+function releaseListeners(
+  gracePeriodMs = resolveShutdownGracePeriod(getConfig()),
+): Promise<void> {
   const pending = listeners;
   listeners = [];
-  return closeListeners(pending, resolveShutdownGracePeriod(getConfig()));
+  return closeListeners(pending, gracePeriodMs);
 }
 
 async function bindConfiguredPorts(): Promise<void> {
@@ -212,18 +218,27 @@ export async function listenServers(): Promise<void> {
  * requests of a drain still in progress.
  */
 export function stop(): Promise<void> {
-  closing = Promise.all([closing, closeServers(), releaseListeners()]).then(
-    () => undefined,
-  );
-  return closing;
+  return close(resolveShutdownGracePeriod(getConfig()));
 }
 
 /**
  * The core's drain step at project shutdown, run before any module stops:
  * the requests in flight end while the modules their handlers call still
- * run. The core stops the modules anyway after 5 s; `stop` then still
+ * run. Without a configured `shutdownGracePeriodMs`, they get the 5 s the
+ * core waits for the drain before it stops the modules; `stop` then still
  * waits for the requests of this drain.
  */
 export function drain(): Promise<void> {
-  return stop();
+  return close(
+    resolveShutdownGracePeriod(getConfig(), DEFAULT_DRAIN_GRACE_PERIOD_MS),
+  );
+}
+
+function close(gracePeriodMs: number): Promise<void> {
+  closing = Promise.all([
+    closing,
+    closeServers(),
+    releaseListeners(gracePeriodMs),
+  ]).then(() => undefined);
+  return closing;
 }

@@ -53,7 +53,7 @@ export default defineConfig({
         publicBaseUrl: "https://api.example.com",
         strictPort: false,
         autoListen: true,
-        shutdownGracePeriodMs: 1000,
+        shutdownGracePeriodMs: 5000,
         cors: {
           allowedOrigins: ["https://app.example.com", /\.example\.com$/],
           allowedMethods: ["GET", "POST", "PUT", "DELETE"],
@@ -67,14 +67,14 @@ export default defineConfig({
 });
 ```
 
-| Key                     | Default                      | Description                                                                                                                                                                                                                            |
-| ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `servers`               | one HTTP server on port `80` | Servers to start. Each entry takes `protocol` (`http` or `https`), an optional `host` and `port`, and any Node.js `http.ServerOptions` or `https.ServerOptions`.                                                                       |
-| `publicBaseUrl`         | `API_LOCAL_BASE_URL` in dev  | Origin that browsers use to reach the API. Outside development it is required, and the boot fails without it.                                                                                                                          |
-| `strictPort`            | `false`                      | In development, fail instead of falling back to the next free port. Outside development, the module always binds the exact port.                                                                                                       |
-| `autoListen`            | `true`                       | Set to `false` to create the servers and serve them only when a module calls `Listen()`.                                                                                                                                               |
-| `shutdownGracePeriodMs` | `1000`                       | How long the shutdown lets in-flight requests finish, in milliseconds. Event streams and websockets still open when it elapses are destroyed. The core stops the other modules after 5 s of drain and caps the whole shutdown at 10 s. |
-| `cors`                  | none                         | CORS policy. `allowedMethods` defaults to `GET,HEAD,PUT,PATCH,POST,DELETE`, and `credentials` defaults to `true`. Change it at run time with `SetCorsConfig()`.                                                                        |
+| Key                     | Default                      | Description                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `servers`               | one HTTP server on port `80` | Servers to start. Each entry takes `protocol` (`http` or `https`), an optional `host` and `port`, and any Node.js `http.ServerOptions` or `https.ServerOptions`.                                                                                                                                                                                                         |
+| `publicBaseUrl`         | `API_LOCAL_BASE_URL` in dev  | Origin that browsers use to reach the API. Outside development it is required, and the boot fails without it.                                                                                                                                                                                                                                                            |
+| `strictPort`            | `false`                      | In development, fail instead of falling back to the next free port. Outside development, the module always binds the exact port.                                                                                                                                                                                                                                         |
+| `autoListen`            | `true`                       | Set to `false` to create the servers and serve them only when a module calls `Listen()`.                                                                                                                                                                                                                                                                                 |
+| `shutdownGracePeriodMs` | `1000`, `5000` at shutdown   | How long a stop lets in-flight requests finish, in milliseconds. Event streams and websockets still open when it elapses are destroyed. Unset, the drain at project shutdown uses the 5 s the core waits for it before it stops the other modules, so an event stream or websocket left open holds the shutdown for those 5 s. The core caps the whole shutdown at 10 s. |
+| `cors`                  | none                         | CORS policy. `allowedMethods` defaults to `GET,HEAD,PUT,PATCH,POST,DELETE`, and `credentials` defaults to `true`. Change it at run time with `SetCorsConfig()`.                                                                                                                                                                                                          |
 
 In development, loopback origins (`localhost`, `127.0.0.1`, `[::1]`, any port) pass CORS without configuration. List every other origin in `allowedOrigins`.
 
@@ -148,7 +148,7 @@ export function stop(): void {}
 
 | Package                          | Supported        | Tested with |
 | -------------------------------- | ---------------- | ----------- |
-| `@antelopejs/core`               | `~1.24.0`        | `1.24.0`    |
+| `@antelopejs/core`               | `~1.24.4`        | `1.24.4`    |
 | `@antelopejs/interface-api`      | `>=0.3.0 <0.4.0` | `0.3.2`     |
 | `@antelopejs/interface-api-util` | `>=0.3.0 <0.4.0` | `0.3.2`     |
 | `@antelopejs/interface-core`     | `>=0.5.1 <0.6.0` | `0.5.1`     |
@@ -156,6 +156,10 @@ export function stop(): void {}
 <!-- antelopejs-docs-compat:end -->
 
 The generated table lists `@antelopejs/core`, which this module requires as a peer dependency, and the interface packages it loads, with their ranges read from `package.json`. If another loaded module declares a range that excludes the copy this module loads, `@antelopejs/core` refuses to start the project. It reports `Incompatible interface package resolution` and names the module, its range, and the copy it found.
+
+## Upgrade notes
+
+- Drain at shutdown needs `@antelopejs/core` 1.24.4 or later. From `Events.ModulesStopping` the module refuses new connections and waits for the requests in flight before any module stops. On an earlier core the port stays open until this module stops, and the gate answers `503` there.
 
 ## Contributing
 
