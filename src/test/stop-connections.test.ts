@@ -1,31 +1,27 @@
-import sinon from "sinon";
 import assert from "node:assert";
 import * as http from "node:http";
 import * as net from "node:net";
 import { WebSocket } from "ws";
-import { HandlerPriority } from "@antelopejs/interface-api";
-import * as coreRuntime from "@antelopejs/interface-core/runtime";
 
+import { DEFAULT_SHUTDOWN_GRACE_PERIOD_MS } from "../server-config";
+import { stop } from "../index";
 import {
-  type Config,
-  DEFAULT_SHUTDOWN_GRACE_PERIOD_MS,
-} from "../server-config";
-import {
-  type RouteCallback,
-  registerHandler,
-  unregisterHandler,
-} from "../server";
-import {
-  configure,
-  drain,
-  getConfig,
-  listenServers,
-  provide,
-  start,
-  stop,
-} from "../index";
+  LONG_GRACE_PERIOD_MS,
+  LONG_RESPONSE_MS,
+  ROUTE_ROOT,
+  SLOW_RESPONSE_BODY,
+  SLOW_RESPONSE_MS,
+  SUCCESS_STATUS,
+  TEST_HOST,
+  delay,
+  handledRequests,
+  register,
+  registerSlowRoute,
+  request,
+  restoreServerAfterEach,
+  serve,
+} from "./connection-fixture";
 
-const TEST_HOST = "127.0.0.1";
 const STREAM_PORT = 25400;
 const IN_FLIGHT_PORT = 25410;
 const WEBSOCKET_PORT = 25420;
@@ -37,10 +33,6 @@ const QUEUED_PORT = 25470;
 const REUSED_PORT = 25480;
 const PIPELINED_REUSE_PORT = 25490;
 const STREAMED_PORT = 25500;
-const DRAIN_PORT = 25520;
-const DRAIN_THEN_STOP_PORT = 25530;
-const DRAIN_DEFAULT_GRACE_PORT = 25540;
-const ROUTE_ROOT = "/stop-connections";
 const STREAM_PATH = `${ROUTE_ROOT}/stream`;
 const SLOW_PATH = `${ROUTE_ROOT}/slow`;
 const LONG_PATH = `${ROUTE_ROOT}/long`;
@@ -52,11 +44,6 @@ const QUEUED_FAST_PATH = `${ROUTE_ROOT}/queued-fast`;
 const FAST_RESPONSE_MS = 0;
 const REUSED_PATH = `${ROUTE_ROOT}/reused`;
 const STREAMED_PATH = `${ROUTE_ROOT}/streamed`;
-const DEPENDENT_PATH = `${ROUTE_ROOT}/dependent`;
-const DRAIN_THEN_STOP_PATH = `${ROUTE_ROOT}/drain-then-stop`;
-const DRAIN_DEFAULT_GRACE_PATH = `${ROUTE_ROOT}/drain-default-grace`;
-const DRAINED_RESPONSE_MS = 2000;
-const DRAINED_TEST_TIMEOUT_MS = 2 * DRAINED_RESPONSE_MS;
 const STREAM_CHUNK = "a";
 const CHUNKED_BODY_END = "0\r\n\r\n";
 const FIRST_OF_PAIR_MS = 50;
@@ -65,55 +52,9 @@ const PAIR_LAST_PATH = `${ROUTE_ROOT}/pair-last`;
 const FAST_RESPONSE_SETTLE_MS = 50;
 const OK_STATUS_LINE = /HTTP\/1\.1 200 OK/g;
 const SOCKET_PATH = `${ROUTE_ROOT}/socket`;
-const PUBLIC_BASE_URL = "https://api.example.com";
-const SLOW_RESPONSE_MS = 200;
-const LONG_RESPONSE_MS = 1500;
-const LONG_GRACE_PERIOD_MS = 3000;
-const SLOW_RESPONSE_BODY = "done";
 const STREAM_EVENT = "data: ready\n\n";
-const SUCCESS_STATUS = 200;
 const STOP_MARGIN_MS = 1000;
 const STOP_DEADLINE_MS = DEFAULT_SHUTDOWN_GRACE_PERIOD_MS + STOP_MARGIN_MS;
-
-type RouteMode = "handler" | "websocket";
-
-interface CapturedResponse {
-  status: number;
-  body: string;
-}
-
-function stubRuntime(): void {
-  sinon
-    .stub(coreRuntime, "GetRuntimeInfo")
-    .resolves({ dev: false, projectPath: "", env: "test" });
-  sinon.stub(coreRuntime, "RegisterDevServer").resolves();
-}
-
-function singleServerConfig(
-  port: number,
-  shutdownGracePeriodMs?: number,
-): Config {
-  return {
-    autoListen: false,
-    shutdownGracePeriodMs,
-    publicBaseUrl: PUBLIC_BASE_URL,
-    servers: [{ protocol: "http", host: TEST_HOST, port }],
-  };
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function serve(
-  port: number,
-  shutdownGracePeriodMs?: number,
-): Promise<void> {
-  stubRuntime();
-  await provide(singleServerConfig(port, shutdownGracePeriodMs));
-  start();
-  await listenServers();
-}
 
 async function measureStop(): Promise<number> {
   const startedAt = Date.now();
@@ -138,27 +79,6 @@ function waitForClose(
   emitter: http.IncomingMessage | WebSocket,
 ): Promise<void> {
   return new Promise((resolve) => emitter.once("close", () => resolve()));
-}
-
-function request(
-  port: number,
-  path: string,
-  agent: http.Agent | false = false,
-): Promise<CapturedResponse> {
-  return new Promise((resolve, reject) => {
-    http
-      .get({ host: TEST_HOST, port, path, agent }, (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.once("end", () =>
-          resolve({
-            status: res.statusCode ?? 0,
-            body: Buffer.concat(chunks).toString(),
-          }),
-        );
-      })
-      .once("error", reject);
-  });
 }
 
 function pipelineRequests(port: number, paths: string[]): Promise<string> {
@@ -218,46 +138,6 @@ function openWebSocket(port: number): Promise<WebSocket> {
   });
 }
 
-const registeredIds: string[] = [];
-let handledRequests = 0;
-
-function register(mode: RouteMode, path: string, callback: RouteCallback) {
-  const id = `stop-connections-${registeredIds.length}`;
-  registeredIds.push(id);
-  registerHandler(
-    id,
-    {
-      mode: mode,
-      method: "get",
-      location: path,
-      priority: HandlerPriority.NORMAL,
-    },
-    callback,
-  );
-}
-
-/**
- * Registers a route answering after `durationMs`; the promise resolves once
- * `requestCount` requests are being handled.
- */
-function registerSlowRoute(path: string, durationMs: number, requestCount = 1) {
-  let handled = 0;
-  let markReceived: () => void = () => undefined;
-  const received = new Promise<void>((resolve) => {
-    markReceived = resolve;
-  });
-  register("handler", path, async () => {
-    handled += 1;
-    handledRequests += 1;
-    if (handled === requestCount) {
-      markReceived();
-    }
-    await delay(durationMs);
-    return SLOW_RESPONSE_BODY;
-  });
-  return received;
-}
-
 /**
  * Registers a route that sends its headers and a first chunk at once, then
  * ends after `durationMs`; the promise resolves once a request is handled.
@@ -268,41 +148,13 @@ function registerStreamingRoute(path: string, durationMs: number) {
     markReceived = resolve;
   });
   register("handler", path, ({ response }) => {
-    handledRequests += 1;
+    handledRequests.count += 1;
     const stream = response.getWriteStream("text/plain");
     stream.write(STREAM_CHUNK);
     setTimeout(() => stream.end(), durationMs);
     markReceived();
   });
   return received;
-}
-
-/**
- * Stops the server after each test, then restores the configuration the
- * test project started with.
- */
-function restoreServerAfterEach(): void {
-  let originalConfig: Config;
-
-  before(() => {
-    originalConfig = getConfig();
-  });
-
-  after(() => {
-    registeredIds.splice(0).forEach((id) => unregisterHandler(id));
-    if (!originalConfig.servers?.length) {
-      return;
-    }
-
-    configure(originalConfig);
-    start();
-  });
-
-  afterEach(async () => {
-    await stop();
-    sinon.restore();
-    handledRequests = 0;
-  });
 }
 
 describe("Stopping with open connections", () => {
@@ -375,7 +227,7 @@ describe("Stopping under a configured grace period", () => {
 
     await stop();
 
-    assert.equal(await responses, handledRequests);
+    assert.equal(await responses, handledRequests.count);
   });
 
   it("answers every request it handles on a pipelined connection reused during stop", async () => {
@@ -391,7 +243,7 @@ describe("Stopping under a configured grace period", () => {
 
     await stop();
 
-    assert.equal(await responses, handledRequests);
+    assert.equal(await responses, handledRequests.count);
   });
 
   it("answers every request it handles on a reused connection that streamed before stop", async () => {
@@ -407,7 +259,7 @@ describe("Stopping under a configured grace period", () => {
 
     await stop();
 
-    assert.equal(await responses, handledRequests);
+    assert.equal(await responses, handledRequests.count);
   });
 
   it("lets a request outlive the default grace period under a longer configured one", async () => {
@@ -496,89 +348,5 @@ describe("Stopping under a configured grace period", () => {
       stopDuration < LONG_GRACE_PERIOD_MS,
       `Stop took ${stopDuration} ms after a queued pipelined response`,
     );
-  });
-});
-
-/**
- * Registers a route that answers after `durationMs` unless the module it
- * depends on stopped meanwhile, as a handler calling a database module
- * does. `received` resolves once a request is handled.
- */
-function registerDependentRoute(path: string, durationMs: number) {
-  let dependencyStopped = false;
-  let markReceived: () => void = () => undefined;
-  const received = new Promise<void>((resolve) => {
-    markReceived = resolve;
-  });
-  register("handler", path, async () => {
-    markReceived();
-    await delay(durationMs);
-    if (dependencyStopped) {
-      throw new Error("the dependency stopped under the request");
-    }
-    return SLOW_RESPONSE_BODY;
-  });
-  return {
-    received,
-    stopDependency: () => {
-      dependencyStopped = true;
-    },
-  };
-}
-
-describe("Draining at shutdown", () => {
-  restoreServerAfterEach();
-
-  it("answers a request in flight before a module it depends on stops after the drain", async () => {
-    const route = registerDependentRoute(DEPENDENT_PATH, SLOW_RESPONSE_MS);
-    await serve(DRAIN_PORT);
-    const response = request(DRAIN_PORT, DEPENDENT_PATH);
-    await route.received;
-
-    await drain();
-    route.stopDependency();
-
-    assert.deepEqual(await response, {
-      status: SUCCESS_STATUS,
-      body: SLOW_RESPONSE_BODY,
-    });
-  });
-
-  it("makes a stop that arrives during the drain wait for the request in flight", async () => {
-    const route = registerDependentRoute(
-      DRAIN_THEN_STOP_PATH,
-      LONG_RESPONSE_MS,
-    );
-    await serve(DRAIN_THEN_STOP_PORT, LONG_GRACE_PERIOD_MS);
-    const response = request(DRAIN_THEN_STOP_PORT, DRAIN_THEN_STOP_PATH);
-    await route.received;
-
-    const draining = drain();
-    await stop();
-    route.stopDependency();
-
-    assert.equal((await response).status, SUCCESS_STATUS);
-    await draining;
-  });
-
-  it("answers a 2 s request in flight under the default grace period", async function () {
-    this.timeout(DRAINED_TEST_TIMEOUT_MS);
-    const received = registerSlowRoute(
-      DRAIN_DEFAULT_GRACE_PATH,
-      DRAINED_RESPONSE_MS,
-    );
-    await serve(DRAIN_DEFAULT_GRACE_PORT);
-    const response = request(
-      DRAIN_DEFAULT_GRACE_PORT,
-      DRAIN_DEFAULT_GRACE_PATH,
-    );
-    await received;
-
-    await drain();
-
-    assert.deepEqual(await response, {
-      status: SUCCESS_STATUS,
-      body: SLOW_RESPONSE_BODY,
-    });
   });
 });
