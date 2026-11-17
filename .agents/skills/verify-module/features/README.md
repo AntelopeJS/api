@@ -16,7 +16,7 @@ The module keeps no state and calls no service, so `verify.config.ts` declares n
 | [websocket](websocket.md) | Serves WebSocket connections with `@WebsocketHandler` and `@Connection`. | websocket-handlers, secure-websocket, websocket-refusals |
 | [guards](guards.md) | Guards routes with `assert`, `assertValidation` and `RateLimit` from interface-api-util. | assert-guards, assert-validations, rate-limiting, rate-limit-ordering |
 | [cors](cors.md) | Sets the CORS policy in the module config or at run time with `SetCorsConfig`. | cors-config, cors-defaults, cors-runtime, cors-credentials, cors-unconfigured |
-| [servers](servers.md) | Configures `servers`, `publicBaseUrl`, `strictPort`, `autoListen` and `shutdownGracePeriodMs`. | server-ports, port-fallback, server-protocols, server-options, dev-registry, server-sockets, server-reload, listen-on-demand, production-boot, server-shutdown |
+| [servers](servers.md) | Configures `servers`, `publicBaseUrl`, `strictPort`, `autoListen` and `shutdownGracePeriodMs`. | server-ports, port-fallback, server-protocols, server-options, dev-registry, server-sockets, server-reload, listen-on-demand, production-boot, server-shutdown, server-drain |
 | [gate](gate.md) | Gets `503` until every module has started, and `GET /_live` at any time. | startup-gate, failed-start, module-lifecycle |
 | [config-vars](config-vars.md) | Resolves `${@api.*}` config variables and adds the module with its manifest. | config-variables, manifest, modules-add, interface-ranges |
 | [smoke](smoke.md) | The fixed journey every verdict runs. | module-dev, route-forms |

@@ -17,6 +17,7 @@ import {
 } from "../server";
 import {
   configure,
+  drain,
   getConfig,
   listenServers,
   provide,
@@ -36,6 +37,8 @@ const QUEUED_PORT = 25470;
 const REUSED_PORT = 25480;
 const PIPELINED_REUSE_PORT = 25490;
 const STREAMED_PORT = 25500;
+const DRAIN_PORT = 25520;
+const DRAIN_THEN_STOP_PORT = 25530;
 const ROUTE_ROOT = "/stop-connections";
 const STREAM_PATH = `${ROUTE_ROOT}/stream`;
 const SLOW_PATH = `${ROUTE_ROOT}/slow`;
@@ -48,6 +51,8 @@ const QUEUED_FAST_PATH = `${ROUTE_ROOT}/queued-fast`;
 const FAST_RESPONSE_MS = 0;
 const REUSED_PATH = `${ROUTE_ROOT}/reused`;
 const STREAMED_PATH = `${ROUTE_ROOT}/streamed`;
+const DEPENDENT_PATH = `${ROUTE_ROOT}/dependent`;
+const DRAIN_THEN_STOP_PATH = `${ROUTE_ROOT}/drain-then-stop`;
 const STREAM_CHUNK = "a";
 const CHUNKED_BODY_END = "0\r\n\r\n";
 const FIRST_OF_PAIR_MS = 50;
@@ -487,5 +492,68 @@ describe("Stopping under a configured grace period", () => {
       stopDuration < LONG_GRACE_PERIOD_MS,
       `Stop took ${stopDuration} ms after a queued pipelined response`,
     );
+  });
+});
+
+/**
+ * Registers a route that answers after `durationMs` unless the module it
+ * depends on stopped meanwhile, as a handler calling a database module
+ * does. `received` resolves once a request is handled.
+ */
+function registerDependentRoute(path: string, durationMs: number) {
+  let dependencyStopped = false;
+  let markReceived: () => void = () => undefined;
+  const received = new Promise<void>((resolve) => {
+    markReceived = resolve;
+  });
+  register("handler", path, async () => {
+    markReceived();
+    await delay(durationMs);
+    if (dependencyStopped) {
+      throw new Error("the dependency stopped under the request");
+    }
+    return SLOW_RESPONSE_BODY;
+  });
+  return {
+    received,
+    stopDependency: () => {
+      dependencyStopped = true;
+    },
+  };
+}
+
+describe("Draining at shutdown", () => {
+  restoreServerAfterEach();
+
+  it("answers a request in flight before a module it depends on stops after the drain", async () => {
+    const route = registerDependentRoute(DEPENDENT_PATH, SLOW_RESPONSE_MS);
+    await serve(DRAIN_PORT);
+    const response = request(DRAIN_PORT, DEPENDENT_PATH);
+    await route.received;
+
+    await drain();
+    route.stopDependency();
+
+    assert.deepEqual(await response, {
+      status: SUCCESS_STATUS,
+      body: SLOW_RESPONSE_BODY,
+    });
+  });
+
+  it("makes a stop that arrives during the drain wait for the request in flight", async () => {
+    const route = registerDependentRoute(
+      DRAIN_THEN_STOP_PATH,
+      LONG_RESPONSE_MS,
+    );
+    await serve(DRAIN_THEN_STOP_PORT, LONG_GRACE_PERIOD_MS);
+    const response = request(DRAIN_THEN_STOP_PORT, DRAIN_THEN_STOP_PATH);
+    await route.received;
+
+    const draining = drain();
+    await stop();
+    route.stopDependency();
+
+    assert.equal((await response).status, SUCCESS_STATUS);
+    await draining;
   });
 });
