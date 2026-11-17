@@ -57,4 +57,5 @@ pnpm exec antelopejs-verify journey "$RUN" servers
 
 - A busy port is held by the journey itself with `node:net`, then released. The fallback warning is the module's own message (`Port N in use, listening on ... instead`); the docs say only that the module falls back.
 - Production runs without the pack's driver module, which needs `ajs project dev`'s environment; the consumer module reads the variables.
+- `server-drain` needs a core that calls `drain()`, `1.24.4-next.521.gd295027` (antelopejs#529) or later. Core 1.24.3 never calls it, so the store stops under the request and it answers 500.
 - Not reached: the default port 80, because binding it needs privileges (`ip_unprivileged_port_start` is 1024). `config-variables` covers the default as a value. `ajs project modules add` writing the default configuration is in [config-vars](config-vars.md).

@@ -34,5 +34,6 @@ pnpm exec antelopejs-verify journey "$RUN" gate
 
 - Not reached: a `start()` that has not settled after 120 s. The timer is core's, and api's side of it (the gate stays closed because `ModulesStarted` never comes) is what `failed-start` drives.
 - The exit is core's: a failed start destroys every module, which releases the port, and `ajs project dev` exits 1. `failed-start` pins it because README.md documents it.
+- The stopping half of `startup-gate` needs a core that calls `drain()`, `1.24.4-next.521.gd295027` (antelopejs#529) or later. On core 1.24.3 the port stays open until api stops, and the gate answers 503 there.
 - `module-lifecycle` pins the gate as the core release after 1.17.0 leaves it, which the repository tests with. Core 1.17.0 closes the gate then, which README.md documents too; the journey fails on it.
 - The journey waits about 10 s for the delays it created.
