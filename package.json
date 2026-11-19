@@ -57,7 +57,7 @@
   },
   "devDependencies": {
     "@antelopejs/core": "~1.24.4",
-    "@antelopejs/tooling-configs": ">=0.8.0 <0.9.0",
+    "@antelopejs/tooling-configs": ">=0.8.9 <0.9.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.19.15",
     "@types/sinon": "^21.0.0",
