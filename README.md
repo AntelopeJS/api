@@ -157,10 +157,6 @@ export function stop(): void {}
 
 The generated table lists `@antelopejs/core`, which this module requires as a peer dependency, and the interface packages it loads, with their ranges read from `package.json`. If another loaded module declares a range that excludes the copy this module loads, `@antelopejs/core` refuses to start the project. It reports `Incompatible interface package resolution` and names the module, its range, and the copy it found.
 
-## Upgrade notes
-
-- Drain at shutdown needs `@antelopejs/core` 1.24.4 or later. From `Events.ModulesStopping` the module refuses new connections and waits for the requests in flight before any module stops. On an earlier core the port stays open until this module stops, and the gate answers `503` there.
-
 ## Contributing
 
 ```bash
