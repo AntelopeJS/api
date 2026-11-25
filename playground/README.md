@@ -30,10 +30,10 @@ The `playground` module receives the three config variables of `api` (`API_PORT`
 
 <!-- antelopejs-docs-compat:start -->
 
-| Package                          | Supported        | Tested with |
-| -------------------------------- | ---------------- | ----------- |
-| `@antelopejs/interface-api`      | `>=0.3.0 <0.4.0` | `0.3.2`     |
-| `@antelopejs/interface-api-util` | `>=0.3.0 <0.4.0` | `0.3.2`     |
-| `@antelopejs/interface-core`     | `>=0.5.1 <0.6.0` | `0.5.1`     |
+| Package                          | Supported                 | Tested with               |
+| -------------------------------- | ------------------------- | ------------------------- |
+| `@antelopejs/interface-api`      | `0.3.5-next.116.g8e36c74` | `0.3.5-next.116.g8e36c74` |
+| `@antelopejs/interface-api-util` | `>=0.3.0 <0.4.0`          | `0.3.2`                   |
+| `@antelopejs/interface-core`     | `>=0.5.1 <0.6.0`          | `0.5.1`                   |
 
 <!-- antelopejs-docs-compat:end -->
