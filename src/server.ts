@@ -2,7 +2,7 @@ import { Socket } from "node:net";
 import type stream from "node:stream";
 import { type WebSocket, WebSocketServer } from "ws";
 import { type IncomingMessage, ServerResponse } from "node:http";
-import { HTTPResult } from "@antelopejs/interface-api";
+import { HTTPResult, IsHTTPResult } from "@antelopejs/interface-api";
 
 import { gateResponse } from "./startup-gate";
 import { applyCors } from "./middlewares/cors";
@@ -55,7 +55,7 @@ function isText(value: RequestContext["error"]): value is string {
  */
 function errorResponse(error: RequestContext["error"]): HTTPResult {
   const value = hasMessage(error) ? (error.message ?? error) : error;
-  if (value instanceof HTTPResult) {
+  if (IsHTTPResult(value)) {
     return value;
   }
   if (value === undefined || isText(value)) {
@@ -79,10 +79,9 @@ function replaceResponse(
   status: number,
 ) {
   const previousResponse = requestContext.response;
-  const response =
-    result instanceof HTTPResult
-      ? result
-      : new HTTPResult(status, result === undefined ? undefined : result);
+  const response = IsHTTPResult(result)
+    ? result
+    : new HTTPResult(status, result === undefined ? undefined : result);
   copyHeaders(previousResponse, response);
   requestContext.response = response;
 }
@@ -94,7 +93,7 @@ function setHandlerResponse(
   if (requestContext.response.isStream()) {
     return;
   }
-  if (result instanceof HTTPResult) {
+  if (IsHTTPResult(result)) {
     replaceResponse(requestContext, result, 200);
     return;
   }
@@ -228,7 +227,7 @@ function setMiddlewareResponse(
   if (!result) {
     return;
   }
-  if (result instanceof HTTPResult || requestContext.response.isStream()) {
+  if (IsHTTPResult(result) || requestContext.response.isStream()) {
     replaceResponse(requestContext, result, 200);
     return;
   }
