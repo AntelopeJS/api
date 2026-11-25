@@ -1,18 +1,23 @@
 import assert from "node:assert";
 import { createServer, type Server } from "node:http";
-import { dirname, join } from "node:path";
 
-import type { HTTPResult } from "@antelopejs/interface-api";
+import { HTTPResult, IsHTTPResult } from "@antelopejs/interface-api";
 
 import { isAddressInfo } from "../port-binding";
 import { registerHandler, requestListener, unregisterHandler } from "../server";
 
-function loadForeignHTTPResult(): typeof HTTPResult {
-  const entry = require.resolve("@antelopejs/interface-api");
-  const path = join(dirname(entry), "http-result.js");
-  delete require.cache[path];
-  // SAFETY: http-result.js exports the HTTPResult class this module types it as.
-  return (require(path) as { HTTPResult: typeof HTTPResult }).HTTPResult;
+function foreignResult(status: number, body: string): HTTPResult {
+  const foreignPrototype = Object.defineProperties(
+    {},
+    Object.getOwnPropertyDescriptors(HTTPResult.prototype),
+  );
+  const result: unknown = Object.setPrototypeOf(
+    new HTTPResult(status, body),
+    foreignPrototype,
+  );
+  assert.ok(!(result instanceof HTTPResult));
+  assert.ok(IsHTTPResult(result));
+  return result;
 }
 
 describe("HTTPResult from another interface-api copy", () => {
@@ -35,11 +40,10 @@ describe("HTTPResult from another interface-api copy", () => {
   });
 
   it("answers with the status and body of a foreign result instead of a 200 JSON dump", async () => {
-    const Foreign = loadForeignHTTPResult();
     registerHandler(
       "foreign-result",
       { mode: "handler", method: "GET", location: "/foreign" },
-      () => new Foreign(418, "teapot"),
+      () => foreignResult(418, "teapot"),
     );
 
     const response = await fetch(`${baseUrl}/foreign`);
