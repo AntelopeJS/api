@@ -6,7 +6,7 @@
     "dev": "ajs project run -w"
   },
   "dependencies": {
-    "@antelopejs/interface-api": "0.3.5-next.116.g8e36c74",
+    "@antelopejs/interface-api": ">=0.3.5 <0.4.0",
     "@antelopejs/interface-api-util": ">=0.3.0 <0.4.0",
     "@antelopejs/interface-core": ">=0.5.1 <0.6.0"
   },
