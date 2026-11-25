@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@antelopejs/interface-api':
-        specifier: 0.3.5-next.116.g8e36c74
-        version: 0.3.5-next.116.g8e36c74(@antelopejs/interface-core@0.5.1)
+        specifier: '>=0.3.5 <0.4.0'
+        version: 0.3.5(@antelopejs/interface-core@0.5.1)
       '@antelopejs/interface-api-util':
         specifier: '>=0.3.0 <0.4.0'
-        version: 0.3.2(@antelopejs/interface-api@0.3.5-next.116.g8e36c74(@antelopejs/interface-core@0.5.1))(@antelopejs/interface-core@0.5.1)
+        version: 0.3.2(@antelopejs/interface-api@0.3.5(@antelopejs/interface-core@0.5.1))(@antelopejs/interface-core@0.5.1)
       '@antelopejs/interface-core':
         specifier: '>=0.5.1 <0.6.0'
         version: 0.5.1
@@ -114,6 +114,11 @@ packages:
     peerDependencies:
       '@antelopejs/interface-api': '>=0.3.0 <1.0.0'
       '@antelopejs/interface-core': '>=0.2.4 <1.0.0'
+
+  '@antelopejs/interface-api@0.3.5':
+    resolution: {integrity: sha512-t7seagrP7wxr+bWe0+wTmOftVHtmByXhgKj3bSWaCOGGrM0nhg0bxx+dHfLOXC6gpta9NWcM+DqO+T9+KXrhDg==}
+    peerDependencies:
+      '@antelopejs/interface-core': '>=0.5.1 <0.6.0'
 
   '@antelopejs/interface-api@0.3.5-next.116.g8e36c74':
     resolution: {integrity: sha512-GSfkZJTCHdo7QBk+wE8GHTgs0q+Pj2mdv1D4S8+V6k/wQ6cLKc7We5TibTdYmv5AiXUmDug4IRsoGVYt7rjfCQ==}
@@ -2733,9 +2738,18 @@ snapshots:
       semver: 7.8.5
       typescript: 5.9.3
 
+  '@antelopejs/interface-api-util@0.3.2(@antelopejs/interface-api@0.3.5(@antelopejs/interface-core@0.5.1))(@antelopejs/interface-core@0.5.1)':
+    dependencies:
+      '@antelopejs/interface-api': 0.3.5(@antelopejs/interface-core@0.5.1)
+      '@antelopejs/interface-core': 0.5.1
+
   '@antelopejs/interface-api-util@0.3.2(@antelopejs/interface-api@0.3.5-next.116.g8e36c74(@antelopejs/interface-core@0.5.1))(@antelopejs/interface-core@0.5.1)':
     dependencies:
       '@antelopejs/interface-api': 0.3.5-next.116.g8e36c74(@antelopejs/interface-core@0.5.1)
+      '@antelopejs/interface-core': 0.5.1
+
+  '@antelopejs/interface-api@0.3.5(@antelopejs/interface-core@0.5.1)':
+    dependencies:
       '@antelopejs/interface-core': 0.5.1
 
   '@antelopejs/interface-api@0.3.5-next.116.g8e36c74(@antelopejs/interface-core@0.5.1)':

@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.7.9
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.7.8...v1.7.9)
+
+### 🩹 Fixes
+
+- **server:** Recognise an HTTPResult from another interface-api copy ([#172](https://github.com/AntelopeJS/api/pull/172))
+- **deps:** Depend on the stable @antelopejs/interface-api
+
+### 📖 Documentation
+
+- Promote next to main ([#166](https://github.com/AntelopeJS/api/pull/166))
+
+### ✅ Tests
+
+- Size the formal route tree timeout for a loaded host ([#168](https://github.com/AntelopeJS/api/pull/168))
+
+### 🤖 CI
+
+- Roll out the trunk CI ([#167](https://github.com/AntelopeJS/api/pull/167))
+- Re-sync the AntelopeJS pack for the release app ([#169](https://github.com/AntelopeJS/api/pull/169))
+- Stop forwarding the retired RELEASE_GITHUB_TOKEN ([#171](https://github.com/AntelopeJS/api/pull/171))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli
+
 ## v1.7.8
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.7.7...v1.7.8)
