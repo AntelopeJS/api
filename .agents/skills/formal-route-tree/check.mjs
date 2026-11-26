@@ -4,6 +4,8 @@
  * `--seed <n>` on as `FORMAL_RUNS` and `FORMAL_SEED`. Prints nothing and exits 0 when the property
  * holds. Exits 1 and prints `BROKEN RouteTreeMatchesReference` with the failing seed and the smallest
  * scenario when it does not, and exits 2 when the check could not run. Needs port 5010 free, as `pnpm test` does.
+ *
+ * @packageDocumentation
  */
 import { spawnSync } from "node:child_process";
 import path from "node:path";

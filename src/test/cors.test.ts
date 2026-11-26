@@ -1,7 +1,11 @@
 import assert from "node:assert";
 import { Socket } from "node:net";
 import { IncomingMessage, ServerResponse } from "node:http";
-import { HTTPResult, type RequestContext } from "@antelopejs/interface-api";
+import {
+  HTTPResult,
+  IsHTTPResult,
+  type RequestContext,
+} from "@antelopejs/interface-api";
 
 import { Cors } from "../middlewares/cors";
 import { isDevMode, setDevMode } from "../dev-mode";
@@ -56,7 +60,7 @@ function preflightHeaders(headers: RequestHeaders): Record<string, string> {
     ...headers,
   };
   const result = corsController.cors(buildContext("OPTIONS", preflight));
-  assert.ok(result instanceof HTTPResult);
+  assert.ok(IsHTTPResult(result));
   return result.getHeaders();
 }
 
@@ -161,7 +165,7 @@ describe("CORS", () => {
       }),
     );
 
-    assert.ok(result instanceof HTTPResult);
+    assert.ok(IsHTTPResult(result));
     assert.equal(result.getStatus(), PREFLIGHT_STATUS);
     const headers = result.getHeaders();
     assert.equal(headers["Access-Control-Allow-Methods"], "GET,POST");
