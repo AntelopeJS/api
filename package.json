@@ -57,7 +57,7 @@
   },
   "devDependencies": {
     "@antelopejs/core": "~1.24.4",
-    "@antelopejs/tooling-configs": ">=0.9.4 <0.10.0",
+    "@antelopejs/tooling-configs": "^0.10.7",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.19.15",
     "@types/sinon": "^21.0.0",
@@ -83,7 +83,7 @@
       "optional": true
     }
   },
-  "packageManager": "pnpm@10.6.5",
+  "packageManager": "pnpm@10.34.9",
   "antelopeJs": {
     "implements": [
       "@antelopejs/interface-api",

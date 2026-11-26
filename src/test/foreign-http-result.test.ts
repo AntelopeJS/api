@@ -15,7 +15,7 @@ function foreignResult(status: number, body: string): HTTPResult {
     new HTTPResult(status, body),
     foreignPrototype,
   );
-  assert.ok(!(result instanceof HTTPResult));
+  assert.strictEqual(Object.getPrototypeOf(result), foreignPrototype);
   assert.ok(IsHTTPResult(result));
   return result;
 }
