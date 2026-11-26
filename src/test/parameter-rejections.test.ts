@@ -118,6 +118,7 @@ describe("Parameter rejections", () => {
 
   after(async () => {
     routeIds.forEach((id) => routesProxy.unregister(id));
+    server.closeAllConnections();
     await close(server);
   });
 

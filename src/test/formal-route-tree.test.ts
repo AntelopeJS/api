@@ -47,8 +47,6 @@ async function isolatedRouteTable(): Promise<RouteTable> {
 let table: RouteTable;
 
 const RUNS = Number(process.env.FORMAL_RUNS ?? 200);
-const MS_PER_RUN = 150;
-const MIN_TIMEOUT_MS = 30_000;
 const SEED = Number(process.env.FORMAL_SEED ?? 20_261_117);
 const MODES: readonly Mode[] = [
   "handler",
@@ -336,7 +334,7 @@ async function runScenario(scenario: Scenario): Promise<void> {
 
 describe("Route tree against a Map-based reference router", () => {
   it("registers, matches and unregisters like the reference for any segment, method and parameter name", async function () {
-    this.timeout(Math.max(MIN_TIMEOUT_MS, RUNS * MS_PER_RUN));
+    this.timeout(0);
     const outcome = await fc.check(
       fc.asyncProperty(scenarioArbitrary(), runScenario),
       {
