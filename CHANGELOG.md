@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.7.10
+
+[compare changes](https://github.com/AntelopeJS/api/compare/v1.7.9...v1.7.10)
+
+### 🩹 Fixes
+
+- **playground:** Pin interface-api to the stable range ([#175](https://github.com/AntelopeJS/api/pull/175))
+
+### 🏡 Chore
+
+- **deps:** Update dependency oxlint-tsgolint to v7.0.2008 ([#176](https://github.com/AntelopeJS/api/pull/176))
+- **deps:** Update dependency rimraf to v6.1.4 ([#177](https://github.com/AntelopeJS/api/pull/177))
+- **deps:** Update antelopejs tooling configs ([#179](https://github.com/AntelopeJS/api/pull/179))
+- **deps:** Update dependency eslint-plugin-perfectionist to v5.14.0 ([#182](https://github.com/AntelopeJS/api/pull/182))
+- **deps:** Update dependency @antelopejs/core to v1.24.8 ([#174](https://github.com/AntelopeJS/api/pull/174))
+
+### ✅ Tests
+
+- Stop the Stress-failing tests from racing the clock ([#178](https://github.com/AntelopeJS/api/pull/178))
+
+### ❤️ Contributors
+
+- Antony Rizzitelli
+
 ## v1.7.9
 
 [compare changes](https://github.com/AntelopeJS/api/compare/v1.7.8...v1.7.9)
