@@ -28,7 +28,7 @@ importers:
         specifier: ~1.24.4
         version: 1.24.8
       '@antelopejs/tooling-configs':
-        specifier: 0.10.12
+        specifier: '>=0.10.12 <0.11.0'
         version: 0.10.12(eslint-plugin-perfectionist@5.14.0(eslint@10.10.0(jiti@2.7.0))(typescript@5.9.3))(knip@6.34.0)(oxfmt@0.80.0)(oxlint@1.95.0(oxlint-tsgolint@7.0.2008))
       '@types/mocha':
         specifier: ^10.0.10
