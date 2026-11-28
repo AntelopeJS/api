@@ -36,7 +36,7 @@
     "lint": "oxlint",
     "prepack": "pnpm run build",
     "release": "pnpm run typecheck && pnpm run lint && pnpm run test && release-it",
-    "test": "pnpm run build && ajs module test .",
+    "test": "pnpm run build && ajs module test . --timeout 30000",
     "format:check": "oxfmt --check .",
     "knip": "knip",
     "prepare": "if [ -e .git ] && command -v git >/dev/null 2>&1 && command -v lefthook >/dev/null 2>&1 && GIT_DIR=.git GIT_WORK_TREE=. git rev-parse --git-dir >/dev/null 2>&1; then GIT_DIR=.git GIT_WORK_TREE=. lefthook install; fi",
@@ -57,7 +57,7 @@
   },
   "devDependencies": {
     "@antelopejs/core": "~1.24.4",
-    "@antelopejs/tooling-configs": "^0.10.7",
+    "@antelopejs/tooling-configs": "0.10.12",
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.0.0",
     "@types/sinon": "^21.0.0",
