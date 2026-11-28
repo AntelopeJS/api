@@ -29,7 +29,7 @@ importers:
         version: 1.24.8
       '@antelopejs/tooling-configs':
         specifier: ^0.10.7
-        version: 0.10.7(eslint-plugin-perfectionist@5.14.0(eslint@10.10.0(jiti@2.7.0))(typescript@5.9.3))(knip@6.34.0)(oxfmt@0.80.0)(oxlint@1.95.0(oxlint-tsgolint@7.0.2008))
+        version: 0.10.12(eslint-plugin-perfectionist@5.14.0(eslint@10.10.0(jiti@2.7.0))(typescript@5.9.3))(knip@6.34.0)(oxfmt@0.80.0)(oxlint@1.95.0(oxlint-tsgolint@7.0.2008))
       '@types/mocha':
         specifier: ^10.0.10
         version: 10.0.10
@@ -122,8 +122,8 @@ packages:
   '@antelopejs/interface-core@0.5.4':
     resolution: {integrity: sha512-5IzF8eGvXugI5KNHj2q+ux3J5AE09Sagul4Sl1k2FFRlfm7WSRE1uzmjL8CT2cqJvWExqW6SGX17InOddI/t/g==}
 
-  '@antelopejs/tooling-configs@0.10.7':
-    resolution: {integrity: sha512-13abD0BhsR9RF6LQoYYKa+XBknlmcrZVB6iW3BwdfHKu6pPG4ClhAQCLJSSPYtbTMuvNU4imI+dVFSB78TdTnQ==}
+  '@antelopejs/tooling-configs@0.10.12':
+    resolution: {integrity: sha512-2Yjx8JxWr4Opz1hA8363Zctf4SUmtG3DFmm/UaPe1447fWzmTX8FgTDRg1qoEIQ94g/U6rte6lj9cIdNEE3Kmg==}
     engines: {node: '>=22.18.0'}
     hasBin: true
     peerDependencies:
@@ -131,8 +131,8 @@ packages:
       eslint-plugin-perfectionist: '>=5.0.0'
       knip: '>=6.0.0'
       mongodb-memory-server: '>=10.0.0'
-      oxfmt: ^0.66.0 || ^0.77.0 || ^0.79.0
-      oxlint: 1.81.0 || 1.94.0
+      oxfmt: ^0.66.0 || ^0.77.0 || ^0.79.0 || ^0.80.0
+      oxlint: 1.81.0 || 1.94.0 || 1.95.0
       pixelmatch: '>=7.0.0'
       playwright-core: '>=1.56.0'
       sharp: '>=0.34.0'
@@ -943,8 +943,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@oxlint/plugins@1.94.0':
-    resolution: {integrity: sha512-YT6htikBOBQ00XDxZpRZLZ0anEDo7h9s4+YvjRU0/Ng/cLd0D6SZQ3tsms4g/GDer/z8UKlegC5iptEfyRXJcw==}
+  '@oxlint/plugins@1.95.0':
+    resolution: {integrity: sha512-wb81nObfxWVASxtMQknyL4A387XDVuSIgpL1/wlhWzGpWLAGMzEvI+xWXJ242Bk8qqAmgDwG6ejetKnLISTGGw==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
   '@phun-ky/typeof@2.0.3':
@@ -2414,11 +2414,6 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  semver@7.8.5:
-    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.8.6:
     resolution: {integrity: sha512-9lpSSU4Mly3mrtruwLs1eLK6+gzbzqeBFwRNjIjE+9LuDpWdYctrQlQ3ej1Ilgi7gknpsTRnPoLP8DpCHqHIJw==}
     engines: {node: '>=10'}
@@ -2781,12 +2776,12 @@ snapshots:
     dependencies:
       reflect-metadata: 0.2.2
 
-  '@antelopejs/tooling-configs@0.10.7(eslint-plugin-perfectionist@5.14.0(eslint@10.10.0(jiti@2.7.0))(typescript@5.9.3))(knip@6.34.0)(oxfmt@0.80.0)(oxlint@1.95.0(oxlint-tsgolint@7.0.2008))':
+  '@antelopejs/tooling-configs@0.10.12(eslint-plugin-perfectionist@5.14.0(eslint@10.10.0(jiti@2.7.0))(typescript@5.9.3))(knip@6.34.0)(oxfmt@0.80.0)(oxlint@1.95.0(oxlint-tsgolint@7.0.2008))':
     dependencies:
-      '@oxlint/plugins': 1.94.0
+      '@oxlint/plugins': 1.95.0
       dts-bundle-generator: 9.5.1
       minimatch: 10.2.6
-      semver: 7.8.5
+      semver: 7.8.6
       typescript: 6.0.3
       yaml: 2.9.1
     optionalDependencies:
@@ -3372,7 +3367,7 @@ snapshots:
   '@oxlint/binding-win32-x64-msvc@1.95.0':
     optional: true
 
-  '@oxlint/plugins@1.94.0': {}
+  '@oxlint/plugins@1.95.0': {}
 
   '@phun-ky/typeof@2.0.3': {}
 
@@ -4927,8 +4922,6 @@ snapshots:
   scule@1.3.0: {}
 
   semver@7.7.3: {}
-
-  semver@7.8.5: {}
 
   semver@7.8.6: {}
 
